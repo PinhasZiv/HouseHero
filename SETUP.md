@@ -33,19 +33,27 @@ GitHub, לא קשורות למה שהגדרנו בקוד).
 2. תחת **Build and deployment** ← **Source**, בוחרים **GitHub Actions**
    (במקום "Deploy from a branch").
 
-**ב. קביעת main כברירת המחדל**
+**ב. קביעת main כברירת המחדל** ✅ בוצע.
 
-ה-repo עדיין מוגדר עם ענף ברירת המחדל הישן (`claude/househero-task-pwa-rqg8lh`)
-במקום `main`. זה גורם ל-GitHub לחסום את הפריסה בהודעה "Branch main is not
-allowed to deploy to github-pages due to environment protection rules" —
-כי אתר Pages מאפשר פריסה רק מענף ברירת המחדל.
+**ג. הסרת הגבלת הענף מסביבת ה-Pages**
 
-1. נכנסים ל-<https://github.com/PinhasZiv/HouseHero/settings/branches>.
-2. ליד **Default branch**, לוחצים על אייקון העיפרון (✏️), בוחרים **main**,
-   **Update**, ומאשרים.
+גם אחרי ששני התיקונים הקודמים בוצעו, ה-deploy עדיין נכשל באותה הודעה:
+"Branch main is not allowed to deploy to github-pages due to environment
+protection rules". הסיבה: לסביבת ה-`github-pages` יש הגבלת ענפים משלה
+שנקבעה בנפרד (ל-`claude/househero-task-pwa-rqg8lh` הישן), וזה לא מתעדכן
+לבד כששינינו את ברירת המחדל.
 
-זהו. אחרי שני אלה תגיד לי "עשיתי" ואני אריץ שוב את ה-deploy — מהריצה הזו
-והלאה זה כבר יעבוד לבד בכל שינוי עתידי, בלי לחזור על השלבים האלה.
+1. נכנסים ל-<https://github.com/PinhasZiv/HouseHero/settings/environments>.
+2. לוחצים על **github-pages**.
+3. תחת **Deployment branches and tags**, אם רשום שם ענף ספציפי — מוחקים
+   אותו (עם ה-🗑) ומוסיפים במקומו **Add deployment branch or tag rule** ←
+   בוחרים **Selected branches and tags** ← מקלידים `main` ← **Add rule**.
+   (או פשוט משנים את הבורר ל-**No restriction**, שזו האפשרות הפשוטה
+   ביותר ומספיקה לחלוטין לאפליקציה פרטית כמו זו.)
+4. **Save protection rules** אם מופיע כפתור כזה.
+
+זהו. אחרי שלושת אלה תגיד לי "עשיתי" ואני אריץ שוב את ה-deploy — מהריצה
+הזו והלאה זה כבר יעבוד לבד בכל שינוי עתידי, בלי לחזור על השלבים האלה.
 
 ---
 
@@ -168,7 +176,8 @@ accessible by integration".**
 
 **ריצת ה-workflow נכשלת ב-"Branch main is not allowed to deploy to
 github-pages due to environment protection rules".**
-עוד לא בוצע שלב 1ב למעלה — שינוי ענף ברירת המחדל ל-`main` ב-Settings ←
-Branches. גם זה חד-פעמי בלבד.
+עוד לא בוצע שלב 1ג למעלה — הסרת הגבלת הענף בסביבת `github-pages` תחת
+Settings ← Environments. גם זה חד-פעמי בלבד. (שינוי ברירת המחדל לבדו לא
+מספיק — לסביבה יש הגבלה נפרדת משלה.)
 
 </div>
