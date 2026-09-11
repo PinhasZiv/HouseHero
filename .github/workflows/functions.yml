@@ -1,0 +1,43 @@
+name: Deploy Supabase functions
+
+# Pushes the Edge Functions to Supabase whenever they change, so the whole
+# project can be maintained from a browser without installing anything.
+#
+# Needs two repository secrets:
+#   SUPABASE_ACCESS_TOKEN  from https://supabase.com/dashboard/account/tokens
+#   SUPABASE_PROJECT_REF   the subdomain of your Supabase URL
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - '.github/workflows/functions.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check credentials
+        env:
+          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          if [ -z "$TOKEN" ] || [ -z "$REF" ]; then
+            echo "::error::Set SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF as repository secrets. See SETUP.md."
+            exit 1
+          fi
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase functions deploy send-reminders --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+          supabase functions deploy send-test --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"

@@ -1,0 +1,93 @@
+name: Build and deploy
+
+# Builds the PWA and publishes it to GitHub Pages on every push to the branch,
+# so a change to the code is one commit away from being live on the phone.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race; the newer one wins.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+
+  build:
+    needs: [test, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Build
+        env:
+          # GitHub Pages serves a project site from /<repo>/, so the bundle has
+          # to be built for that sub-path.
+          VITE_BASE: /${{ github.event.repository.name }}/
+        run: |
+          # The Supabase details live in src/config.ts rather than in build
+          # secrets, so that filling them in is one edit in the web editor.
+          # Both values are public by design - see the comment in that file.
+          if grep -q "PASTE_YOUR_SUPABASE" src/config.ts; then
+            echo "::warning::src/config.ts still has its placeholders, so the app will show the setup screen. See SETUP.md step 4."
+          fi
+          npm run build
+
+      - uses: actions/configure-pages@v5
+        with:
+          # actions/configure-pages defaults this to false. Without it, the
+          # action only reads the existing Pages configuration and fails with
+          # a 404 the first time - a repo's Pages site has to already exist,
+          # which normally means a manual Settings -> Pages -> Source:
+          # GitHub Actions click before the very first deploy. Setting this
+          # true lets the action create that site itself, so nothing has to
+          # be done by hand in the GitHub UI at all.
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>HouseHero — משימות ותגמולים לבית</title>
+    <meta name="description" content="ניהול משימות בית משותף עם נקודות ותגמולים." />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <meta name="theme-color" content="#5b4fc4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#100e1f" media="(prefers-color-scheme: dark)" />
+    <meta name="mobile-web-app-capable" content="yes" />
+  </head>
+  <body>
+    <script>
+      // Applies the saved language before the first paint. Without this the
+      // page renders in the markup's direction and then flips once React
+      // loads, which is a visible jolt on a slow phone.
+      try {
+        var saved = localStorage.getItem('househero.language')
+        var lang =
+          saved === 'he' || saved === 'en'
+            ? saved
+            : (navigator.languages || [navigator.language]).some(function (tag) {
+                return tag && tag.toLowerCase().indexOf('he') === 0
+              })
+              ? 'he'
+              : 'en'
+        document.documentElement.lang = lang
+        document.documentElement.dir = lang === 'he' ? 'rtl' : 'ltr'
+      } catch (error) {
+        // Storage blocked; the markup's default stands and React corrects it.
+      }
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

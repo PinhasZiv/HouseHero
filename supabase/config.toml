@@ -1,0 +1,10 @@
+project_id = "househero"
+
+# The reminder job is called by pg_cron, which has no user session to present.
+# It authenticates with the x-cron-secret header instead.
+[functions.send-reminders]
+verify_jwt = false
+
+# The test button is called by a signed-in person, so the JWT is the auth.
+[functions.send-test]
+verify_jwt = true
