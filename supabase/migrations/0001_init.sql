@@ -6,7 +6,7 @@
 create schema if not exists private_setup;
 create or replace function private_setup.values()
 returns table (project_ref text, vapid_private_key text, contact_email text)
-language sql immutable as $$
+language sql immutable set search_path = '' as $$
   select
     -- The project ref: the part before supabase.co in the project URL.
     -- From https://abcdefghijklmnop.supabase.co, write abcdefghijklmnop
@@ -142,7 +142,7 @@ $$;
 
 -- No 0/O or 1/I/L, so a code read aloud or typed from a screenshot works.
 create or replace function public.generate_invite_code()
-returns text language plpgsql as $$
+returns text language plpgsql set search_path = public as $$
 declare
   alphabet constant text := 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   candidate text;
@@ -157,6 +157,21 @@ begin
   return candidate;
 end;
 $$;
+
+-- Postgres grants EXECUTE on every new function to PUBLIC by default, which
+-- would let an unauthenticated caller invoke these as bare RPCs
+-- (/rest/v1/rpc/is_member, etc.) even though they exist only to be called
+-- from inside RLS policies and the new-user trigger. authenticated keeps
+-- EXECUTE on the three membership checks because policies evaluated for a
+-- signed-in user need to call them; handle_new_user needs no grant back at
+-- all - only the trigger ever invokes it.
+revoke execute on function public.is_member(uuid) from public;
+revoke execute on function public.is_owner(uuid) from public;
+revoke execute on function public.shares_space_with(uuid) from public;
+revoke execute on function public.handle_new_user() from public;
+grant execute on function public.is_member(uuid) to authenticated;
+grant execute on function public.is_owner(uuid) to authenticated;
+grant execute on function public.shares_space_with(uuid) to authenticated;
 
 -- RLS --
 
@@ -306,7 +321,7 @@ revoke all on public.app_config from anon, authenticated;
 insert into public.app_config (id, vapid_public_key, vapid_private_key, vapid_subject, functions_url)
 select
   true,
-  'BDJiNMmEeXk34oQvE1RjsVvlHjeJxM1aBKBhAwj2Idk9ePLvmCqcHT27VIkVh_roDRlE2JTgHCiffN4joeAXqjc',
+  'BCyWeQPwL0wQSPWcWi1WBDVvzkHiU6Q8BIMi5w1BL5pwQAKGyBV1Ocl4lr00HRworVm0bXanVcvcKniK32FgL8c',
   v.vapid_private_key,
   'mailto:' || v.contact_email,
   'https://' || v.project_ref || '.supabase.co/functions/v1/send-reminders'
