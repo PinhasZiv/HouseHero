@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { celebrateAt } from '../lib/celebrate'
 import { classify } from '../lib/taskDue'
 import {
   describeInterval,
@@ -64,8 +65,14 @@ export function TaskCard({
   const [justCompleted, setJustCompleted] = useState(false)
   const info = classify(task, today)
 
-  async function complete() {
+  async function complete(event: React.MouseEvent<HTMLButtonElement>) {
     if (!onComplete || busy) return
+    const rect = event.currentTarget.getBoundingClientRect()
+    // A keyboard-triggered click carries clientX/clientY of 0 rather than a
+    // real tap position, so the burst falls back to the button's own center.
+    const x = event.clientX || rect.left + rect.width / 2
+    const y = event.clientY || rect.top + rect.height / 2
+    celebrateAt(x, y, task.points)
     setBusy(true)
     setJustCompleted(true)
     try {

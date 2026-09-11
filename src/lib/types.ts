@@ -102,7 +102,7 @@ export interface Reward {
   created_at: string
 }
 
-export type RedemptionStatus = 'pending' | 'approved' | 'rejected'
+export type RedemptionStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
 
 export interface RewardRedemption {
   id: string

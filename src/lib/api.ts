@@ -335,6 +335,13 @@ export async function rejectRedemption(redemptionId: string): Promise<RewardRede
   return data as RewardRedemption
 }
 
+/** Withdraws your own still-pending request. Only the requester may call this. */
+export async function cancelRedemption(redemptionId: string): Promise<RewardRedemption> {
+  const { data, error } = await supabase.rpc('cancel_redemption', { p_redemption: redemptionId }).single()
+  if (error) throw error
+  return data as RewardRedemption
+}
+
 export interface StatsCompletion {
   task_id: string
   user_id: string

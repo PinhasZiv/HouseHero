@@ -52,7 +52,7 @@ export interface FakeRedemption {
   cost: number
   requested_by: string
   approved_by: string | null
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
   requested_at: string
   decided_at: string | null
 }
@@ -186,6 +186,15 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
           decided_at: null,
         }
         db.redemptions.push(redemption)
+        return json(route, wantsSingle ? redemption : [redemption])
+      }
+      if (fn === 'cancel_redemption') {
+        const redemption = db.redemptions.find((r) => r.id === body.p_redemption)
+        if (!redemption) return json(route, { message: 'no_such_redemption' }, 404)
+        if (redemption.requested_by !== FAKE_USER_ID) return json(route, { message: 'not_your_request' }, 403)
+        if (redemption.status !== 'pending') return json(route, { message: 'not_pending' }, 409)
+        redemption.status = 'cancelled'
+        redemption.decided_at = new Date().toISOString()
         return json(route, wantsSingle ? redemption : [redemption])
       }
       return json(route, { message: `unmocked rpc: ${fn}` }, 404)

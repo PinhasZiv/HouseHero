@@ -50,7 +50,9 @@ test.describe('rewards', () => {
     await expect(tiles.nth(1)).toHaveText('45')
 
     const movie = page.locator('.task-card', { hasText: 'ערב סרטים' })
-    await expect(movie).toContainText('30')
+    // Exact match, not just "contains '30'" - guards against the cost label
+    // ever doubling up the number again (it used to render "30 30 נקודות").
+    await expect(movie.locator('.badge-points')).toHaveText('30 נקודות')
 
     // Far more expensive than the available balance: still listed, not
     // hidden - redeeming is always offered, the server is what actually
@@ -84,5 +86,48 @@ test.describe('rewards', () => {
     await expect(page.getByRole('heading', { name: 'ממתין לאישור' })).toBeVisible()
     expect(db.redemptions).toHaveLength(1)
     expect(db.redemptions[0]).toMatchObject({ status: 'pending', reward_title: 'קפה בבית קפה', cost: 15 })
+  })
+
+  test('cancelling your own pending request removes it from the approval queue', async ({ page }) => {
+    const db = makeFakeDb({
+      rewards: [
+        {
+          id: 'reward-coffee',
+          space_id: FAKE_SPACE_ID,
+          title: 'קפה בבית קפה',
+          description: null,
+          cost: 15,
+          created_by: FAKE_USER_ID,
+          created_at: new Date().toISOString(),
+        },
+      ],
+      redemptions: [
+        {
+          id: 'redemption-1',
+          space_id: FAKE_SPACE_ID,
+          reward_id: 'reward-coffee',
+          reward_title: 'קפה בבית קפה',
+          cost: 15,
+          requested_by: FAKE_USER_ID,
+          approved_by: null,
+          status: 'pending',
+          requested_at: new Date().toISOString(),
+          decided_at: null,
+        },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'תגמולים' }).click()
+
+    // A pending request of your own offers only Cancel - approve/reject are
+    // for the other person, never for whoever asked for it.
+    const pending = page.locator('.task-card', { hasText: 'הבקשה שלך' })
+    await expect(pending.getByRole('button', { name: 'אישור' })).toHaveCount(0)
+    await pending.getByRole('button', { name: 'ביטול', exact: false }).click()
+
+    await expect(page.getByText('בוטלה', { exact: false })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'ממתין לאישור' })).toHaveCount(0)
+    expect(db.redemptions[0].status).toBe('cancelled')
   })
 })

@@ -25,12 +25,18 @@ create table if not exists public.reward_redemptions (
   cost          smallint not null,
   requested_by  uuid not null references auth.users(id) on delete cascade,
   approved_by   uuid references auth.users(id) on delete set null,
-  status        text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  status        text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'cancelled')),
   requested_at  timestamptz not null default now(),
   decided_at    timestamptz
 );
 
 create index if not exists reward_redemptions_space_idx on public.reward_redemptions(space_id, status);
+
+-- Re-running this file against a database created before 'cancelled' existed
+-- needs the old check constraint widened, since the column already exists.
+alter table public.reward_redemptions drop constraint if exists reward_redemptions_status_check;
+alter table public.reward_redemptions add constraint reward_redemptions_status_check
+  check (status in ('pending', 'approved', 'rejected', 'cancelled'));
 
 -- RLS --
 
@@ -153,6 +159,34 @@ begin
 
   update public.reward_redemptions
   set status = 'rejected', approved_by = auth.uid(), decided_at = now()
+  where id = p_redemption
+  returning * into result;
+
+  return result;
+end;
+$$;
+
+-- The requester can withdraw their own still-pending request - the mirror of
+-- reject_redemption, which only the other person may call.
+create or replace function public.cancel_redemption(p_redemption uuid)
+returns public.reward_redemptions language plpgsql security definer set search_path = public as $$
+declare
+  target public.reward_redemptions;
+  result public.reward_redemptions;
+begin
+  select * into target from public.reward_redemptions where id = p_redemption;
+  if target.id is null then
+    raise exception 'no_such_redemption' using errcode = 'P0002';
+  end if;
+  if target.requested_by <> auth.uid() then
+    raise exception 'not_your_request' using errcode = '42501';
+  end if;
+  if target.status <> 'pending' then
+    raise exception 'not_pending' using errcode = 'P0002';
+  end if;
+
+  update public.reward_redemptions
+  set status = 'cancelled', decided_at = now()
   where id = p_redemption
   returning * into result;
 

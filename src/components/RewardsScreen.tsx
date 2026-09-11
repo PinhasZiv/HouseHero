@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import * as api from '../lib/api'
+import { burstConfetti } from '../lib/celebrate'
 import { errorMessage } from '../lib/errors'
 import { useI18n } from '../lib/i18n'
 import { useApp } from '../state/AppState'
@@ -153,7 +154,8 @@ export function RewardsScreen() {
 
   const pending = redemptions.filter((r) => r.status === 'pending')
 
-  async function redeem(reward: Reward) {
+  async function redeem(reward: Reward, event: React.MouseEvent<HTMLButtonElement>) {
+    burstConfetti(event.clientX, event.clientY)
     try {
       await api.requestRedemption(reward.id)
       toast.show(t.rewards.requested(reward.title))
@@ -163,7 +165,8 @@ export function RewardsScreen() {
     }
   }
 
-  async function approve(redemption: RewardRedemption) {
+  async function approve(redemption: RewardRedemption, event: React.MouseEvent<HTMLButtonElement>) {
+    burstConfetti(event.clientX, event.clientY)
     try {
       await api.approveRedemption(redemption.id)
       toast.show(t.rewards.approved(redemption.reward_title))
@@ -179,6 +182,16 @@ export function RewardsScreen() {
     try {
       await api.rejectRedemption(redemption.id)
       toast.show(t.rewards.rejected(redemption.reward_title))
+      await load()
+    } catch (cause) {
+      toast.showError(cause)
+    }
+  }
+
+  async function cancel(redemption: RewardRedemption) {
+    try {
+      await api.cancelRedemption(redemption.id)
+      toast.show(t.rewards.cancelled(redemption.reward_title))
       await load()
     } catch (cause) {
       toast.showError(cause)
@@ -244,26 +257,37 @@ export function RewardsScreen() {
                     </span>
                   </p>
                 </div>
-                {!mine && (
-                  <div className="row-actions">
-                    <button
-                      type="button"
-                      className="complete-button"
-                      onClick={() => approve(redemption)}
-                      aria-label={t.rewards.approveAria(redemption.reward_title)}
-                    >
-                      {t.rewards.approve}
-                    </button>
+                <div className="row-actions">
+                  {mine ? (
                     <button
                       type="button"
                       className="complete-button complete-button-muted"
-                      onClick={() => reject(redemption)}
-                      aria-label={t.rewards.rejectAria(redemption.reward_title)}
+                      onClick={() => cancel(redemption)}
+                      aria-label={t.rewards.cancelAria(redemption.reward_title)}
                     >
-                      {t.rewards.reject}
+                      {t.rewards.cancel}
                     </button>
-                  </div>
-                )}
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="complete-button"
+                        onClick={(event) => approve(redemption, event)}
+                        aria-label={t.rewards.approveAria(redemption.reward_title)}
+                      >
+                        {t.rewards.approve}
+                      </button>
+                      <button
+                        type="button"
+                        className="complete-button complete-button-muted"
+                        onClick={() => reject(redemption)}
+                        aria-label={t.rewards.rejectAria(redemption.reward_title)}
+                      >
+                        {t.rewards.reject}
+                      </button>
+                    </>
+                  )}
+                </div>
               </article>
             )
           })}
@@ -298,7 +322,7 @@ export function RewardsScreen() {
               <button
                 type="button"
                 className="complete-button"
-                onClick={() => redeem(reward)}
+                onClick={(event) => redeem(reward, event)}
                 aria-label={t.rewards.redeemAria(reward.title)}
               >
                 {t.rewards.redeem}
