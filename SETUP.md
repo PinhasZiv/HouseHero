@@ -73,8 +73,13 @@
 
 ### ג. פתיחה לכולם
 
-6. חזרה ל-Google Cloud ← **OAuth consent screen** ← **Publish app** ←
-   **Confirm**.
+6. נכנסים ישירות לעמוד הזה (מוודאים שהפרויקט שנבחר למעלה הוא `HouseHero`):
+   [console.cloud.google.com/auth/audience](https://console.cloud.google.com/auth/audience)
+   ← **Publish app** ← **Confirm**.
+
+   (גוגל שינו לאחרונה את השם מ-"OAuth consent screen" ל-"Google Auth
+   Platform", וכפתור הפרסום עבר ללשונית **Audience** — זו הסיבה שהוא לא
+   נמצא איפה שהיה פעם.)
 
    כל עוד לא עשית את זה, רק חשבונות שרשומים ידנית תחת **Test users** יוכלו
    להיכנס, וכל השאר יראו אזהרה. אין צורך בשום בדיקה או אישור מגוגל —
