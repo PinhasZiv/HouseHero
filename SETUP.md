@@ -21,18 +21,31 @@
 
 ---
 
-## שלב 1 — הדלקת GitHub Pages (חובה, דקה אחת)
+## שלב 1 — שני תיקוני הגדרות חד-פעמיים (חובה, שתי דקות)
 
-זה מה שחוסם כרגע את העלייה לאוויר. יצירת אתר Pages בפעם הראשונה חייבת
-להיעשות ידנית דרך האתר — ל-workflow אין הרשאה לעשות את זה לבד, גם עם כל
-ההרשאות הנכונות (מגבלה ידועה של GitHub, לא קשורה למה שהגדרנו).
+זה מה שחוסם כרגע את העלייה לאוויר. שני התיקונים האלה חייבים להיעשות ידנית
+דרך האתר — לא קיים API שמאפשר לי לבצע אותם מרחוק (מגבלות ידועות של
+GitHub, לא קשורות למה שהגדרנו בקוד).
+
+**א. הדלקת GitHub Pages**
 
 1. נכנסים ל-<https://github.com/PinhasZiv/HouseHero/settings/pages>.
 2. תחת **Build and deployment** ← **Source**, בוחרים **GitHub Actions**
    (במקום "Deploy from a branch").
 
-זהו. אחרי זה תגיד לי "עשיתי" ואני אריץ שוב את ה-deploy — מהריצה הזו והלאה
-זה כבר יעבוד לבד בכל שינוי עתידי, בלי לחזור על השלב הזה.
+**ב. קביעת main כברירת המחדל**
+
+ה-repo עדיין מוגדר עם ענף ברירת המחדל הישן (`claude/househero-task-pwa-rqg8lh`)
+במקום `main`. זה גורם ל-GitHub לחסום את הפריסה בהודעה "Branch main is not
+allowed to deploy to github-pages due to environment protection rules" —
+כי אתר Pages מאפשר פריסה רק מענף ברירת המחדל.
+
+1. נכנסים ל-<https://github.com/PinhasZiv/HouseHero/settings/branches>.
+2. ליד **Default branch**, לוחצים על אייקון העיפרון (✏️), בוחרים **main**,
+   **Update**, ומאשרים.
+
+זהו. אחרי שני אלה תגיד לי "עשיתי" ואני אריץ שוב את ה-deploy — מהריצה הזו
+והלאה זה כבר יעבוד לבד בכל שינוי עתידי, בלי לחזור על השלבים האלה.
 
 ---
 
@@ -150,7 +163,12 @@ Supabase (`.../auth/v1/callback`), לא של האפליקציה.
 
 **ריצת ה-workflow נכשלת ב-"Create Pages site failed: Resource not
 accessible by integration".**
-עוד לא בוצע שלב 1 למעלה — הדלקת GitHub Pages ב-Settings ← Pages ← Source
+עוד לא בוצע שלב 1א למעלה — הדלקת GitHub Pages ב-Settings ← Pages ← Source
 ← GitHub Actions. זה חד-פעמי בלבד.
+
+**ריצת ה-workflow נכשלת ב-"Branch main is not allowed to deploy to
+github-pages due to environment protection rules".**
+עוד לא בוצע שלב 1ב למעלה — שינוי ענף ברירת המחדל ל-`main` ב-Settings ←
+Branches. גם זה חד-פעמי בלבד.
 
 </div>
