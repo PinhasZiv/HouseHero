@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import * as api from '../lib/api'
-import { burstConfetti } from '../lib/celebrate'
+import { burstConfetti, failAt } from '../lib/celebrate'
 import { errorMessage } from '../lib/errors'
 import { useI18n } from '../lib/i18n'
 import { useApp } from '../state/AppState'
@@ -155,45 +155,56 @@ export function RewardsScreen() {
   const pending = redemptions.filter((r) => r.status === 'pending')
 
   async function redeem(reward: Reward, event: React.MouseEvent<HTMLButtonElement>) {
-    burstConfetti(event.clientX, event.clientY)
+    const { clientX: x, clientY: y } = event
     try {
       await api.requestRedemption(reward.id)
+      burstConfetti(x, y)
       toast.show(t.rewards.requested(reward.title))
       await load()
     } catch (cause) {
+      failAt(x, y)
       toast.showError(cause)
     }
   }
 
   async function approve(redemption: RewardRedemption, event: React.MouseEvent<HTMLButtonElement>) {
-    burstConfetti(event.clientX, event.clientY)
+    const { clientX: x, clientY: y } = event
     try {
       await api.approveRedemption(redemption.id)
+      burstConfetti(x, y)
       toast.show(t.rewards.approved(redemption.reward_title))
       setCelebrate(true)
       window.setTimeout(() => setCelebrate(false), 900)
       await load()
     } catch (cause) {
+      failAt(x, y)
       toast.showError(cause)
     }
   }
 
-  async function reject(redemption: RewardRedemption) {
+  // Rejecting is itself a "no" - even when the action succeeds, this shows
+  // the same failure-style mark as an error, never a celebration.
+  async function reject(redemption: RewardRedemption, event: React.MouseEvent<HTMLButtonElement>) {
+    const { clientX: x, clientY: y } = event
     try {
       await api.rejectRedemption(redemption.id)
       toast.show(t.rewards.rejected(redemption.reward_title))
       await load()
     } catch (cause) {
       toast.showError(cause)
+    } finally {
+      failAt(x, y)
     }
   }
 
-  async function cancel(redemption: RewardRedemption) {
+  async function cancel(redemption: RewardRedemption, event: React.MouseEvent<HTMLButtonElement>) {
+    const { clientX: x, clientY: y } = event
     try {
       await api.cancelRedemption(redemption.id)
       toast.show(t.rewards.cancelled(redemption.reward_title))
       await load()
     } catch (cause) {
+      failAt(x, y)
       toast.showError(cause)
     }
   }
@@ -262,7 +273,7 @@ export function RewardsScreen() {
                     <button
                       type="button"
                       className="complete-button complete-button-muted"
-                      onClick={() => cancel(redemption)}
+                      onClick={(event) => cancel(redemption, event)}
                       aria-label={t.rewards.cancelAria(redemption.reward_title)}
                     >
                       {t.rewards.cancel}
@@ -280,7 +291,7 @@ export function RewardsScreen() {
                       <button
                         type="button"
                         className="complete-button complete-button-muted"
-                        onClick={() => reject(redemption)}
+                        onClick={(event) => reject(redemption, event)}
                         aria-label={t.rewards.rejectAria(redemption.reward_title)}
                       >
                         {t.rewards.reject}

@@ -21,8 +21,8 @@ export function useCompletion() {
    * notices needs doing can be completed even if the schedule says it is not
    * due for days yet, which restarts a recurring task's schedule from today.
    */
-  async function complete(task: Task) {
-    if (!selfId) return
+  async function complete(task: Task): Promise<boolean> {
+    if (!selfId) return false
     // Optimistic: the tap should feel instant even on a slow connection. If
     // the write fails, reload() brings back the real state.
     const previousTask = { ...task }
@@ -56,11 +56,13 @@ export function useCompletion() {
           run: () => undo(task, { silent: true }),
         },
       })
+      return true
     } catch (cause) {
       patchTask(previousTask)
       if (previousProfile) setProfile(previousProfile)
       toast.showError(cause)
       void reload()
+      return false
     }
   }
 

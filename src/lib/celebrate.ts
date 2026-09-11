@@ -59,3 +59,22 @@ export function celebrateAt(x: number, y: number, points?: number): void {
   burstConfetti(x, y)
   if (points) floatScore(x, y, points)
 }
+
+/**
+ * A small red shake-and-fade "✕" at (x, y) - the opposite of celebrateAt.
+ * Used whenever an action did not actually succeed (the request failed) or
+ * whose outcome is itself a "no" (rejecting someone's request), so the
+ * screen never shows a confetti burst for something that didn't happen.
+ */
+export function failAt(x: number, y: number): void {
+  if (prefersReducedMotion()) return
+
+  const mark = document.createElement('span')
+  mark.className = 'fail-mark'
+  mark.style.left = `${x}px`
+  mark.style.top = `${y}px`
+  mark.textContent = '✕'
+
+  document.body.appendChild(mark)
+  window.setTimeout(() => mark.remove(), 600)
+}

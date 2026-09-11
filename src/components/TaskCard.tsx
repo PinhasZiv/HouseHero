@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { celebrateAt } from '../lib/celebrate'
+import { celebrateAt, failAt } from '../lib/celebrate'
 import { classify } from '../lib/taskDue'
 import {
   describeInterval,
@@ -23,7 +23,9 @@ interface TaskCardProps {
   spaceName?: string
   completedBy?: CompletedBy
   assignedName?: string | null
-  onComplete?: () => Promise<void>
+  /** Resolves to false (rather than throwing) when the completion failed - the
+   *  card celebrates only on true, and shows a failure mark otherwise. */
+  onComplete?: () => Promise<boolean | void>
   /**
    * The caller decides whether to offer this - based on whether the task was
    * actually completed by whoever is looking at the screen right now. The
@@ -69,14 +71,18 @@ export function TaskCard({
     if (!onComplete || busy) return
     const rect = event.currentTarget.getBoundingClientRect()
     // A keyboard-triggered click carries clientX/clientY of 0 rather than a
-    // real tap position, so the burst falls back to the button's own center.
+    // real tap position, so the effect falls back to the button's own center.
     const x = event.clientX || rect.left + rect.width / 2
     const y = event.clientY || rect.top + rect.height / 2
-    celebrateAt(x, y, task.points)
     setBusy(true)
-    setJustCompleted(true)
     try {
-      await onComplete()
+      const ok = await onComplete()
+      if (ok === false) {
+        failAt(x, y)
+      } else {
+        setJustCompleted(true)
+        celebrateAt(x, y, task.points)
+      }
     } finally {
       setBusy(false)
     }
