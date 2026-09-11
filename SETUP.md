@@ -55,13 +55,16 @@
 
 ### ב. חיבור ל-Supabase
 
-נכנסים ל-[supabase.com/dashboard/project/axamojjnbhygnclqihhe](https://supabase.com/dashboard/project/axamojjnbhygnclqihhe):
-
-4. **Authentication** ← **Sign In / Providers** ← **Google**.
-   - להדליק את **Enable Sign in with Google**
+4. נכנסים ישירות לעמוד הזה:
+   [supabase.com/dashboard/project/axamojjnbhygnclqihhe/auth/providers](https://supabase.com/dashboard/project/axamojjnbhygnclqihhe/auth/providers)
+   (זה **Authentication** ← **Providers** בתפריט הצד, אם רוצים להגיע דרך
+   הניווט הרגיל). ברשימה לוחצים על **Google**.
+   - להדליק את המתג בראש החלונית (**Enable Sign in with Google**)
    - להדביק את **Client ID** ואת **Client Secret** מהחלון של Google
    - **Save**
-5. **Authentication** ← **URL Configuration**:
+5. אותו דבר לעמוד ה-URL Configuration:
+   [supabase.com/dashboard/project/axamojjnbhygnclqihhe/auth/url-configuration](https://supabase.com/dashboard/project/axamojjnbhygnclqihhe/auth/url-configuration)
+   (**Authentication** ← **URL Configuration**):
    - **Site URL**: `https://pinhasziv.github.io/HouseHero/`
    - **Redirect URLs** ← **Add URL**: אותה כתובת בדיוק.
 
