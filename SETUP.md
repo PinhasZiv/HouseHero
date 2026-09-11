@@ -2,62 +2,29 @@
 
 <div dir="rtl">
 
-**כמעט הכול כבר מוכן ורץ.** נכנסתי בעצמי ל-Supabase ול-GitHub ועשיתי את כל
-מה שניתן לעשות מרחוק:
+**הכול רץ ועלה לאוויר.** נכנסתי בעצמי ל-Supabase ול-GitHub ועשיתי את כל מה
+שניתן לעשות מרחוק:
 
 - ✅ נפתח פרויקט Supabase (`househero`, אזור Frankfurt).
 - ✅ הורצו שלושת סקריפטי ה-SQL — כל הטבלאות, ההרשאות (RLS), והפונקציות.
 - ✅ שני ה-Edge Functions (`send-reminders`, `send-test`) הועלו.
 - ✅ נבדק דוח אבטחה ותוקנו כל הממצאים הרלוונטיים.
 - ✅ `src/config.ts` מחובר לפרויקט האמיתי, ונדחף ל-`main`.
-- ✅ ה-repo הפך לציבורי, וניתנו הרשאות כתיבה ל-workflows (שני תיקונים
-  שביקשתי ממך לעשות בעצמך, כי אין לזה API מרחוק — תודה).
+- ✅ ה-repo הפך לציבורי, ניתנו הרשאות כתיבה ל-workflows, GitHub Pages דלוק,
+  `main` הוגדר כברירת המחדל, והוסרה הגבלת הענף שחסמה את הפריסה (חמישה
+  תיקוני הגדרות שביקשתי ממך לעשות בעצמך בדפדפן, כי אין לאף אחד מהם API
+  מרוחק — תודה על הסבלנות).
+- ✅ **ריצת ה-Build and deploy האחרונה הסתיימה בירוק, כולל שלב הפריסה
+  עצמו** — האתר חי בכתובת:
 
-**נשארו שני דברים, שניהם דורשים דפדפן עם החשבון האישי שלך ואין דרך לעשות
-אותם מרחוק:**
+  **<https://pinhasziv.github.io/HouseHero/>**
 
-1. **הדלקה חד-פעמית של GitHub Pages** (דקה אחת) — בלי זה האתר לא עולה בכלל.
-2. **חיבור כניסה עם Google** (כ-10 דקות).
-
----
-
-## שלב 1 — שני תיקוני הגדרות חד-פעמיים (חובה, שתי דקות)
-
-זה מה שחוסם כרגע את העלייה לאוויר. שני התיקונים האלה חייבים להיעשות ידנית
-דרך האתר — לא קיים API שמאפשר לי לבצע אותם מרחוק (מגבלות ידועות של
-GitHub, לא קשורות למה שהגדרנו בקוד).
-
-**א. הדלקת GitHub Pages**
-
-1. נכנסים ל-<https://github.com/PinhasZiv/HouseHero/settings/pages>.
-2. תחת **Build and deployment** ← **Source**, בוחרים **GitHub Actions**
-   (במקום "Deploy from a branch").
-
-**ב. קביעת main כברירת המחדל** ✅ בוצע.
-
-**ג. הסרת הגבלת הענף מסביבת ה-Pages**
-
-גם אחרי ששני התיקונים הקודמים בוצעו, ה-deploy עדיין נכשל באותה הודעה:
-"Branch main is not allowed to deploy to github-pages due to environment
-protection rules". הסיבה: לסביבת ה-`github-pages` יש הגבלת ענפים משלה
-שנקבעה בנפרד (ל-`claude/househero-task-pwa-rqg8lh` הישן), וזה לא מתעדכן
-לבד כששינינו את ברירת המחדל.
-
-1. נכנסים ל-<https://github.com/PinhasZiv/HouseHero/settings/environments>.
-2. לוחצים על **github-pages**.
-3. תחת **Deployment branches and tags**, אם רשום שם ענף ספציפי — מוחקים
-   אותו (עם ה-🗑) ומוסיפים במקומו **Add deployment branch or tag rule** ←
-   בוחרים **Selected branches and tags** ← מקלידים `main` ← **Add rule**.
-   (או פשוט משנים את הבורר ל-**No restriction**, שזו האפשרות הפשוטה
-   ביותר ומספיקה לחלוטין לאפליקציה פרטית כמו זו.)
-4. **Save protection rules** אם מופיע כפתור כזה.
-
-זהו. אחרי שלושת אלה תגיד לי "עשיתי" ואני אריץ שוב את ה-deploy — מהריצה
-הזו והלאה זה כבר יעבוד לבד בכל שינוי עתידי, בלי לחזור על השלבים האלה.
+**נשאר דבר אחד בלבד, ודורש דפדפן עם החשבון האישי שלך — אין דרך לעשות את
+זה מרחוק:** לחבר כניסה עם Google. בערך 10 דקות.
 
 ---
 
-## שלב 2 — כניסה עם Google
+## השלב היחיד — כניסה עם Google
 
 ### א. יצירת מזהה ב-Google Cloud
 
@@ -95,7 +62,7 @@ protection rules". הסיבה: לסביבת ה-`github-pages` יש הגבלת ע
    - להדביק את **Client ID** ואת **Client Secret** מהחלון של Google
    - **Save**
 5. **Authentication** ← **URL Configuration**:
-   - **Site URL**: `https://<שם המשתמש שלך ב-GitHub>.github.io/HouseHero/`
+   - **Site URL**: `https://pinhasziv.github.io/HouseHero/`
    - **Redirect URLs** ← **Add URL**: אותה כתובת בדיוק.
 
 > **הקו הנטוי בסוף הכתובת חשוב.** אם אחרי הכניסה עם Google מגיעים לדף לבן,
@@ -115,7 +82,7 @@ protection rules". הסיבה: לסביבת ה-`github-pages` יש הגבלת ע
 ## בדיקה בטלפון
 
 1. לפתוח את הכתובת בכרום באנדרואיד:
-   `https://<שם המשתמש שלך ב-GitHub>.github.io/HouseHero/`
+   `https://pinhasziv.github.io/HouseHero/`
 2. **כניסה עם Google**.
 3. תפריט הכרום (⋮) ← **הוספה למסך הבית**. **כדאי לעשות את זה עכשיו, לפני
    הפעלת ההתראות** — לאפליקציה מותקנת יש קבלת התראות אמינה יותר.
@@ -168,16 +135,5 @@ Supabase (`.../auth/v1/callback`), לא של האפליקציה.
 **האפליקציה עדיין מציגה מסך "צריך להשלים הגדרה".**
 בודקים בלשונית **Actions** בגיטהאב שריצת **Build and deploy** האחרונה על
 `main` הסתיימה בירוק, ואז מרעננים.
-
-**ריצת ה-workflow נכשלת ב-"Create Pages site failed: Resource not
-accessible by integration".**
-עוד לא בוצע שלב 1א למעלה — הדלקת GitHub Pages ב-Settings ← Pages ← Source
-← GitHub Actions. זה חד-פעמי בלבד.
-
-**ריצת ה-workflow נכשלת ב-"Branch main is not allowed to deploy to
-github-pages due to environment protection rules".**
-עוד לא בוצע שלב 1ג למעלה — הסרת הגבלת הענף בסביבת `github-pages` תחת
-Settings ← Environments. גם זה חד-פעמי בלבד. (שינוי ברירת המחדל לבדו לא
-מספיק — לסביבה יש הגבלה נפרדת משלה.)
 
 </div>
