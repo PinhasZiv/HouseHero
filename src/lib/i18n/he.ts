@@ -99,9 +99,18 @@ export const he = {
   },
 
   history: {
-    title: (name: string) => `היסטוריית הביצוע של ${name}`,
+    sectionTitle: 'היסטוריית הביצוע',
     empty: 'עוד לא בוצעה אף פעם.',
     entry: (who: string, points: number) => `${who} · +${points} נק'`,
+    detail: {
+      points: 'ניקוד',
+      schedule: 'תבנית',
+      oneTime: 'חד-פעמית',
+      reminder: 'שעת תזכורת',
+      assignedTo: 'שייכת ל',
+      ends: 'מסתיימת',
+      endsAfterCount: (n: number) => `אחרי ${n} פעמים`,
+    },
   },
 
   snooze: {

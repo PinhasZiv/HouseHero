@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import * as api from '../lib/api'
-import { formatDate, personLabel } from '../lib/format'
+import { describeInterval, describeWeeklyDays, formatDate, formatTime, personLabel } from '../lib/format'
 import { useI18n } from '../lib/i18n'
 import { useApp } from '../state/AppState'
 import type { Task, TaskHistoryEntry } from '../lib/types'
@@ -12,10 +12,15 @@ interface TaskHistoryProps {
 }
 
 /**
- * Who completed this task and when - including completions from previous
- * days, which are no longer visible on the card itself. Undoing a completion
- * removes its row here too, the same way it restores everything else about
- * that completion as if it had not happened.
+ * Tapping a task card opens this: everything about the task that does not
+ * fit on the compact card - the description, its full schedule, who it is
+ * assigned to - plus its completion history, including days no longer
+ * visible on the card itself. This is the only place to see those details
+ * without going into the edit form, which most people opening this just
+ * want to look at, not change.
+ *
+ * Undoing a completion removes its row here too, the same way it restores
+ * everything else about that completion as if it had not happened.
  */
 export function TaskHistory({ task, onClose }: TaskHistoryProps) {
   const { people, session } = useApp()
@@ -40,10 +45,56 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
     }
   }, [task.id, toast])
 
+  const scheduleLabel =
+    task.task_type === 'one_time'
+      ? t.history.detail.oneTime
+      : task.recurrence_mode === 'weekly_days'
+        ? describeWeeklyDays(task.weekly_days ?? [], language)
+        : describeInterval(task.interval_days ?? 1, language)
+
+  const assignedLabel = !task.assigned_to
+    ? t.common.everyone
+    : task.assigned_to === selfId
+      ? t.task.assignedToYou
+      : t.task.assignedTo(
+          people.get(task.assigned_to)?.display_name || people.get(task.assigned_to)?.email || t.task.someoneElse,
+        )
+
   return (
     <div className="sheet-backdrop" onClick={onClose} role="presentation">
       <div className="sheet" onClick={(event) => event.stopPropagation()}>
-        <h2>{t.history.title(task.title)}</h2>
+        <h2>{task.title}</h2>
+
+        {task.description && <p className="task-detail-description">{task.description}</p>}
+
+        <dl className="task-detail-grid">
+          <dt>{t.history.detail.points}</dt>
+          <dd>{t.task.pointsBadge(task.points)}</dd>
+
+          <dt>{t.history.detail.schedule}</dt>
+          <dd>{scheduleLabel}</dd>
+
+          <dt>{t.history.detail.reminder}</dt>
+          <dd>{formatTime(task.reminder_hour, task.reminder_minute)}</dd>
+
+          <dt>{t.history.detail.assignedTo}</dt>
+          <dd>{assignedLabel}</dd>
+
+          {task.task_type === 'recurring' && task.end_condition !== 'never' && (
+            <>
+              <dt>{t.history.detail.ends}</dt>
+              <dd>
+                {task.end_condition === 'after_count' && task.end_after_count != null
+                  ? t.history.detail.endsAfterCount(task.end_after_count)
+                  : task.end_date
+                    ? formatDate(task.end_date, language)
+                    : null}
+              </dd>
+            </>
+          )}
+        </dl>
+
+        <h3 className="group-title">{t.history.sectionTitle}</h3>
 
         {entries === null ? (
           <p className="muted">{t.common.loading}</p>

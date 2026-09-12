@@ -312,7 +312,9 @@ button { font: inherit; cursor: pointer; }
 .task-card {
   display: flex;
   align-items: stretch;
-  gap: 8px;
+  /* No gap: each action button already carries its own border-inline-start
+     as a divider, so a flex gap on top of that read as an odd double gap
+     between adjacent buttons (and between the info side and the first one). */
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -367,10 +369,12 @@ button { font: inherit; cursor: pointer; }
 .task-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px 6px;
-  margin-top: 5px;
+  align-items: center;
+  gap: 4px 6px;
+  margin-top: 6px;
   color: var(--text-muted);
   font-size: 0.86rem;
+  line-height: 1.5;
 }
 
 /* Without a mark between them the facts run into one another in Hebrew, where
@@ -648,6 +652,33 @@ button { font: inherit; cursor: pointer; }
 
 .sheet-actions { display: flex; gap: 10px; }
 .sheet-actions .btn { flex: 1; }
+
+/* ------------------------------------------------------- task detail --- */
+
+.task-detail-description {
+  color: var(--text-muted);
+  font-size: 0.94rem;
+  white-space: pre-wrap;
+}
+
+/* A <dl> laid out as a two-column grid: every dt/dd pair lands in its own
+   row automatically, labels form one steady column and values the other -
+   easier to scan than a space-between row, where a short value sits flush
+   against the far edge with nothing to line it up against. */
+.task-detail-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 16px;
+  row-gap: 8px;
+  margin: 0;
+  padding: 14px;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  font-size: 0.92rem;
+}
+
+.task-detail-grid dt { color: var(--text-muted); }
+.task-detail-grid dd { margin: 0; font-weight: 600; }
 
 /* ----------------------------------------------------------- history --- */
 

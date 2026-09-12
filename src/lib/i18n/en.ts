@@ -97,9 +97,18 @@ export const en: Strings = {
   },
 
   history: {
-    title: (name: string) => `${name}'s completion history`,
+    sectionTitle: 'Completion history',
     empty: 'Not completed yet.',
     entry: (who: string, points: number) => `${who} · +${points} pts`,
+    detail: {
+      points: 'Points',
+      schedule: 'Schedule',
+      oneTime: 'One-time',
+      reminder: 'Reminder time',
+      assignedTo: 'Assigned to',
+      ends: 'Ends',
+      endsAfterCount: (n: number) => `After ${n} times`,
+    },
   },
 
   snooze: {

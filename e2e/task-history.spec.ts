@@ -102,6 +102,51 @@ test.describe('task completion history', () => {
     await expect(page.locator('.sheet', { hasText: 'עריכת משימה' })).toBeVisible()
   })
 
+  test('shows the task\'s description, schedule, reminder time and assignment - not just the edit form', async ({ page }) => {
+    const db = makeFakeDb({
+      tasks: [
+        {
+          id: 'task-plants',
+          space_id: FAKE_SPACE_ID,
+          title: 'להשקות צמחים',
+          description: 'רק את העציצים בסלון, לא את הגינה.',
+          task_type: 'recurring',
+          recurrence_mode: 'interval',
+          interval_days: 3,
+          weekly_days: null,
+          end_condition: 'after_count',
+          end_after_count: 10,
+          end_date: null,
+          occurrences_completed: 2,
+          points: 8,
+          reminder_hour: 18,
+          reminder_minute: 30,
+          due_date: isoDaysFromToday(1),
+          last_completed_date: null,
+          last_completed_by: null,
+          is_done: false,
+          assigned_to: FAKE_USER_ID,
+          created_by: FAKE_USER_ID,
+          created_at: new Date().toISOString(),
+        },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'משימות' }).click()
+
+    await page.locator('.task-card', { hasText: 'להשקות צמחים' }).locator('.task-main').click()
+
+    const sheet = page.locator('.sheet', { hasText: 'להשקות צמחים' })
+    await expect(sheet).toBeVisible()
+    await expect(sheet).toContainText('רק את העציצים בסלון')
+    await expect(sheet).toContainText('8 נק')
+    await expect(sheet).toContainText('כל 3 ימים')
+    await expect(sheet).toContainText('18:30')
+    await expect(sheet).toContainText('שייכת אליך')
+    await expect(sheet).toContainText('אחרי 10 פעמים')
+  })
+
   test('says so when a task has never been completed', async ({ page }) => {
     const db = makeFakeDb({
       tasks: [
