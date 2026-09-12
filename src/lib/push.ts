@@ -1,5 +1,6 @@
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { t } from './i18n'
+import { withRetry } from './retry'
 import { VAPID_PUBLIC_KEY, supabase } from './supabase'
 
 // Getting a browser subscribed to push is a four-step handshake, and each step
@@ -121,12 +122,20 @@ export function shouldAutoRestorePush(permission: NotificationPermission, state:
  * idea why, even though nothing about their choice to allow notifications
  * changed. Call this once a signed-in session is confirmed: if permission is
  * still granted, it silently re-subscribes with no prompt of any kind.
+ *
+ * This runs from the very same cold-start moment as AppState's own initial
+ * fetch - opening the app after it sat backgrounded, racing a session token
+ * still being refreshed or a network interface still waking up - so it gets
+ * the same retry rather than a single silent attempt: without it, this was
+ * the one place a transient cold-start failure left no visible trace at all,
+ * just a subscription that quietly never came back until someone noticed and
+ * pressed "turn on reminders" again by hand.
  */
 export async function restorePushIfGranted(userId: string): Promise<void> {
   if (!pushSupported() || !VAPID_PUBLIC_KEY) return
   if (!shouldAutoRestorePush(Notification.permission, await currentPushState())) return
   try {
-    await enablePush(userId)
+    await withRetry(() => enablePush(userId), [1200, 2500])
   } catch (error) {
     console.error('could not silently restore the push subscription', error)
   }
