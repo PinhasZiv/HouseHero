@@ -78,3 +78,27 @@ export const TEST_NOTIFICATION: Record<Language, { title: string; body: string }
     body: 'Notifications work. You will get one like this when a task of yours is due.',
   },
 }
+
+/**
+ * The one-shot push sent the moment a task is assigned to someone specific -
+ * separate from composeReminder, which only fires later, at the task's own
+ * due time. `byName` is best-effort (the person who did the assigning may
+ * have no display name or email on file) and simply drops from the sentence
+ * when unknown, rather than falling back to a placeholder like "Someone".
+ */
+export function composeAssignment(
+  taskName: string,
+  byName: string | null,
+  language: Language,
+): { title: string; body: string } {
+  if (language === 'en') {
+    return {
+      title: 'A task was assigned to you',
+      body: byName ? `${byName} assigned you "${taskName}".` : `You were assigned "${taskName}".`,
+    }
+  }
+  return {
+    title: 'שויכה לך משימה',
+    body: byName ? `${byName} שייך/ה לך את "${taskName}".` : `שויכה לך המשימה "${taskName}".`,
+  }
+}

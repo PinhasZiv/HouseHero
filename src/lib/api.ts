@@ -180,6 +180,18 @@ export async function deleteTask(taskId: string): Promise<void> {
 }
 
 /**
+ * Tells the assigned person, right now, that a task is theirs - separate
+ * from the due-date reminder they will still get later. Best-effort and
+ * silent on purpose: whoever just saved the task should never see an error
+ * over a notification that is not the thing they were actually doing, so
+ * callers fire this without awaiting its result.
+ */
+export async function notifyAssignment(taskId: string): Promise<void> {
+  const { error } = await supabase.functions.invoke('send-assignment', { body: { taskId } })
+  if (error) console.error('could not send the assignment notification', error)
+}
+
+/**
  * Completes a task and awards its points to whoever called this. There is no
  * due-date check here on purpose - anyone in the space can complete a task
  * early, which is exactly the "I can see it needs doing right now" case.

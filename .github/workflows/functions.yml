@@ -41,3 +41,4 @@ jobs:
         run: |
           supabase functions deploy send-reminders --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
           supabase functions deploy send-test --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+          supabase functions deploy send-assignment --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"

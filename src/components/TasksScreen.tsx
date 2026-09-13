@@ -75,17 +75,31 @@ export function TasksScreen() {
 
   async function addTask(draft: TaskDraft) {
     if (!session) return
-    await api.createTask(draftToNewTask(draft, currentSpace!.id), session.user.id)
+    const created = await api.createTask(draftToNewTask(draft, currentSpace!.id), session.user.id)
     setAdding(false)
     await reload()
     toast.show(t.tasks.added(draft.title.trim()))
+    if (created.assigned_to && created.assigned_to !== session.user.id) {
+      void api.notifyAssignment(created.id)
+    }
   }
 
   async function saveTask(draft: TaskDraft) {
     if (!editing) return
+    const previousAssignee = editing.assigned_to
     const updated = await api.updateTask(editing.id, draftToNewTask(draft, currentSpace!.id))
     patchTask(updated)
     setEditing(null)
+    // Only a genuinely new assignment to someone else notifies - not every
+    // edit of an already-assigned task, and never for assigning it to
+    // yourself.
+    if (
+      updated.assigned_to &&
+      updated.assigned_to !== previousAssignee &&
+      updated.assigned_to !== session?.user.id
+    ) {
+      void api.notifyAssignment(updated.id)
+    }
   }
 
   async function removeTaskAction() {

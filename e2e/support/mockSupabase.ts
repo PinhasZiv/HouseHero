@@ -76,6 +76,8 @@ export interface FakeDb {
   redemptions: FakeRedemption[]
   /** Other space members fetchPeople() should resolve names for. */
   otherPeople: { id: string; display_name: string | null; avatar_url: string | null; email: string | null; lifetime_points: number; spendable_points: number }[]
+  /** Every send-assignment invocation this session made, in call order. */
+  assignmentNotifications: { taskId: string }[]
 }
 
 export function makeFakeDb(overrides?: Partial<FakeDb>): FakeDb {
@@ -105,6 +107,7 @@ export function makeFakeDb(overrides?: Partial<FakeDb>): FakeDb {
     rewards: [],
     redemptions: [],
     otherPeople: [],
+    assignmentNotifications: [],
     ...overrides,
   }
 }
@@ -214,9 +217,54 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
 
     if (table === 'spaces' && method === 'GET') return json(route, db.spaces)
 
-    if (table === 'space_members') return json(route, [])
+    if (table === 'space_members' && method === 'GET') {
+      // fetchMembers() joins the profile inline, which is what the assignee
+      // dropdown in TaskForm reads its options from - and that dropdown only
+      // renders once there is someone else to assign to, so this has to
+      // include the signed-in user as a member row too, not just otherPeople.
+      const rows = [
+        {
+          space_id: FAKE_SPACE_ID,
+          user_id: db.profile.id,
+          role: 'owner',
+          joined_at: new Date().toISOString(),
+          profile: { id: db.profile.id, display_name: db.profile.display_name, avatar_url: db.profile.avatar_url, email: db.profile.email },
+        },
+        ...db.otherPeople.map((person) => ({
+          space_id: FAKE_SPACE_ID,
+          user_id: person.id,
+          role: 'member',
+          joined_at: new Date().toISOString(),
+          profile: { id: person.id, display_name: person.display_name, avatar_url: person.avatar_url, email: person.email },
+        })),
+      ]
+      return json(route, rows)
+    }
 
     if (table === 'tasks' && method === 'GET') return json(route, db.tasks)
+
+    if (table === 'tasks' && method === 'POST') {
+      const body = request.postDataJSON() as Record<string, unknown>
+      const newTask: FakeTask = {
+        id: `task-${db.tasks.length + 1}`,
+        occurrences_completed: 0,
+        last_completed_date: null,
+        last_completed_by: null,
+        is_done: false,
+        created_at: new Date().toISOString(),
+        ...body,
+      } as FakeTask
+      db.tasks.push(newTask)
+      return json(route, wantsSingle ? newTask : [newTask], 201)
+    }
+
+    if (table === 'tasks' && method === 'PATCH') {
+      const taskId = eqValue(url, 'id')
+      const task = db.tasks.find((t) => t.id === taskId)
+      if (!task) return json(route, { message: 'no_such_task' }, 404)
+      Object.assign(task, request.postDataJSON() as Record<string, unknown>)
+      return json(route, wantsSingle ? task : [task])
+    }
 
     if (table === 'task_snoozes') {
       if (method === 'GET') {
@@ -251,6 +299,16 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
     if (table === 'push_subscriptions') return json(route, [])
 
     return json(route, { message: `unmocked request: ${method} ${url.pathname}${url.search}` }, 404)
+  })
+
+  await page.route('**/functions/v1/**', async (route) => {
+    const fn = new URL(route.request().url()).pathname.split('/functions/v1/').pop()
+    if (fn === 'send-assignment') {
+      const body = route.request().postDataJSON() as { taskId: string }
+      db.assignmentNotifications.push({ taskId: body.taskId })
+      return json(route, { ok: true, delivered: 1, devices: 1 })
+    }
+    return json(route, { message: `unmocked function: ${fn}` }, 404)
   })
 
   // Realtime is best-effort in the app (a task list that just does not
