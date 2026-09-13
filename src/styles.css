@@ -800,7 +800,7 @@ input:focus-visible, select:focus-visible, button:focus-visible {
    the normal segment padding/font-size wraps "של אחרים" onto two lines and
    makes the whole bar taller. Shrinking just this bar keeps every label on
    one line without touching the 2-3-segment pickers elsewhere. */
-.owner-filter { gap: 2px; padding: 2px; }
+.owner-filter { gap: 2px; padding: 2px; margin-bottom: 14px; }
 .owner-filter .segment { padding: 8px 2px; font-size: 0.82rem; white-space: nowrap; }
 
 .segment {
