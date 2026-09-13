@@ -8,7 +8,7 @@
 // literal types here would force the English dictionary to contain these
 // exact strings. Without it, English is only required to match the shape.
 
-import { days, pointsWord, tasksWord } from '../format'
+import { days, peopleWord, pointsWord, tasksWord } from '../format'
 
 export const he = {
   appName: 'HouseHero',
@@ -80,6 +80,7 @@ export const he = {
     pointsBadge: (n: number) => `${n} נק'`,
     completedBy: (who: string) => `בוצעה על ידי ${who}`,
     completedByYou: 'בוצעה על ידך',
+    completedByGroup: (n: number) => `בוצעה על ידי ${peopleWord(n, 'he')}`,
     nextIn: (when: string) => `הבאה ${when}`,
     dueOn: (date: string) => `יעד: ${date}`,
     nextOn: (date: string) => `הבאה: ${date}`,
@@ -96,12 +97,27 @@ export const he = {
     snoozedUntil: (when: string) => `מושהה עד ${when}`,
     editAria: (name: string) => `עריכת ${name}`,
     completed: (name: string, points: number) => `${name} בוצעה. +${points} נקודות!`,
+    completedByGroupToast: (name: string, points: number, count: number) =>
+      `${name} בוצעה על ידי ${peopleWord(count, 'he')}! +${points} נק' לכל אחד/ת.`,
+    completedForToast: (name: string, who: string, points: number) =>
+      `${name} סומנה כבוצעה על ידי ${who}. +${points} נק'.`,
+  },
+
+  completion: {
+    title: 'מי ביצע את זה?',
+    self: 'אני ביצעתי',
+    together: 'כולם ביצעו יחד',
+    multiSelectTitle: 'בחירה מרובה',
+    confirmSelection: 'אישור',
+    you: 'אני',
   },
 
   history: {
     sectionTitle: 'היסטוריית הביצוע',
     empty: 'עוד לא בוצעה אף פעם.',
     entry: (who: string, points: number) => `${who} · +${points} נק'`,
+    entryGroup: (points: number, count: number) =>
+      `בוצע יחד · ${peopleWord(count, 'he')} · +${points} נק' לכל אחד/ת`,
     detail: {
       points: 'ניקוד',
       schedule: 'תבנית',

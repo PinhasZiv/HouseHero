@@ -198,14 +198,32 @@ export async function notifyAssignment(taskId: string): Promise<void> {
   }
 }
 
+export interface CompletionChoice {
+  /** Everyone to credit with the task's full point value - not split
+   * between them. Omitted or empty defaults to whoever calls this. */
+  userIds?: string[]
+}
+
 /**
- * Completes a task and awards its points to whoever called this. There is no
- * due-date check here on purpose - anyone in the space can complete a task
- * early, which is exactly the "I can see it needs doing right now" case.
+ * Completes a task and awards its points. There is no due-date check here on
+ * purpose - anyone in the space can complete a task early, which is exactly
+ * the "I can see it needs doing right now" case.
+ *
+ * By default this credits whoever calls it, same as always. `choice` lets
+ * the caller instead credit someone else, or several people at once - see
+ * complete_task() for how each is recorded.
  */
-export async function completeTask(taskId: string, today: string): Promise<TaskCompletion> {
+export async function completeTask(
+  taskId: string,
+  today: string,
+  choice: CompletionChoice = {},
+): Promise<TaskCompletion> {
   const { data, error } = await supabase
-    .rpc('complete_task', { p_task: taskId, p_today: today })
+    .rpc('complete_task', {
+      p_task: taskId,
+      p_today: today,
+      p_completed_by: choice.userIds && choice.userIds.length > 0 ? choice.userIds : null,
+    })
     .single()
   if (error) throw error
   return data as TaskCompletion
@@ -261,7 +279,7 @@ export async function cancelSnooze(taskId: string, userId: string): Promise<void
 export async function fetchHistory(taskId: string, limit = 20): Promise<TaskHistoryEntry[]> {
   const { data, error } = await supabase
     .from('task_completions')
-    .select('id, user_id, points_awarded, completed_on, created_at')
+    .select('id, user_id, points_awarded, completed_on, created_at, completion_group')
     .eq('task_id', taskId)
     .order('created_at', { ascending: false })
     .limit(limit)

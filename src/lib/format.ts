@@ -31,6 +31,13 @@ export function pointsWord(count: number, language: Language): string {
   return count === 1 ? 'נקודה אחת' : `${count} נקודות`
 }
 
+/** "שני אנשים" / "5 אנשים", or "2 people" / "5 people". */
+export function peopleWord(count: number, language: Language): string {
+  if (language === 'en') return count === 1 ? '1 person' : `${count} people`
+  if (count === 2) return 'שני אנשים'
+  return `${count} אנשים`
+}
+
 export function initials(name: string | null, email: string | null): string {
   const source = (name || email || '?').trim()
   const parts = source.split(/[\s@._-]+/).filter(Boolean)
@@ -49,8 +56,12 @@ export function firstName(
   return source.split(/[\s@]/)[0]
 }
 
-/** Who did something: you, someone else by name (if known), or nobody. */
-export type PersonLabel = { kind: 'you' } | { kind: 'other'; name: string | null } | null
+/** Who did something: you, someone else by name (if known), several people at once, or nobody. */
+export type PersonLabel =
+  | { kind: 'you' }
+  | { kind: 'other'; name: string | null }
+  | { kind: 'group'; count: number }
+  | null
 
 /**
  * Resolves a user id to "you" / a first name / "someone" - shared by every

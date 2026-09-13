@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { CompletionChoice } from '../lib/api'
 import { classify } from '../lib/taskDue'
 import { useApp } from '../state/AppState'
 import { useSnooze } from '../state/useSnooze'
 import { useCompletion } from '../state/useCompletion'
+import { CompletionSheet } from './CompletionSheet'
 import { TaskCard, completedByLabel } from './TaskCard'
 import { TaskHistory } from './TaskHistory'
 import { SnoozeSheet } from './SnoozeSheet'
@@ -40,6 +42,23 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
 
   const [sheetTargets, setSheetTargets] = useState<Task[] | null>(null)
   const [viewingHistory, setViewingHistory] = useState<Task | null>(null)
+  const [completing, setCompleting] = useState<{
+    task: Task
+    resolve: (result: boolean | void) => void
+  } | null>(null)
+
+  /** Opens the "who did this?" picker and resolves once a choice is made
+   *  (or the sheet is dismissed, resolving to undefined - a no-op). */
+  function requestComplete(task: Task): Promise<boolean | void> {
+    return new Promise((resolve) => setCompleting({ task, resolve }))
+  }
+
+  async function chooseCompletion(choice: CompletionChoice) {
+    if (!completing) return
+    const ok = await complete(completing.task, choice)
+    completing.resolve(ok)
+    setCompleting(null)
+  }
 
   // A snoozed task should come back on its own the moment the timer runs out,
   // without waiting for a navigation or a reload to force a re-render.
@@ -88,6 +107,13 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
   const spaceNames = useMemo(() => new Map(spaces.map((space) => [space.id, space.name])), [spaces])
   const showSpaceNames = spaces.length > 1
 
+  // Whoever was credited can undo, same as always; so can whoever actually
+  // tapped Done, even when they credited someone else - and if it was
+  // completed together, everyone was credited, so everyone can undo it.
+  function canUndo(task: Task): boolean {
+    return (selfId !== null && (task.last_completed_by ?? []).includes(selfId)) || task.last_completed_actor === selfId
+  }
+
   function assignedName(task: Task): string | null {
     if (!task.assigned_to) return null
     if (task.assigned_to === selfId) return t.task.assignedToYou
@@ -134,7 +160,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
               today={today}
               spaceName={showSpaceNames ? spaceNames.get(task.space_id) : undefined}
               assignedName={assignedName(task)}
-              onComplete={() => complete(task)}
+              onComplete={() => requestComplete(task)}
               onSnooze={() => setSheetTargets([task])}
               onOpen={() => setViewingHistory(task)}
             />
@@ -152,7 +178,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
               today={today}
               spaceName={showSpaceNames ? spaceNames.get(task.space_id) : undefined}
               assignedName={assignedName(task)}
-              onComplete={() => complete(task)}
+              onComplete={() => requestComplete(task)}
               onSnooze={() => setSheetTargets([task])}
               onOpen={() => setViewingHistory(task)}
             />
@@ -171,7 +197,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
               spaceName={showSpaceNames ? spaceNames.get(task.space_id) : undefined}
               assignedName={assignedName(task)}
               snoozedUntil={until}
-              onComplete={() => complete(task)}
+              onComplete={() => requestComplete(task)}
               onCancelSnooze={() => cancelSnooze(task)}
               onOpen={() => setViewingHistory(task)}
             />
@@ -191,7 +217,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
               today={today}
               spaceName={showSpaceNames ? spaceNames.get(task.space_id) : undefined}
               completedBy={completedByLabel(task, people, selfId, language)}
-              onUndo={task.last_completed_by === selfId ? () => undo(task) : undefined}
+              onUndo={canUndo(task) ? () => undo(task) : undefined}
               onOpen={() => setViewingHistory(task)}
             />
           ))}
@@ -210,6 +236,18 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
       )}
 
       {viewingHistory && <TaskHistory task={viewingHistory} onClose={() => setViewingHistory(null)} />}
+
+      {completing && selfId && (
+        <CompletionSheet
+          task={completing.task}
+          selfId={selfId}
+          onChoose={chooseCompletion}
+          onClose={() => {
+            completing.resolve(undefined)
+            setCompleting(null)
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -34,6 +34,7 @@ function baseTask(overrides: Partial<FakeDb['tasks'][number]>): FakeDb['tasks'][
     due_date: isoDaysFromToday(0),
     last_completed_date: null,
     last_completed_by: null,
+    last_completed_actor: null,
     is_done: false,
     assigned_to: null,
     created_by: FAKE_USER_ID,

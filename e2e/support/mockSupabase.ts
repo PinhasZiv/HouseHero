@@ -27,7 +27,8 @@ export interface FakeTask {
   reminder_minute: number
   due_date: string
   last_completed_date: string | null
-  last_completed_by: string | null
+  last_completed_by: string[] | null
+  last_completed_actor: string | null
   is_done: boolean
   assigned_to: string | null
   created_by: string
@@ -71,7 +72,15 @@ export interface FakeDb {
   spaces: { id: string; name: string; invite_code: string; created_by: string; created_at: string }[]
   tasks: FakeTask[]
   snoozes: Map<string, string> // task_id -> snoozed_until, this user only
-  taskCompletions: { id: string; task_id: string; user_id: string; points_awarded: number; completed_on: string; created_at: string }[]
+  taskCompletions: {
+    id: string
+    task_id: string
+    user_id: string
+    points_awarded: number
+    completed_on: string
+    created_at: string
+    completion_group: string | null
+  }[]
   rewards: FakeReward[]
   redemptions: FakeRedemption[]
   /** Other space members fetchPeople() should resolve names for. */
@@ -125,20 +134,24 @@ function eqValue(url: URL, column: string): string | null {
   return raw?.startsWith('eq.') ? raw.slice(3) : null
 }
 
+/** Credits one person's points, whether that's the signed-in profile or one of otherPeople. */
+function awardPoints(db: FakeDb, userId: string, points: number) {
+  if (userId === db.profile.id) {
+    db.profile.lifetime_points += points
+    db.profile.spendable_points += points
+    return
+  }
+  const person = db.otherPeople.find((p) => p.id === userId)
+  if (person) {
+    person.lifetime_points += points
+    person.spendable_points += points
+  }
+}
+
 /** Applies complete_task's rules well enough for the one_time/interval cases the suite exercises. */
-function applyCompleteTask(db: FakeDb, taskId: string, today: string) {
+function applyCompleteTask(db: FakeDb, taskId: string, today: string, completedBy: string[] | null) {
   const task = db.tasks.find((t) => t.id === taskId)
   if (!task) return null
-
-  const event = {
-    id: `completion-${db.taskCompletions.length + 1}`,
-    task_id: task.id,
-    user_id: FAKE_USER_ID,
-    points_awarded: task.points,
-    completed_on: today,
-    created_at: new Date().toISOString(),
-  }
-  db.taskCompletions.push(event)
 
   if (task.task_type === 'one_time') {
     task.is_done = true
@@ -148,13 +161,29 @@ function applyCompleteTask(db: FakeDb, taskId: string, today: string) {
     task.due_date = next.toISOString().slice(0, 10)
   }
   task.last_completed_date = today
-  task.last_completed_by = FAKE_USER_ID
+  task.last_completed_actor = FAKE_USER_ID
   task.occurrences_completed += 1
 
-  db.profile.lifetime_points += task.points
-  db.profile.spendable_points += task.points
+  const credited = completedBy && completedBy.length > 0 ? [...new Set(completedBy)] : [FAKE_USER_ID]
+  const groupId = credited.length > 1 ? `group-${db.taskCompletions.length + 1}` : null
+  let firstEvent = null
+  for (const userId of credited) {
+    const event = {
+      id: `completion-${db.taskCompletions.length + 1}`,
+      task_id: task.id,
+      user_id: userId,
+      points_awarded: task.points,
+      completed_on: today,
+      created_at: new Date().toISOString(),
+      completion_group: groupId,
+    }
+    db.taskCompletions.push(event)
+    awardPoints(db, userId, task.points)
+    if (!firstEvent) firstEvent = event
+  }
+  task.last_completed_by = credited
 
-  return event
+  return firstEvent
 }
 
 export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void> {
@@ -169,7 +198,12 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
       const body = request.postDataJSON() as Record<string, unknown>
 
       if (fn === 'complete_task') {
-        const event = applyCompleteTask(db, body.p_task as string, body.p_today as string)
+        const event = applyCompleteTask(
+          db,
+          body.p_task as string,
+          body.p_today as string,
+          (body.p_completed_by as string[] | null) ?? null,
+        )
         if (!event) return json(route, { message: 'no_such_task' }, 404)
         return json(route, wantsSingle ? event : [event])
       }
@@ -250,6 +284,7 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
         occurrences_completed: 0,
         last_completed_date: null,
         last_completed_by: null,
+        last_completed_actor: null,
         is_done: false,
         created_at: new Date().toISOString(),
         ...body,

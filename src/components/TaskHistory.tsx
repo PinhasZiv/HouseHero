@@ -60,6 +60,32 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
           people.get(task.assigned_to)?.display_name || people.get(task.assigned_to)?.email || t.task.someoneElse,
         )
 
+  // A "together" completion inserts one row per space member, all sharing
+  // completion_group - collapse those into a single entry rather than
+  // listing the same moment once per person.
+  const seenGroups = new Set<string>()
+  const displayEntries = (entries ?? [])
+    .filter((entry) => {
+      if (!entry.completion_group) return true
+      if (seenGroups.has(entry.completion_group)) return false
+      seenGroups.add(entry.completion_group)
+      return true
+    })
+    .map((entry) => {
+      const label = entry.completion_group
+        ? t.history.entryGroup(
+            entry.points_awarded,
+            (entries ?? []).filter((row) => row.completion_group === entry.completion_group).length,
+          )
+        : (() => {
+            const who = personLabel(entry.user_id, people, selfId, language)
+            const whoText =
+              who?.kind === 'other' ? t.task.completedBy(who.name ?? t.task.someoneElse) : t.task.completedByYou
+            return t.history.entry(whoText, entry.points_awarded)
+          })()
+      return { key: entry.id, date: entry.completed_on, label }
+    })
+
   return (
     <div className="sheet-backdrop" onClick={onClose} role="presentation">
       <div className="sheet" onClick={(event) => event.stopPropagation()}>
@@ -102,19 +128,12 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
           <p className="muted">{t.history.empty}</p>
         ) : (
           <ul className="history-list">
-            {entries.map((entry) => {
-              const who = personLabel(entry.user_id, people, selfId, language)
-              const whoText =
-                who?.kind === 'other'
-                  ? t.task.completedBy(who.name ?? t.task.someoneElse)
-                  : t.task.completedByYou
-              return (
-                <li key={entry.id} className="history-row">
-                  <span className="history-date">{formatDate(entry.completed_on, language)}</span>
-                  <span className="history-who">{t.history.entry(whoText, entry.points_awarded)}</span>
-                </li>
-              )
-            })}
+            {displayEntries.map((entry) => (
+              <li key={entry.key} className="history-row">
+                <span className="history-date">{formatDate(entry.date, language)}</span>
+                <span className="history-who">{entry.label}</span>
+              </li>
+            ))}
           </ul>
         )}
 

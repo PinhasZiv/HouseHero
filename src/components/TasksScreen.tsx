@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as api from '../lib/api'
+import type { CompletionChoice } from '../lib/api'
 import { classify } from '../lib/taskDue'
 import { useApp } from '../state/AppState'
 import { useCompletion } from '../state/useCompletion'
+import { CompletionSheet } from './CompletionSheet'
 import { TaskCard, completedByLabel } from './TaskCard'
 import { TaskForm, type TaskDraft } from './TaskForm'
 import { TaskHistory } from './TaskHistory'
@@ -44,6 +46,23 @@ export function TasksScreen() {
   const [editing, setEditing] = useState<Task | null>(null)
   const [viewingHistory, setViewingHistory] = useState<Task | null>(null)
   const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>('all')
+  const [completing, setCompleting] = useState<{
+    task: Task
+    resolve: (result: boolean | void) => void
+  } | null>(null)
+
+  /** Opens the "who did this?" picker and resolves once a choice is made
+   *  (or the sheet is dismissed, resolving to undefined - a no-op). */
+  function requestComplete(task: Task): Promise<boolean | void> {
+    return new Promise((resolve) => setCompleting({ task, resolve }))
+  }
+
+  async function chooseCompletion(choice: CompletionChoice) {
+    if (!completing) return
+    const ok = await complete(completing.task, choice)
+    completing.resolve(ok)
+    setCompleting(null)
+  }
 
   useEffect(() => {
     if (!currentSpace) return
@@ -132,6 +151,13 @@ export function TasksScreen() {
     return t.task.assignedTo(person?.display_name || person?.email || t.task.someoneElse)
   }
 
+  // Whoever was credited can undo, same as always; so can whoever actually
+  // tapped Done, even when they credited someone else instead.
+  function canUndo(task: Task): boolean {
+    const selfId = session?.user.id ?? null
+    return (selfId !== null && (task.last_completed_by ?? []).includes(selfId)) || task.last_completed_actor === selfId
+  }
+
   function renderCard(task: Task) {
     return (
       <TaskCard
@@ -140,8 +166,8 @@ export function TasksScreen() {
         today={today}
         assignedName={assignedName(task)}
         completedBy={completedByLabel(task, people, session?.user.id ?? null, language)}
-        onComplete={!task.is_done ? () => complete(task) : undefined}
-        onUndo={task.last_completed_by === session?.user.id ? () => undo(task) : undefined}
+        onComplete={!task.is_done ? () => requestComplete(task) : undefined}
+        onUndo={canUndo(task) ? () => undo(task) : undefined}
         onOpen={() => setViewingHistory(task)}
         onEdit={() => setEditing(task)}
       />
@@ -266,6 +292,18 @@ export function TasksScreen() {
         />
       )}
       {viewingHistory && <TaskHistory task={viewingHistory} onClose={() => setViewingHistory(null)} />}
+
+      {completing && session && (
+        <CompletionSheet
+          task={completing.task}
+          selfId={session.user.id}
+          onChoose={chooseCompletion}
+          onClose={() => {
+            completing.resolve(undefined)
+            setCompleting(null)
+          }}
+        />
+      )}
     </div>
   )
 }

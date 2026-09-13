@@ -5,7 +5,7 @@
 // half-translated interface is worse than an untranslated one, because you
 // only find the gaps by stumbling into them.
 
-import { days, pointsWord, tasksWord } from '../format'
+import { days, peopleWord, pointsWord, tasksWord } from '../format'
 import type { Strings } from './he'
 
 export const en: Strings = {
@@ -78,6 +78,7 @@ export const en: Strings = {
     pointsBadge: (n: number) => `${n} pts`,
     completedBy: (who: string) => `completed by ${who}`,
     completedByYou: 'completed by you',
+    completedByGroup: (n: number) => `completed by ${peopleWord(n, 'en')}`,
     nextIn: (when: string) => `next ${when}`,
     dueOn: (date: string) => `due: ${date}`,
     nextOn: (date: string) => `next: ${date}`,
@@ -94,12 +95,27 @@ export const en: Strings = {
     snoozedUntil: (when: string) => `Snoozed until ${when}`,
     editAria: (name: string) => `Edit ${name}`,
     completed: (name: string, points: number) => `${name} done. +${points} points!`,
+    completedByGroupToast: (name: string, points: number, count: number) =>
+      `${name} done by ${peopleWord(count, 'en')}! +${points} pts each.`,
+    completedForToast: (name: string, who: string, points: number) =>
+      `${name} marked as done by ${who}. +${points} pts.`,
+  },
+
+  completion: {
+    title: 'Who did this?',
+    self: 'I did it',
+    together: 'Everyone did it together',
+    multiSelectTitle: 'Pick who did it',
+    confirmSelection: 'Confirm',
+    you: 'me',
   },
 
   history: {
     sectionTitle: 'Completion history',
     empty: 'Not completed yet.',
     entry: (who: string, points: number) => `${who} · +${points} pts`,
+    entryGroup: (points: number, count: number) =>
+      `Done together · ${peopleWord(count, 'en')} · +${points} pts each`,
     detail: {
       points: 'Points',
       schedule: 'Schedule',

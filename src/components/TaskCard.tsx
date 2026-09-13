@@ -77,12 +77,14 @@ export function TaskCard({
     setBusy(true)
     try {
       const ok = await onComplete()
-      if (ok === false) {
-        failAt(x, y)
-      } else {
+      if (ok === true) {
         setJustCompleted(true)
         celebrateAt(x, y, task.points)
+      } else if (ok === false) {
+        failAt(x, y)
       }
+      // ok === undefined: the "who did this?" picker was opened and then
+      // cancelled - nothing happened, so no celebration and no failure mark.
     } finally {
       setBusy(false)
     }
@@ -147,7 +149,9 @@ export function TaskCard({
               <span>
                 {!completedBy || completedBy.kind === 'you'
                   ? t.task.completedByYou
-                  : t.task.completedBy(completedBy.name ?? t.task.someoneElse)}
+                  : completedBy.kind === 'group'
+                    ? t.task.completedByGroup(completedBy.count)
+                    : t.task.completedBy(completedBy.name ?? t.task.someoneElse)}
               </span>
               {task.task_type === 'recurring' && !task.is_done && (
                 <span>{t.task.nextIn(relativeDay(task.due_date, today, language))}</span>
@@ -226,5 +230,8 @@ export function completedByLabel(
   selfId: string | null,
   language: Language,
 ): CompletedBy {
-  return personLabel(task.last_completed_by, people, selfId, language)
+  const ids = task.last_completed_by ?? []
+  if (ids.length === 0) return null
+  if (ids.length > 1) return { kind: 'group', count: ids.length }
+  return personLabel(ids[0], people, selfId, language)
 }

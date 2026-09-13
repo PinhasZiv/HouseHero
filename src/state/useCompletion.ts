@@ -1,5 +1,7 @@
+import { firstName } from '../lib/format'
 import { planCompletion } from '../lib/taskDue'
 import * as api from '../lib/api'
+import type { CompletionChoice } from '../lib/api'
 import { useI18n } from '../lib/i18n'
 import { useToast } from '../components/Toast'
 import { useApp } from './AppState'
@@ -11,8 +13,8 @@ import type { Task } from '../lib/types'
  * Tasks list" cannot drift into two different implementations.
  */
 export function useCompletion() {
-  const { today, session, profile, setProfile, patchTask, reload } = useApp()
-  const { t } = useI18n()
+  const { today, session, profile, people, setProfile, patchTask, reload } = useApp()
+  const { t, language } = useI18n()
   const toast = useToast()
   const selfId = session?.user.id ?? null
 
@@ -20,24 +22,31 @@ export function useCompletion() {
    * Marks a task done right now. There is no due-date check - a task someone
    * notices needs doing can be completed even if the schedule says it is not
    * due for days yet, which restarts a recurring task's schedule from today.
+   *
+   * `choice` defaults to crediting whoever calls this. It can instead credit
+   * someone else, or several people at once - see CompletionChoice and
+   * complete_task() for what each does server-side.
    */
-  async function complete(task: Task): Promise<boolean> {
+  async function complete(task: Task, choice: CompletionChoice = {}): Promise<boolean> {
     if (!selfId) return false
     // Optimistic: the tap should feel instant even on a slow connection. If
     // the write fails, reload() brings back the real state.
     const previousTask = { ...task }
     const previousProfile = profile ? { ...profile } : null
     const outcome = planCompletion(task, today)
+    const credited = choice.userIds && choice.userIds.length > 0 ? choice.userIds : [selfId]
+    const creditsSelf = credited.includes(selfId)
 
     patchTask({
       ...task,
       due_date: outcome.nextDueDate ?? task.due_date,
       last_completed_date: today,
-      last_completed_by: selfId,
+      last_completed_by: credited,
+      last_completed_actor: selfId,
       occurrences_completed: outcome.occurrencesCompleted,
       is_done: outcome.finished,
     })
-    if (profile) {
+    if (creditsSelf && profile) {
       setProfile({
         ...profile,
         lifetime_points: profile.lifetime_points + task.points,
@@ -46,20 +55,32 @@ export function useCompletion() {
     }
 
     try {
-      await api.completeTask(task.id, today)
-      toast.show(t.task.completed(task.title, task.points), {
-        action: {
-          label: t.common.undo,
-          // The toast's Undo calls the same undo action the persistent button
-          // calls, just without its own confirmation - the toast itself is
-          // confirmation enough that the action registered.
-          run: () => undo(task, { silent: true }),
-        },
-      })
+      await api.completeTask(task.id, today, choice)
+      if (credited.length > 1) {
+        toast.show(t.task.completedByGroupToast(task.title, task.points, credited.length))
+      } else if (credited[0] !== selfId) {
+        const person = people.get(credited[0])
+        const who = person ? firstName(person.display_name, person.email, language) : t.task.someoneElse
+        toast.show(t.task.completedForToast(task.title, who, task.points))
+      } else {
+        toast.show(t.task.completed(task.title, task.points), {
+          action: {
+            label: t.common.undo,
+            // The toast's Undo calls the same undo action the persistent button
+            // calls, just without its own confirmation - the toast itself is
+            // confirmation enough that the action registered.
+            run: () => undo(task, { silent: true }),
+          },
+        })
+      }
+      // Crediting anyone besides whoever tapped Done changes points and
+      // completed-today state for people this hook has no optimistic patch
+      // for - a plain reload picks up their fresh balances instead.
+      if (credited.length > 1 || !creditsSelf) void reload()
       return true
     } catch (cause) {
       patchTask(previousTask)
-      if (previousProfile) setProfile(previousProfile)
+      if (creditsSelf && previousProfile) setProfile(previousProfile)
       toast.showError(cause)
       void reload()
       return false

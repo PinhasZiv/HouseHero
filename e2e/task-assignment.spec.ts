@@ -73,6 +73,7 @@ test.describe('task assignment notifications', () => {
           due_date: new Date().toISOString().slice(0, 10),
           last_completed_date: null,
           last_completed_by: null,
+          last_completed_actor: null,
           is_done: false,
           assigned_to: null,
           created_by: FAKE_USER_ID,

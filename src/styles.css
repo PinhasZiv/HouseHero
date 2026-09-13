@@ -653,6 +653,33 @@ button { font: inherit; cursor: pointer; }
 .sheet-actions { display: flex; gap: 10px; }
 .sheet-actions .btn { flex: 1; }
 
+/* The completion picker can grow tall (a member checklist on top of the two
+   quick buttons), and .sheet scrolls internally - without this, Cancel can
+   end up below the fold, reachable only by scrolling past everything else. */
+.sheet-actions-sticky {
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+  padding-top: 10px;
+  margin-top: -6px;
+}
+
+.completion-options { display: flex; flex-direction: column; gap: 8px; }
+
+.completion-checklist { display: flex; flex-direction: column; gap: 2px; }
+
+.completion-check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.95rem;
+}
+
+.completion-check-row:last-child { border-bottom: 0; }
+.completion-check-row input { width: 20px; height: 20px; accent-color: var(--accent); }
+
 /* ------------------------------------------------------- task detail --- */
 
 .task-detail-description {

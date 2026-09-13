@@ -51,7 +51,12 @@ export interface Task {
   reminder_minute: number
   due_date: string
   last_completed_date: string | null
-  last_completed_by: string | null
+  /** Everyone credited for the most recent completion - one id for a normal
+   *  completion, several when it was logged as done by more than one person. */
+  last_completed_by: string[] | null
+  /** Who actually tapped Done for the most recent completion - may differ
+   *  from last_completed_by when that credited someone else instead. */
+  last_completed_actor: string | null
   is_done: boolean
   assigned_to: string | null
   created_by: string
@@ -65,6 +70,8 @@ export interface TaskCompletion {
   user_id: string
   points_awarded: number
   completed_on: string
+  /** Non-null only for a "together" completion - every row of the same event shares this id. */
+  completion_group: string | null
 }
 
 /**
@@ -77,6 +84,8 @@ export interface TaskHistoryEntry {
   user_id: string
   points_awarded: number
   completed_on: string
+  /** Non-null only for a "together" completion - every row of the same event shares this id, so the UI can collapse them into one entry. */
+  completion_group: string | null
   created_at: string
 }
 
