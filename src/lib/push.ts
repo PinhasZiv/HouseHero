@@ -1,6 +1,6 @@
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { t } from './i18n'
-import { withRetry } from './retry'
+import { COLD_START_RETRY_DELAYS_MS, withRetry } from './retry'
 import { VAPID_PUBLIC_KEY, supabase } from './supabase'
 
 // Getting a browser subscribed to push is a four-step handshake, and each step
@@ -135,7 +135,7 @@ export async function restorePushIfGranted(userId: string): Promise<void> {
   if (!pushSupported() || !VAPID_PUBLIC_KEY) return
   if (!shouldAutoRestorePush(Notification.permission, await currentPushState())) return
   try {
-    await withRetry(() => enablePush(userId), [1200, 2500])
+    await withRetry(() => enablePush(userId), COLD_START_RETRY_DELAYS_MS)
   } catch (error) {
     console.error('could not silently restore the push subscription', error)
   }

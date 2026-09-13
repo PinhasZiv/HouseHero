@@ -17,3 +17,13 @@ export async function withRetry<T>(fn: () => Promise<T>, delaysMs: number[]): Pr
     }
   }
 }
+
+/**
+ * How long to keep silently retrying a cold-start fetch (the initial data
+ * load, and restoring a push subscription) before finally showing an error.
+ * Two retries at 1.2s/2.5s (under 4s total) still occasionally lost to a
+ * slower reconnect - a spotty connection recovering, not just a WiFi/LTE
+ * handoff - so this adds a third, longer attempt: four tries in total,
+ * spread over up to 10s, before giving up and showing a real error screen.
+ */
+export const COLD_START_RETRY_DELAYS_MS = [1000, 2000, 4000]

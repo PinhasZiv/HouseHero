@@ -12,7 +12,7 @@ import type { Session } from '@supabase/supabase-js'
 import { errorMessage } from '../lib/errors'
 import { getLanguage, isLanguage, setLanguage } from '../lib/i18n'
 import { restorePushIfGranted } from '../lib/push'
-import { withRetry } from '../lib/retry'
+import { COLD_START_RETRY_DELAYS_MS, withRetry } from '../lib/retry'
 import { supabase } from '../lib/supabase'
 import { todayIn } from '../lib/taskDue'
 import * as api from '../lib/api'
@@ -125,10 +125,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // A cold start (opening the PWA after it sat backgrounded, or from
       // fully closed) can race the very first request against a session
       // token that is still being refreshed, or a network interface that has
-      // not woken up yet - a WiFi/LTE handoff can take a few seconds, not
-      // just one. That clears up on its own, which is all "press try again"
-      // ever did, so this retries silently rather than making it a manual step.
-      const result = await withRetry(fetchEverything, [1200, 2500])
+      // not woken up yet - a WiFi/LTE handoff, or a spotty connection still
+      // recovering, can take several seconds, not just one. That clears up
+      // on its own, which is all "press try again" ever did, so this retries
+      // silently rather than making it a manual step.
+      const result = await withRetry(fetchEverything, COLD_START_RETRY_DELAYS_MS)
       const [nextProfile, nextSpaces, nextTasks, nextPeople, nextSnoozes] = result
       setProfile(nextProfile)
       adoptLanguage(nextProfile)
