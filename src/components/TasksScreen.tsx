@@ -178,7 +178,7 @@ export function TasksScreen() {
         </div>
       ) : (
         <>
-          <div className="segmented" role="tablist">
+          <div className="segmented owner-filter" role="tablist">
             <button
               type="button"
               role="tab"

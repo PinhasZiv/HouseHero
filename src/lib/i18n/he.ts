@@ -180,7 +180,7 @@ export const he = {
     filterAll: 'הכל',
     filterMine: 'שלי',
     filterEveryone: 'של כולם',
-    filterOthers: 'לאחרים',
+    filterOthers: 'של אחרים',
     groupMine: 'המשימות שלי',
     groupEveryone: 'משימות של כולם',
     groupOthers: 'משויכות לאחרים',
