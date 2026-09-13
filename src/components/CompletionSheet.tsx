@@ -80,7 +80,13 @@ export function CompletionSheet({ task, selfId, onChoose, onClose }: CompletionS
             type="button"
             className="btn btn-primary"
             disabled={busy}
-            onClick={() => void choose({ userIds: [selfId] })}
+            onClick={() =>
+              // With others in the space, this only sets the checklist below -
+              // nothing is submitted until Confirm is tapped. Alone in the
+              // space there is no checklist to confirm from, so it acts right
+              // away, same as before.
+              hasOthers ? setSelected(new Set([selfId])) : void choose({ userIds: [selfId] })
+            }
           >
             {t.completion.self}
           </button>
@@ -90,7 +96,7 @@ export function CompletionSheet({ task, selfId, onChoose, onClose }: CompletionS
               type="button"
               className="btn"
               disabled={busy}
-              onClick={() => void choose({ userIds: roster.map((member) => member.user_id) })}
+              onClick={() => setSelected(new Set(roster.map((member) => member.user_id)))}
             >
               {t.completion.together}
             </button>

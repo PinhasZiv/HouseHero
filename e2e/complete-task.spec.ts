@@ -101,6 +101,32 @@ test.describe('completing a task', () => {
     expect(db.taskCompletions.length).toBe(0)
   })
 
+  test('the quick "everyone"/"I did it" buttons only preset the checklist - nothing happens until Confirm', async ({
+    page,
+  }) => {
+    const db = makeFakeDb({
+      tasks: [baseTask({ id: 'task-once', title: 'לנקות את המטבח', points: 20 })],
+      otherPeople: [
+        { id: OTHER_ID, display_name: 'דנה כהן', avatar_url: null, email: 'dana@example.com', lifetime_points: 0, spendable_points: 0 },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+
+    const card = page.locator('.task-card', { hasText: 'לנקות את המטבח' })
+    await card.getByRole('button', { name: /סימון .* כבוצעה/ }).click()
+    const sheet = page.locator('.sheet', { hasText: 'מי ביצע את זה?' })
+
+    await sheet.getByRole('button', { name: 'כולם ביצעו יחד' }).click()
+    await sheet.getByRole('button', { name: 'אני ביצעתי' }).click()
+
+    // Neither quick button submitted anything by itself - the sheet is
+    // still open and no completion was recorded yet.
+    await expect(sheet).toBeVisible()
+    expect(db.tasks[0].is_done).toBe(false)
+    expect(db.taskCompletions.length).toBe(0)
+  })
+
   test('choosing "everyone did it together" credits every space member with the full points', async ({ page }) => {
     const db = makeFakeDb({
       tasks: [baseTask({ id: 'task-once', title: 'לנקות את המטבח', points: 20 })],
@@ -113,7 +139,14 @@ test.describe('completing a task', () => {
 
     const card = page.locator('.task-card', { hasText: 'לנקות את המטבח' })
     await card.getByRole('button', { name: /סימון .* כבוצעה/ }).click()
-    await page.getByRole('button', { name: 'כולם ביצעו יחד' }).click()
+    // "Everyone did it together" only checks everyone in the list below -
+    // nothing happens until Confirm is tapped.
+    const sheet = page.locator('.sheet', { hasText: 'מי ביצע את זה?' })
+    await sheet.getByRole('button', { name: 'כולם ביצעו יחד' }).click()
+    for (const checkbox of await sheet.getByRole('checkbox').all()) {
+      await expect(checkbox).toBeChecked()
+    }
+    await sheet.getByRole('button', { name: 'אישור' }).click()
 
     await expect(page.locator('.toast')).toContainText('+20 נק')
     await expect(page.locator('.task-card', { hasText: 'לנקות את המטבח' })).toContainText('בוצעה על ידי שני אנשים')
