@@ -31,6 +31,8 @@ function draftToNewTask(draft: TaskDraft, spaceId: string) {
   }
 }
 
+type OwnerFilter = 'all' | 'mine' | 'everyone' | 'others'
+
 /** Every task in the selected space, whether or not it needs anything today. */
 export function TasksScreen() {
   const { tasks, currentSpace, today, session, people, reload, patchTask, removeTask } = useApp()
@@ -41,6 +43,7 @@ export function TasksScreen() {
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Task | null>(null)
   const [viewingHistory, setViewingHistory] = useState<Task | null>(null)
+  const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>('all')
 
   useEffect(() => {
     if (!currentSpace) return
@@ -70,6 +73,18 @@ export function TasksScreen() {
         }),
     [tasks, currentSpace, today],
   )
+
+  const ownerGroups = useMemo(() => {
+    const mine: Task[] = []
+    const everyone: Task[] = []
+    const others: Task[] = []
+    for (const task of spaceTasks) {
+      if (!task.assigned_to) everyone.push(task)
+      else if (task.assigned_to === session?.user.id) mine.push(task)
+      else others.push(task)
+    }
+    return { mine, everyone, others }
+  }, [spaceTasks, session])
 
   if (!currentSpace) return null
 
@@ -117,6 +132,34 @@ export function TasksScreen() {
     return t.task.assignedTo(person?.display_name || person?.email || t.task.someoneElse)
   }
 
+  function renderCard(task: Task) {
+    return (
+      <TaskCard
+        key={task.id}
+        task={task}
+        today={today}
+        assignedName={assignedName(task)}
+        completedBy={completedByLabel(task, people, session?.user.id ?? null, language)}
+        onComplete={!task.is_done ? () => complete(task) : undefined}
+        onUndo={task.last_completed_by === session?.user.id ? () => undo(task) : undefined}
+        onOpen={() => setViewingHistory(task)}
+        onEdit={() => setEditing(task)}
+      />
+    )
+  }
+
+  // The "others" filter only earns its own tab once it can ever hold
+  // something - in a two-person space every task is either mine or
+  // everyone's, so a permanently-empty tab would just be clutter.
+  const hasOthers = ownerGroups.others.length > 0
+  const showMine = ownerFilter === 'all' || ownerFilter === 'mine'
+  const showEveryone = ownerFilter === 'all' || ownerFilter === 'everyone'
+  const showOthers = ownerFilter === 'all' || ownerFilter === 'others'
+  const visibleCount =
+    (showMine ? ownerGroups.mine.length : 0) +
+    (showEveryone ? ownerGroups.everyone.length : 0) +
+    (showOthers ? ownerGroups.others.length : 0)
+
   return (
     <div className="screen fade-in">
       <header className="screen-header">
@@ -134,21 +177,75 @@ export function TasksScreen() {
           </button>
         </div>
       ) : (
-        <section className="task-group">
-          {spaceTasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              today={today}
-              assignedName={assignedName(task)}
-              completedBy={completedByLabel(task, people, session?.user.id ?? null, language)}
-              onComplete={!task.is_done ? () => complete(task) : undefined}
-              onUndo={task.last_completed_by === session?.user.id ? () => undo(task) : undefined}
-              onOpen={() => setViewingHistory(task)}
-              onEdit={() => setEditing(task)}
-            />
-          ))}
-        </section>
+        <>
+          <div className="segmented" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={ownerFilter === 'all'}
+              className={ownerFilter === 'all' ? 'segment segment-active' : 'segment'}
+              onClick={() => setOwnerFilter('all')}
+            >
+              {t.tasks.filterAll}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={ownerFilter === 'mine'}
+              className={ownerFilter === 'mine' ? 'segment segment-active' : 'segment'}
+              onClick={() => setOwnerFilter('mine')}
+            >
+              {t.tasks.filterMine}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={ownerFilter === 'everyone'}
+              className={ownerFilter === 'everyone' ? 'segment segment-active' : 'segment'}
+              onClick={() => setOwnerFilter('everyone')}
+            >
+              {t.tasks.filterEveryone}
+            </button>
+            {hasOthers && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={ownerFilter === 'others'}
+                className={ownerFilter === 'others' ? 'segment segment-active' : 'segment'}
+                onClick={() => setOwnerFilter('others')}
+              >
+                {t.tasks.filterOthers}
+              </button>
+            )}
+          </div>
+
+          {showMine && ownerGroups.mine.length > 0 && (
+            <section className="task-group">
+              {ownerFilter === 'all' && <h3 className="group-title">{t.tasks.groupMine}</h3>}
+              {ownerGroups.mine.map(renderCard)}
+            </section>
+          )}
+
+          {showEveryone && ownerGroups.everyone.length > 0 && (
+            <section className="task-group">
+              {ownerFilter === 'all' && <h3 className="group-title">{t.tasks.groupEveryone}</h3>}
+              {ownerGroups.everyone.map(renderCard)}
+            </section>
+          )}
+
+          {showOthers && ownerGroups.others.length > 0 && (
+            <section className="task-group">
+              {ownerFilter === 'all' && <h3 className="group-title">{t.tasks.groupOthers}</h3>}
+              {ownerGroups.others.map(renderCard)}
+            </section>
+          )}
+
+          {visibleCount === 0 && (
+            <div className="empty-state">
+              <p>{t.tasks.empty}</p>
+            </div>
+          )}
+        </>
       )}
 
       <button type="button" className="fab" onClick={() => setAdding(true)} aria-label={t.tasks.addAria}>

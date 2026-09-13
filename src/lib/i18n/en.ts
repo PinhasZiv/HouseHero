@@ -175,6 +175,13 @@ export const en: Strings = {
     addAria: 'Add a task',
     added: (name: string) => `${name} added.`,
     deleted: 'Task deleted.',
+    filterAll: 'All',
+    filterMine: 'Mine',
+    filterEveryone: "Everyone's",
+    filterOthers: "Others'",
+    groupMine: 'My tasks',
+    groupEveryone: "Everyone's tasks",
+    groupOthers: "Assigned to others",
   },
 
   rewards: {

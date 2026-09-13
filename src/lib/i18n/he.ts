@@ -177,6 +177,13 @@ export const he = {
     addAria: 'הוספת משימה',
     added: (name: string) => `${name} נוספה.`,
     deleted: 'המשימה נמחקה.',
+    filterAll: 'הכל',
+    filterMine: 'שלי',
+    filterEveryone: 'של כולם',
+    filterOthers: 'לאחרים',
+    groupMine: 'המשימות שלי',
+    groupEveryone: 'משימות של כולם',
+    groupOthers: 'משויכות לאחרים',
   },
 
   rewards: {
