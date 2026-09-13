@@ -1,4 +1,5 @@
 import { t } from './i18n'
+import { COLD_START_RETRY_DELAYS_MS, withRetry } from './retry'
 import { supabase } from './supabase'
 import type {
   Member,
@@ -187,8 +188,14 @@ export async function deleteTask(taskId: string): Promise<void> {
  * callers fire this without awaiting its result.
  */
 export async function notifyAssignment(taskId: string): Promise<void> {
-  const { error } = await supabase.functions.invoke('send-assignment', { body: { taskId } })
-  if (error) console.error('could not send the assignment notification', error)
+  try {
+    await withRetry(async () => {
+      const { error } = await supabase.functions.invoke('send-assignment', { body: { taskId } })
+      if (error) throw error
+    }, COLD_START_RETRY_DELAYS_MS)
+  } catch (cause) {
+    console.error('could not send the assignment notification', cause)
+  }
 }
 
 /**

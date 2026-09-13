@@ -14,23 +14,41 @@ export interface AppConfig {
   cronSecret: string
 }
 
+// A gateway timeout talking to Postgres from inside the function - a
+// transient infra blip, seen once in practice right as send-assignment ran -
+// looks identical to a genuinely missing app_config row: both come back as
+// `error` here. Without a retry, that one blip silently failed the whole
+// notification with no visible trace anywhere (the client only logs it to
+// its own console), which is worse than the config actually being missing -
+// that case is at least permanent and shows up on every call. A few retries
+// tell the two apart: a real setup problem still fails after all of them,
+// but a one-off timeout clears within a second or two.
+const RETRY_DELAYS_MS = [0, 500, 1500]
+
 export async function loadConfig(admin: SupabaseClient): Promise<AppConfig | null> {
-  const { data, error } = await admin
-    .from('app_config')
-    .select('vapid_public_key, vapid_private_key, vapid_subject, cron_secret')
-    .single()
+  let lastError: unknown = null
 
-  if (error || !data) {
-    console.error('app_config is missing - has the setup SQL been run?', error)
-    return null
+  for (const delayMs of RETRY_DELAYS_MS) {
+    if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs))
+
+    const { data, error } = await admin
+      .from('app_config')
+      .select('vapid_public_key, vapid_private_key, vapid_subject, cron_secret')
+      .single()
+
+    if (!error && data) {
+      return {
+        vapid: {
+          publicKey: data.vapid_public_key,
+          privateKey: data.vapid_private_key,
+          subject: data.vapid_subject,
+        },
+        cronSecret: data.cron_secret,
+      }
+    }
+    lastError = error
   }
 
-  return {
-    vapid: {
-      publicKey: data.vapid_public_key,
-      privateKey: data.vapid_private_key,
-      subject: data.vapid_subject,
-    },
-    cronSecret: data.cron_secret,
-  }
+  console.error('app_config is missing - has the setup SQL been run?', lastError)
+  return null
 }
