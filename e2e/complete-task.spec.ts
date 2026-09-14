@@ -62,8 +62,10 @@ test.describe('completing a task', () => {
     await card.getByRole('button', { name: /סימון .* כבוצעה/ }).click()
 
     // The "who did this?" picker opens rather than completing right away.
+    // Alone in the space there is no segmented control to choose from - just
+    // Confirm, defaulting to "I did it".
     await expect(page.getByRole('heading', { name: 'מי ביצע את זה?' })).toBeVisible()
-    await page.getByRole('button', { name: 'אני ביצעתי' }).click()
+    await page.getByRole('button', { name: 'אישור' }).click()
 
     // A toast confirms the points, and the task now sits in "בוצעו היום"
     // rather than the due list.
@@ -101,9 +103,7 @@ test.describe('completing a task', () => {
     expect(db.taskCompletions.length).toBe(0)
   })
 
-  test('the quick "everyone"/"I did it" buttons only preset the checklist - nothing happens until Confirm', async ({
-    page,
-  }) => {
+  test('selecting a segment only changes which option is active - nothing happens until Confirm', async ({ page }) => {
     const db = makeFakeDb({
       tasks: [baseTask({ id: 'task-once', title: 'לנקות את המטבח', points: 20 })],
       otherPeople: [
@@ -117,11 +117,11 @@ test.describe('completing a task', () => {
     await card.getByRole('button', { name: /סימון .* כבוצעה/ }).click()
     const sheet = page.locator('.sheet', { hasText: 'מי ביצע את זה?' })
 
-    await sheet.getByRole('button', { name: 'כולם ביצעו יחד' }).click()
-    await sheet.getByRole('button', { name: 'אני ביצעתי' }).click()
+    await sheet.getByRole('tab', { name: 'כולם ביצעו יחד' }).click()
+    await sheet.getByRole('tab', { name: 'אני ביצעתי' }).click()
 
-    // Neither quick button submitted anything by itself - the sheet is
-    // still open and no completion was recorded yet.
+    // Switching segments back and forth submitted nothing by itself - the
+    // sheet is still open and no completion was recorded yet.
     await expect(sheet).toBeVisible()
     expect(db.tasks[0].is_done).toBe(false)
     expect(db.taskCompletions.length).toBe(0)
@@ -139,13 +139,10 @@ test.describe('completing a task', () => {
 
     const card = page.locator('.task-card', { hasText: 'לנקות את המטבח' })
     await card.getByRole('button', { name: /סימון .* כבוצעה/ }).click()
-    // "Everyone did it together" only checks everyone in the list below -
-    // nothing happens until Confirm is tapped.
+    // Selecting the "everyone" segment only activates that option - nothing
+    // happens until Confirm is tapped.
     const sheet = page.locator('.sheet', { hasText: 'מי ביצע את זה?' })
-    await sheet.getByRole('button', { name: 'כולם ביצעו יחד' }).click()
-    for (const checkbox of await sheet.getByRole('checkbox').all()) {
-      await expect(checkbox).toBeChecked()
-    }
+    await sheet.getByRole('tab', { name: 'כולם ביצעו יחד' }).click()
     await sheet.getByRole('button', { name: 'אישור' }).click()
 
     await expect(page.locator('.toast')).toContainText('+20 נק')
@@ -177,10 +174,14 @@ test.describe('completing a task', () => {
 
     const card = page.locator('.task-card', { hasText: 'לקפל כביסה' })
     await card.getByRole('button', { name: /סימון .* כבוצעה/ }).click()
-    await expect(page.getByRole('heading', { name: 'בחירה מרובה' })).toBeVisible()
+    const sheet = page.locator('.sheet', { hasText: 'מי ביצע את זה?' })
+
+    // The member checklist is not shown until the "custom" segment is chosen.
+    await expect(sheet.getByRole('checkbox')).toHaveCount(0)
+    await sheet.getByRole('tab', { name: 'בחירה מרובה' }).click()
+    await expect(sheet.getByRole('checkbox')).toHaveCount(2)
 
     // The tapper is checked by default - uncheck them and check Dana instead.
-    const sheet = page.locator('.sheet', { hasText: 'מי ביצע את זה?' })
     await sheet.getByRole('checkbox').nth(0).uncheck()
     await sheet.getByRole('checkbox').nth(1).check()
     await sheet.getByRole('button', { name: 'אישור' }).click()
@@ -208,10 +209,11 @@ test.describe('completing a task', () => {
 
     const card = page.locator('.task-card', { hasText: 'לסדר את הסלון' })
     await card.getByRole('button', { name: /סימון .* כבוצעה/ }).click()
+    const sheet = page.locator('.sheet', { hasText: 'מי ביצע את זה?' })
+    await sheet.getByRole('tab', { name: 'בחירה מרובה' }).click()
 
     // Keep the tapper checked (default) and additionally check Dana, leaving
     // Yossi unchecked.
-    const sheet = page.locator('.sheet', { hasText: 'מי ביצע את זה?' })
     await sheet.getByRole('checkbox').nth(1).check()
     await sheet.getByRole('button', { name: 'אישור' }).click()
 

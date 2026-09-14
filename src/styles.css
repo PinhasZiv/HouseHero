@@ -653,9 +653,10 @@ button { font: inherit; cursor: pointer; }
 .sheet-actions { display: flex; gap: 10px; }
 .sheet-actions .btn { flex: 1; }
 
-/* The completion picker can grow tall (a member checklist on top of the two
-   quick buttons), and .sheet scrolls internally - without this, Cancel can
-   end up below the fold, reachable only by scrolling past everything else. */
+/* The completion picker can grow tall (a member checklist under the
+   segmented control), and .sheet scrolls internally - without this, Cancel
+   can end up below the fold, reachable only by scrolling past everything
+   else. */
 .sheet-actions-sticky {
   position: sticky;
   bottom: 0;
@@ -663,8 +664,6 @@ button { font: inherit; cursor: pointer; }
   padding-top: 10px;
   margin-top: -6px;
 }
-
-.completion-options { display: flex; flex-direction: column; gap: 8px; }
 
 .completion-checklist { display: flex; flex-direction: column; gap: 2px; }
 
