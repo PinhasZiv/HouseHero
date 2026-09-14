@@ -66,9 +66,11 @@ export function StatsScreen() {
 
     const leaderboard = [...byPerson.entries()].sort((a, b) => b[1].points - a[1].points)
     const topTask = [...byTask.values()].sort((a, b) => b.count - a.count)[0] ?? null
-    const totalTasksDone = [...byPerson.values()].reduce((sum, entry) => sum + entry.count, 0)
+    // Points, not task count, so a hard task pulls its own weight - it can
+    // be worth as much as several easy ones.
+    const totalPoints = [...byPerson.values()].reduce((sum, entry) => sum + entry.points, 0)
 
-    return { leaderboard, topTask, total, last7Days, totalTasksDone }
+    return { leaderboard, topTask, total, last7Days, totalPoints }
   }, [completions, today])
 
   if (!currentSpace) return null
@@ -97,10 +99,11 @@ export function StatsScreen() {
                   userId === session?.user.id
                     ? t.space.you
                     : person?.display_name || person?.email || t.task.someoneElse
-                // How much of the household's total work this person did -
+                // How much of the household's total effort this person
+                // contributed, weighted by points rather than task count -
                 // only meaningful to show once there is someone to compare
                 // against.
-                const share = stats.totalTasksDone > 0 ? Math.round((entry.count / stats.totalTasksDone) * 100) : 0
+                const share = stats.totalPoints > 0 ? Math.round((entry.points / stats.totalPoints) * 100) : 0
                 return (
                   <li key={userId} className="leaderboard-row">
                     <span className="leaderboard-rank">{index + 1}</span>

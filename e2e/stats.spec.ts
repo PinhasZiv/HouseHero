@@ -146,4 +146,112 @@ test.describe('stats screen', () => {
 
     await expect(page.locator('.stat-tile', { hasText: 'מאז ומתמיד' }).locator('.points-value')).toHaveText('2')
   })
+
+  test('the contribution share is weighted by points, not task count', async ({ page }) => {
+    // Test does one hard task worth 30 points; Dana does three easy ones
+    // worth 10 each - the same 30 points, from three separate completions.
+    // By count that would read 25%/75%; by points it must read 50%/50%.
+    const db = makeFakeDb({
+      tasks: [
+        {
+          id: 'task-hard',
+          space_id: FAKE_SPACE_ID,
+          title: 'לנקות את הגראז',
+          description: null,
+          task_type: 'one_time',
+          recurrence_mode: null,
+          interval_days: null,
+          weekly_days: null,
+          end_condition: 'never',
+          end_after_count: null,
+          end_date: null,
+          occurrences_completed: 1,
+          points: 30,
+          reminder_hour: 9,
+          reminder_minute: 0,
+          due_date: isoDaysFromToday(1),
+          last_completed_date: isoDaysFromToday(0),
+          last_completed_by: [FAKE_USER_ID],
+          last_completed_actor: FAKE_USER_ID,
+          is_done: true,
+          assigned_to: null,
+          created_by: FAKE_USER_ID,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: 'task-easy',
+          space_id: FAKE_SPACE_ID,
+          title: 'לקפל כביסה',
+          description: null,
+          task_type: 'recurring',
+          recurrence_mode: 'interval',
+          interval_days: 1,
+          weekly_days: null,
+          end_condition: 'never',
+          end_after_count: null,
+          end_date: null,
+          occurrences_completed: 3,
+          points: 10,
+          reminder_hour: 9,
+          reminder_minute: 0,
+          due_date: isoDaysFromToday(1),
+          last_completed_date: isoDaysFromToday(0),
+          last_completed_by: [OTHER_ID],
+          last_completed_actor: OTHER_ID,
+          is_done: false,
+          assigned_to: null,
+          created_by: FAKE_USER_ID,
+          created_at: new Date().toISOString(),
+        },
+      ],
+      otherPeople: [
+        { id: OTHER_ID, display_name: 'דנה כהן', avatar_url: null, email: 'dana@example.com', lifetime_points: 30, spendable_points: 30 },
+      ],
+      taskCompletions: [
+        {
+          id: 'e-hard',
+          task_id: 'task-hard',
+          user_id: FAKE_USER_ID,
+          points_awarded: 30,
+          completed_on: isoDaysFromToday(0),
+          created_at: new Date().toISOString(),
+          completion_group: null,
+        },
+        {
+          id: 'e-easy-1',
+          task_id: 'task-easy',
+          user_id: OTHER_ID,
+          points_awarded: 10,
+          completed_on: isoDaysFromToday(-2),
+          created_at: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+          completion_group: null,
+        },
+        {
+          id: 'e-easy-2',
+          task_id: 'task-easy',
+          user_id: OTHER_ID,
+          points_awarded: 10,
+          completed_on: isoDaysFromToday(-1),
+          created_at: new Date(Date.now() - 86_400_000).toISOString(),
+          completion_group: null,
+        },
+        {
+          id: 'e-easy-3',
+          task_id: 'task-easy',
+          user_id: OTHER_ID,
+          points_awarded: 10,
+          completed_on: isoDaysFromToday(0),
+          created_at: new Date().toISOString(),
+          completion_group: null,
+        },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
+
+    const leaderboard = page.locator('.leaderboard-row')
+    await expect(leaderboard.filter({ hasText: 'אני' }).locator('.contribution-share')).toHaveText('50%')
+    await expect(leaderboard.filter({ hasText: 'דנה' }).locator('.contribution-share')).toHaveText('50%')
+  })
 })
