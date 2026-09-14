@@ -504,7 +504,7 @@ button { font: inherit; cursor: pointer; }
 .leaderboard-row {
   display: grid;
   grid-template-columns: 22px 1fr auto;
-  grid-template-areas: 'rank name points' '. sub sub';
+  grid-template-areas: 'rank name points' '. sub sub' '. bar bar';
   align-items: center;
   gap: 2px 8px;
   padding: 9px 0;
@@ -523,6 +523,27 @@ button { font: inherit; cursor: pointer; }
   font-weight: 700;
 }
 .leaderboard-row .muted.small { grid-area: sub; }
+
+/* Each person's share of the household's total completions - a meter, not a
+   bar chart: one hue, the unfilled track a lighter step of the same ramp, so
+   "how much of the pie" reads at a glance next to the exact count already
+   given as text. */
+.contribution-bar {
+  grid-area: bar;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.contribution-track {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  overflow: hidden;
+}
+.contribution-fill { height: 100%; border-radius: 4px; background: var(--accent); }
+.contribution-share { font-size: 0.78rem; color: var(--text-muted); font-weight: 600; min-width: 2.4em; text-align: end; }
 
 /* ------------------------------------------------------------ buttons --- */
 

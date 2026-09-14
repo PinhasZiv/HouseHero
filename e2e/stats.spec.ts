@@ -83,6 +83,11 @@ test.describe('stats screen', () => {
     await expect(leaderboard).toHaveCount(2)
     await expect(leaderboard.filter({ hasText: 'אני' })).toContainText('משימה אחת הושלמו')
     await expect(leaderboard.filter({ hasText: 'דנה' })).toContainText('משימה אחת הושלמו')
+
+    // Each did one of the two personal completions that went into the
+    // household's total - an even 50/50 contribution split.
+    await expect(leaderboard.filter({ hasText: 'אני' }).locator('.contribution-share')).toHaveText('50%')
+    await expect(leaderboard.filter({ hasText: 'דנה' }).locator('.contribution-share')).toHaveText('50%')
   })
 
   test('two separate completions of the same task count as two', async ({ page }) => {
