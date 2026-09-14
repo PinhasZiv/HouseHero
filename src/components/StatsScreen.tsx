@@ -38,6 +38,11 @@ export function StatsScreen() {
 
     const byPerson = new Map<string, { count: number; points: number }>()
     const byTask = new Map<string, { title: string; count: number }>()
+    // A completion credited to several people at once inserts one row per
+    // person, all sharing completion_group - it happened once, so it must
+    // only count once here, however many people were credited for it.
+    const seenGroups = new Set<string>()
+    let total = 0
     let last7Days = 0
 
     for (const row of completions) {
@@ -46,6 +51,11 @@ export function StatsScreen() {
       person.points += row.points_awarded
       byPerson.set(row.user_id, person)
 
+      const isNewEvent = !row.completion_group || !seenGroups.has(row.completion_group)
+      if (row.completion_group) seenGroups.add(row.completion_group)
+      if (!isNewEvent) continue
+
+      total += 1
       const taskKey = row.task_id
       const task = byTask.get(taskKey) ?? { title: row.task?.title ?? '?', count: 0 }
       task.count += 1
@@ -57,7 +67,7 @@ export function StatsScreen() {
     const leaderboard = [...byPerson.entries()].sort((a, b) => b[1].points - a[1].points)
     const topTask = [...byTask.values()].sort((a, b) => b.count - a.count)[0] ?? null
 
-    return { leaderboard, topTask, total: completions.length, last7Days }
+    return { leaderboard, topTask, total, last7Days }
   }, [completions, today])
 
   if (!currentSpace) return null

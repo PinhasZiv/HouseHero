@@ -385,13 +385,18 @@ export interface StatsCompletion {
   points_awarded: number
   completed_on: string
   task: { title: string } | null
+  /** Non-null only when several people were credited for the same
+   * completion - every row it produced shares this id, so counting "how
+   * many times has this been done" can count that group once, not once
+   * per person credited. */
+  completion_group: string | null
 }
 
 /** Every completion in a space, for the Stats screen to aggregate client-side. */
 export async function fetchStatsCompletions(spaceId: string): Promise<StatsCompletion[]> {
   const { data, error } = await supabase
     .from('task_completions')
-    .select('task_id, user_id, points_awarded, completed_on, task:tasks(title)')
+    .select('task_id, user_id, points_awarded, completed_on, completion_group, task:tasks(title)')
     .eq('space_id', spaceId)
     .order('completed_on', { ascending: false })
     .limit(1000)

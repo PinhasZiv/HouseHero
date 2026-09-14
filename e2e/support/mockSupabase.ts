@@ -321,6 +321,23 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
 
     if (table === 'task_completions' && method === 'GET') {
       const taskId = eqValue(url, 'task_id')
+      const spaceId = eqValue(url, 'space_id')
+      if (spaceId) {
+        // fetchStatsCompletions() - every completion in the space, each with
+        // its task's title embedded, for the Stats screen to aggregate.
+        const rows = db.taskCompletions
+          .filter((row) => db.tasks.find((t) => t.id === row.task_id)?.space_id === spaceId)
+          .map((row) => ({
+            task_id: row.task_id,
+            user_id: row.user_id,
+            points_awarded: row.points_awarded,
+            completed_on: row.completed_on,
+            completion_group: row.completion_group,
+            task: { title: db.tasks.find((t) => t.id === row.task_id)?.title ?? null },
+          }))
+          .sort((a, b) => b.completed_on.localeCompare(a.completed_on))
+        return json(route, rows)
+      }
       const rows = db.taskCompletions
         .filter((row) => row.task_id === taskId)
         .sort((a, b) => b.created_at.localeCompare(a.created_at))
