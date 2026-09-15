@@ -50,10 +50,17 @@ export function composeReminder(
         ? `${days(worstLate, 'en')} late · ${tasksWord(count, 'en')}`
         : `Time for a task · ${tasksWord(count, 'en')}`
 
+  // The title already states the group's worst lateness ("2 days late · 3
+  // tasks"). Repeating that same number on every line - or the only line,
+  // for a single task - adds nothing; a per-task "(N days late)" only earns
+  // its place in the body when the tasks are not all equally late, so each
+  // line can be told apart from the others.
+  const needsPerEntryLateness = count > 1 && entries.some((entry) => entry.daysLate !== worstLate)
+
   const described = entries.slice(0, MAX_NAMES_IN_BODY).map((entry) => {
     const where = entry.spaceName ? `${entry.spaceName}: ` : ''
     const lateness =
-      entry.daysLate > 0
+      needsPerEntryLateness && entry.daysLate > 0
         ? language === 'he'
           ? ` (${days(entry.daysLate, 'he')} איחור)`
           : ` (${days(entry.daysLate, 'en')} late)`

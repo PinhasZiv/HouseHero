@@ -138,7 +138,24 @@ describe('the reminder notification', () => {
 
   it('prefixes the space name only when the person is in more than one', () => {
     const { body } = composeReminder([{ name: 'Take out trash', spaceName: 'Office', daysLate: 1 }], 'en')
-    expect(body).toBe('Office: Take out trash (1 day late)')
+    expect(body).toBe('Office: Take out trash')
+  })
+
+  it('does not repeat the lateness in the body for a single task - the title already says it', () => {
+    const { title, body } = composeReminder([{ name: 'Clean the bathroom', daysLate: 1 }], 'en')
+    expect(title).toBe('1 day late · 1 task')
+    expect(body).toBe('Clean the bathroom')
+  })
+
+  it('does not repeat the lateness per task when every task is equally late', () => {
+    const { body } = composeReminder(
+      [
+        { name: 'Wash dishes', daysLate: 2 },
+        { name: 'Fold laundry', daysLate: 2 },
+      ],
+      'en',
+    )
+    expect(body).toBe('Wash dishes, Fold laundry')
   })
 
   it('truncates a long list rather than filling the notification tray', () => {
