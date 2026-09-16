@@ -16,6 +16,10 @@ const DISHES: SnoozeTask = {
   due_date: '2026-01-10',
   last_completed_date: null,
   is_done: false,
+  starts_at: null,
+  expires_at: null,
+  cancelled_at: null,
+  expired_at: null,
 }
 
 function tasksById(...tasks: SnoozeTask[]): Map<string, SnoozeTask> {

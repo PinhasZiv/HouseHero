@@ -28,6 +28,11 @@ function baseTask(overrides: Partial<Task>): Task {
     assigned_to: null,
     created_by: 'user-1',
     created_at: '2026-01-01T00:00:00.000Z',
+    starts_at: null,
+    expires_at: null,
+    reminder_policy: null,
+    cancelled_at: null,
+    expired_at: null,
     ...overrides,
   }
 }
@@ -86,6 +91,20 @@ describe('googleCalendarUrl', () => {
       ),
     )
     expect(url.searchParams.get('recur')).toBe('RRULE:FREQ=DAILY;INTERVAL=1;COUNT=6')
+  })
+
+  it('uses the actual window, not a 30-minute placeholder, for a time-limited task', () => {
+    const url = new URL(
+      googleCalendarUrl(
+        baseTask({
+          task_type: 'time_limited',
+          starts_at: '2026-09-16T17:00:00.000Z',
+          expires_at: '2026-09-16T20:00:00.000Z',
+        }),
+      ),
+    )
+    expect(url.searchParams.get('dates')).toBe('20260916T170000/20260916T200000')
+    expect(url.searchParams.has('recur')).toBe(false)
   })
 
   it('turns a "stop on date" rule into an UNTIL clause', () => {

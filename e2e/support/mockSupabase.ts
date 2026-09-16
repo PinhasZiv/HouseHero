@@ -14,7 +14,7 @@ export interface FakeTask {
   space_id: string
   title: string
   description: string | null
-  task_type: 'one_time' | 'recurring'
+  task_type: 'one_time' | 'recurring' | 'time_limited'
   recurrence_mode: 'interval' | 'weekly_days' | null
   interval_days: number | null
   weekly_days: number[] | null
@@ -34,6 +34,11 @@ export interface FakeTask {
   assigned_to: string | null
   created_by: string
   created_at: string
+  starts_at: string | null
+  expires_at: string | null
+  reminder_policy: { mode: string; intervalMinutes: number | null; finalReminderMinutesBeforeExpiry: number | null } | null
+  cancelled_at: string | null
+  expired_at: string | null
 }
 
 export interface FakeReward {
@@ -156,7 +161,7 @@ function applyCompleteTask(db: FakeDb, taskId: string, today: string, completedB
   const task = db.tasks.find((t) => t.id === taskId)
   if (!task) return null
 
-  if (task.task_type === 'one_time') {
+  if (task.task_type === 'one_time' || task.task_type === 'time_limited') {
     task.is_done = true
   } else if (task.recurrence_mode === 'interval') {
     const next = new Date(today)

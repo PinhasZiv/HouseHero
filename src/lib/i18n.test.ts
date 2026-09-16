@@ -3,7 +3,7 @@ import { en } from './i18n/en'
 import { he } from './i18n/he'
 import { directionOf, isLanguage, LANGUAGES } from './i18n/types'
 import { days, pointsWord, tasksWord } from './format'
-import { composeReminder } from '../../supabase/functions/_shared/messages.ts'
+import { composeReminder, composeTimeLimitedReminder } from '../../supabase/functions/_shared/messages.ts'
 
 // The type system already forces the two dictionaries to have the same shape.
 // These tests cover what it cannot: that no entry was left in the wrong
@@ -162,5 +162,18 @@ describe('the reminder notification', () => {
     const many = Array.from({ length: 7 }, (_, i) => ({ name: `Task ${i}`, daysLate: 0 }))
     expect(composeReminder(many, 'en').body).toBe('Task 0, Task 1, Task 2, Task 3 +3 more')
     expect(composeReminder(many, 'he').body).toContain('ועוד 3')
+  })
+})
+
+describe('the time-limited task reminder', () => {
+  it('names the task and its window end, in both languages', () => {
+    expect(composeTimeLimitedReminder('Buy milk', '20:00', 'en')).toEqual({
+      title: 'Buy milk',
+      body: 'Still open - valid until 20:00',
+    })
+    expect(composeTimeLimitedReminder('לקנות חלב', '20:00', 'he')).toEqual({
+      title: 'לקנות חלב',
+      body: 'עדיין פתוחה · בתוקף עד 20:00',
+    })
   })
 })

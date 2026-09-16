@@ -11,10 +11,11 @@
 // the mercy of Android's battery optimiser.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4'
-import { classify, minutesOfDayIn, todayIn, type DueTask } from '../_shared/taskDue.ts'
+import { classify, formatTimeIn, minutesOfDayIn, todayIn, type DueTask } from '../_shared/taskDue.ts'
 import { loadConfig } from '../_shared/config.ts'
-import { composeReminder, isLanguage, type Language } from '../_shared/messages.ts'
+import { composeReminder, composeTimeLimitedReminder, isLanguage, type Language } from '../_shared/messages.ts'
 import { planSnoozeOutcomes, type ExpiredSnooze, type SnoozeTask } from '../_shared/snoozeResend.ts'
+import { dueReminderSlots, type ReminderPolicy } from '../_shared/timeLimitedReminders.ts'
 import { sendPush, type PushTarget } from '../_shared/webpush.ts'
 
 interface Profile {
@@ -31,6 +32,7 @@ interface Task extends DueTask {
   reminder_hour: number
   reminder_minute: number
   assigned_to: string | null
+  reminder_policy: ReminderPolicy | null
 }
 
 interface Subscription extends PushTarget {
@@ -117,7 +119,8 @@ Deno.serve(async (request) => {
       .select(
         'id, space_id, title, task_type, recurrence_mode, interval_days, weekly_days, ' +
           'end_condition, end_after_count, end_date, occurrences_completed, due_date, ' +
-          'last_completed_date, is_done, reminder_hour, reminder_minute, assigned_to',
+          'last_completed_date, is_done, reminder_hour, reminder_minute, assigned_to, ' +
+          'starts_at, expires_at, reminder_policy, cancelled_at, expired_at',
       )
       .eq('is_done', false),
     admin.from('spaces').select('id, name'),
@@ -189,6 +192,10 @@ Deno.serve(async (request) => {
     const dueNow = userTasks
       .map((task) => ({ task, info: classify(task, localDate) }))
       .filter(({ task, info }) => {
+        // Time-limited tasks have their own cadence and dedup below - this
+        // loop's once-a-day notification_log key cannot tell two of their
+        // reminders on the same day apart.
+        if (task.task_type === 'time_limited') return false
         if (!info.notifiable) return false
         if (activeSnooze.has(`${task.id}:${userId}`)) return false
         const taskMinutes = task.reminder_hour * 60 + task.reminder_minute
@@ -318,6 +325,76 @@ Deno.serve(async (request) => {
         },
         config.vapid,
       )
+    }
+  }
+
+  // Time-limited tasks: their own reminder cadence (see
+  // _shared/timeLimitedReminders.ts) and their own dedup table, since more
+  // than one of their reminders can land on the same calendar day - and the
+  // moment their window closes, one push cannot substitute for the other.
+  const timeLimitedTasks = [...tasksById.values()].filter((t) => t.task_type === 'time_limited' && t.expires_at)
+
+  const justExpiredIds = timeLimitedTasks
+    .filter((t) => new Date(t.expires_at as string).getTime() <= now.getTime())
+    .map((t) => t.id)
+  if (justExpiredIds.length && !dryRun) {
+    const sweep = await admin
+      .from('tasks')
+      .update({ is_done: true, expired_at: nowIso })
+      .in('id', justExpiredIds)
+      .eq('is_done', false) // never overwrite a completion/cancellation that beat the sweep to it
+    if (sweep.error) console.error('expiring time-limited tasks failed', sweep.error)
+  } else if (justExpiredIds.length) {
+    report.push({ wouldExpire: justExpiredIds })
+  }
+
+  for (const task of timeLimitedTasks) {
+    if (justExpiredIds.includes(task.id)) continue
+    const slots = dueReminderSlots(
+      { id: task.id, startsAt: task.starts_at as string, expiresAt: task.expires_at as string, reminderPolicy: task.reminder_policy },
+      now,
+      WINDOW_MINUTES,
+    )
+    if (!slots.length) continue
+
+    const targets = task.assigned_to ? [task.assigned_to] : (membersBySpace.get(task.space_id) ?? [])
+    for (const userId of targets) {
+      const profile = profilesById.get(userId)
+      const subs = subsByUser.get(userId)
+      if (!profile || !subs?.length) continue
+
+      for (const slot of slots) {
+        if (dryRun) {
+          report.push({ timeLimited: { user: profile.display_name ?? userId, task: task.title, slot: slot.slot } })
+          continue
+        }
+
+        // Same claim-by-insert mutex as notification_log above, just keyed
+        // by this reminder's own instant instead of a calendar day.
+        const claim = await admin
+          .from('time_limited_reminder_log')
+          .insert({ user_id: userId, task_id: task.id, slot: slot.slot })
+          .select('user_id')
+        if (claim.error || !claim.data?.length) continue // already sent
+
+        const language: Language = isLanguage(profile.language) ? profile.language : 'he'
+        const untilTime = formatTimeIn(profile.timezone, task.expires_at as string)
+        const { title, body } = composeTimeLimitedReminder(task.title, untilTime, language)
+        sentCount += await pushToSubscriptions(
+          subs,
+          {
+            title,
+            body,
+            lang: language,
+            dir: language === 'he' ? 'rtl' : 'ltr',
+            tag: `househero-timelimited-${task.id}`,
+            spaceId: task.space_id,
+            taskId: task.id,
+            taskCount: 1,
+          },
+          config.vapid,
+        )
+      }
     }
   }
 

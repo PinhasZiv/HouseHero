@@ -12,7 +12,7 @@ import {
 } from '../lib/format'
 import { useI18n, type Language } from '../lib/i18n'
 import type { Task } from '../lib/types'
-import { CheckIcon, ClockIcon, PencilIcon, StarIcon, UndoIcon } from './Icons'
+import { CheckIcon, ClockIcon, CopyIcon, PencilIcon, StarIcon, UndoIcon, XIcon } from './Icons'
 
 /** Who completed it: you, someone else by name, or nobody yet. */
 export type CompletedBy = PersonLabel
@@ -41,6 +41,11 @@ interface TaskCardProps {
   snoozedUntil?: string
   onSnooze?: () => void
   onCancelSnooze?: () => Promise<void>
+  /** Calls off a time-limited task before its window closes on its own. */
+  onCancel?: () => Promise<void>
+  /** Opens a new-task form pre-filled from this one - only offered once a
+   *  time-limited task is over, to do it again. */
+  onDuplicate?: () => void
 }
 
 /**
@@ -67,6 +72,8 @@ export function TaskCard({
   snoozedUntil,
   onSnooze,
   onCancelSnooze,
+  onCancel,
+  onDuplicate,
 }: TaskCardProps) {
   const { t, language } = useI18n()
   const [busy, setBusy] = useState(false)
@@ -127,6 +134,16 @@ export function TaskCard({
     }
   }
 
+  async function cancelTask() {
+    if (!onCancel || busy) return
+    setBusy(true)
+    try {
+      await onCancel()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const recurrenceLabel =
     task.task_type === 'recurring'
       ? task.recurrence_mode === 'weekly_days'
@@ -158,6 +175,7 @@ export function TaskCard({
             <span className="badge badge-late">{t.task.badgeLate(info.daysLate)}</span>
           )}
           {info.status === 'due' && <span className="badge badge-due">{t.task.badgeDue}</span>}
+          {info.status === 'active' && <span className="badge badge-active">{t.task.badgeActive}</span>}
           <span className="badge badge-points">
             <StarIcon size={12} /> {t.task.pointsBadge(task.points)}
           </span>
@@ -182,6 +200,16 @@ export function TaskCard({
                 <span>{t.task.nextIn(relativeDay(task.due_date, today, language))}</span>
               )}
             </>
+          ) : info.status === 'active' && task.expires_at ? (
+            <span>{t.task.activeUntil(formatSnoozeUntil(task.expires_at, today, language))}</span>
+          ) : info.status === 'scheduled' && task.starts_at ? (
+            <span>{t.task.scheduledFor(formatSnoozeUntil(task.starts_at, today, language))}</span>
+          ) : info.status === 'expired' ? (
+            <span>
+              {t.task.expiredAt(formatSnoozeUntil(task.expired_at ?? task.expires_at ?? today, today, language))}
+            </span>
+          ) : info.status === 'cancelled' ? (
+            <span>{t.task.cancelledLabel}</span>
           ) : (
             <span>{t.task.dueOn(formatDate(task.due_date, language))}</span>
           )}
@@ -209,6 +237,24 @@ export function TaskCard({
           aria-label={t.task.cancelSnoozeAria(task.title)}
         >
           <UndoIcon size={18} />
+        </button>
+      )}
+
+      {onCancel && (
+        <button
+          type="button"
+          className="icon-button"
+          onClick={cancelTask}
+          disabled={busy}
+          aria-label={t.task.cancelAria(task.title)}
+        >
+          <XIcon size={17} />
+        </button>
+      )}
+
+      {onDuplicate && (
+        <button type="button" className="icon-button" onClick={onDuplicate} aria-label={t.task.duplicateAria(task.title)}>
+          <CopyIcon size={17} />
         </button>
       )}
 

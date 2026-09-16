@@ -30,6 +30,9 @@ function draftToNewTask(draft: TaskDraft, spaceId: string) {
     reminderMinute: draft.reminderMinute,
     dueDate: draft.dueDate,
     assignedTo: draft.assignedTo || null,
+    startsAt: draft.startsAt,
+    expiresAt: draft.expiresAt,
+    reminderPolicy: draft.reminderPolicy,
   }
 }
 
@@ -44,12 +47,23 @@ export function TasksScreen() {
   const [members, setMembers] = useState<Member[]>([])
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Task | null>(null)
+  const [duplicating, setDuplicating] = useState<Task | null>(null)
   const [viewingHistory, setViewingHistory] = useState<Task | null>(null)
   const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>('all')
   const [completing, setCompleting] = useState<{
     task: Task
     resolve: (result: boolean | void) => void
   } | null>(null)
+
+  // A time-limited task's status turns on the clock, not just the calendar
+  // day - without this, "scheduled" would only ever become "active" (or
+  // "active" become "expired") after some unrelated re-render happened to
+  // fire.
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    const interval = window.setInterval(() => setTick((n) => n + 1), 60_000)
+    return () => window.clearInterval(interval)
+  }, [])
 
   /** Opens the "who did this?" picker and resolves once a choice is made
    *  (or the sheet is dismissed, resolving to undefined - a no-op). */
@@ -78,6 +92,16 @@ export function TasksScreen() {
     }
   }, [currentSpace])
 
+  // A time-limited task inside its window right now outranks everything else
+  // open - it is relevant for a bounded stretch of time, not just "sometime
+  // today" - then late/due, then whatever is not due yet.
+  function priorityTier(task: Task): number {
+    const status = classify(task, today).status
+    if (status === 'active') return 0
+    if (status === 'upcoming' || status === 'scheduled') return 2
+    return 1
+  }
+
   // Completed tasks (finished for good, or a recurring task just done today)
   // sink below every open task - late and due alike - into their own section
   // at the bottom, since what still needs doing matters more than a record
@@ -88,20 +112,23 @@ export function TasksScreen() {
     for (const task of tasks) {
       if (task.space_id !== currentSpace?.id) continue
       const status = classify(task, today).status
-      if (task.is_done || status === 'completed_today') completed.push(task)
-      else open.push(task)
+      // A time-limited task can read as expired client-side well before the
+      // periodic sweep sets is_done - it belongs in the record the moment
+      // its window closes, not up to 15 minutes later.
+      if (task.is_done || status === 'completed_today' || status === 'expired' || status === 'cancelled') {
+        completed.push(task)
+      } else {
+        open.push(task)
+      }
     }
     open.sort((a, b) => {
-      // Anything needing attention rises above what's merely upcoming; within
-      // each, oldest due date (then earliest reminder time) first.
-      const aUpcoming = classify(a, today).status === 'upcoming'
-      const bUpcoming = classify(b, today).status === 'upcoming'
-      if (aUpcoming !== bUpcoming) return aUpcoming ? 1 : -1
-      return compareBySchedule(a, b)
+      const byTier = priorityTier(a) - priorityTier(b)
+      return byTier !== 0 ? byTier : compareBySchedule(a, b)
     })
     completed.sort(compareByCompletion)
     return { openTasks: open, completedTasks: completed }
-  }, [tasks, currentSpace, today])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, currentSpace, today, tick])
 
   const spaceTasks = useMemo(() => [...openTasks, ...completedTasks], [openTasks, completedTasks])
 
@@ -157,6 +184,11 @@ export function TasksScreen() {
     toast.show(t.tasks.deleted)
   }
 
+  async function cancelTaskAction(task: Task) {
+    const updated = await api.cancelTask(task.id)
+    patchTask(updated)
+  }
+
   function assignedName(task: Task): string | null {
     if (!task.assigned_to) return null
     if (task.assigned_to === session?.user.id) return t.task.assignedToYou
@@ -181,6 +213,12 @@ export function TasksScreen() {
         completedBy={completedByLabel(task, people, session?.user.id ?? null, language)}
         onComplete={!task.is_done ? () => requestComplete(task) : undefined}
         onUndo={canUndo(task) ? () => undo(task) : undefined}
+        onCancel={
+          task.task_type === 'time_limited' && !task.is_done ? () => cancelTaskAction(task) : undefined
+        }
+        onDuplicate={
+          task.task_type === 'time_limited' && task.is_done ? () => setDuplicating(task) : undefined
+        }
         onOpen={() => setViewingHistory(task)}
         onEdit={() => setEditing(task)}
       />
@@ -318,6 +356,18 @@ export function TasksScreen() {
           onCancel={() => setEditing(null)}
           onSave={saveTask}
           onDelete={removeTaskAction}
+        />
+      )}
+      {duplicating && (
+        <TaskForm
+          today={today}
+          duplicateFrom={duplicating}
+          members={members}
+          onCancel={() => setDuplicating(null)}
+          onSave={async (draft) => {
+            await addTask(draft)
+            setDuplicating(null)
+          }}
         />
       )}
       {viewingHistory && <TaskHistory task={viewingHistory} onClose={() => setViewingHistory(null)} />}
