@@ -107,23 +107,27 @@
 
 ---
 
-## אופציונלי: עדכונים עתידיים אוטומטיים
+## עדכונים עתידיים למסד הנתונים
 
-זה לא נדרש כדי שהאתר יעבוד עכשיו — הכול כבר רץ. אבל אם בעתיד תרצה שאני
-(או כל שינוי עתידי בקוד) אעדכן את מסד הנתונים או את הפונקציות **בלי
-שתצטרך לבקש ממני להריץ את זה ידנית שוב**, אפשר להוסיף ב-GitHub ←
-**Settings** ← **Secrets and variables** ← **Actions**:
+שינויים עתידיים ב-`supabase/migrations/` מוחלים על ידי Claude ישירות מול
+מסד הנתונים החי (יש לו גישה ישירה דרך Supabase), בלי workflow ב-GitHub
+Actions ובלי סודות נוספים לשמור. זו הפעולה הקבועה — אין צורך לבקש אישור
+בכל פעם.
+
+## אופציונלי: פריסה אוטומטית של Edge Functions
+
+זה לא נדרש כדי שהאתר יעבוד עכשיו — הכול כבר רץ. אבל אם בעתיד תרצה
+ששינויים ב-`supabase/functions/` יעלו לבד בלי לבקש ממני להריץ את זה
+ידנית, אפשר להוסיף ב-GitHub ← **Settings** ← **Secrets and variables**
+← **Actions**:
 
 | Name | Secret |
 |---|---|
 | `SUPABASE_ACCESS_TOKEN` | נוצר ב-[supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens) ← **Generate new token** |
 | `SUPABASE_PROJECT_REF` | `axamojjnbhygnclqihhe` |
-| `SUPABASE_DB_URL` | מ-Supabase ← כפתור **Connect** ← **Transaction pooler** (עם הסיסמה האמיתית של מסד הנתונים) |
-| `VAPID_PRIVATE_KEY` | המפתח הפרטי של ההתראות — יש לי אותו, תבקש ואשלח שוב אם צריך |
 
-בלי הסודות האלה, שינויים עתידיים ב-`supabase/migrations/` או
-ב-`supabase/functions/` פשוט לא יעלו לבד — אבל אפשר תמיד לבקש ממני
-להריץ אותם ידנית באותו אופן שעשיתי הפעם.
+בלי הסודות האלה, שינויים עתידיים ב-`supabase/functions/` פשוט לא יעלו
+לבד — אבל אפשר תמיד לבקש ממני להריץ אותם ידנית, כמו תמיד.
 
 ---
 
