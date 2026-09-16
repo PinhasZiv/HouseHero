@@ -65,6 +65,29 @@ export interface Task {
   assigned_to: string | null
   created_by: string
   created_at: string
+  /** Only meaningful for task_type 'time_limited' - see ReminderPolicy. */
+  starts_at: string | null
+  expires_at: string | null
+  reminder_policy: ReminderPolicy | null
+  cancelled_at: string | null
+  expired_at: string | null
+}
+
+export type ReminderPolicyMode = 'none' | 'start_only' | 'interval'
+
+/**
+ * How a time-limited task reminds someone inside its window. `mode: 'none'`
+ * and a null reminder_policy on the task mean the same thing - no reminders -
+ * kept as an explicit mode rather than always encoding "none" as null so the
+ * form has something concrete to hold while someone is choosing.
+ */
+export interface ReminderPolicy {
+  mode: ReminderPolicyMode
+  /** Required when mode is 'interval'; the gap between repeats, in minutes. */
+  intervalMinutes: number | null
+  /** An extra reminder this many minutes before expires_at, on top of
+   *  whatever `mode` already sends - null means no extra reminder. */
+  finalReminderMinutesBeforeExpiry: number | null
 }
 
 export interface TaskCompletion {

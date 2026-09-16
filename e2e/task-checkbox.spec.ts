@@ -51,6 +51,11 @@ function baseTask(overrides: Partial<{
     assigned_to: null,
     created_by: FAKE_USER_ID,
     created_at: new Date().toISOString(),
+    starts_at: null,
+    expires_at: null,
+    reminder_policy: null,
+    cancelled_at: null,
+    expired_at: null,
   }
 }
 

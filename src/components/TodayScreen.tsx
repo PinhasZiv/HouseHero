@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CompletionChoice } from '../lib/api'
-import { classify, compareByCompletion, compareBySchedule } from '../lib/taskDue'
+import { classify, compareByCompletion, compareBySchedule, todayIn } from '../lib/taskDue'
 import { useApp } from '../state/AppState'
 import { useSnooze } from '../state/useSnooze'
 import { useCompletion } from '../state/useCompletion'
@@ -34,11 +34,12 @@ function consumeSnoozeFlag(): boolean {
  * contradict the notification that led here.
  */
 export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
-  const { tasks, spaces, people, today, session, snoozes } = useApp()
+  const { tasks, spaces, people, today, session, snoozes, profile } = useApp()
   const { t, language } = useI18n()
   const { complete, undo } = useCompletion()
   const { snooze, cancelSnooze } = useSnooze()
   const selfId = session?.user.id ?? null
+  const timezone = profile?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
 
   const [sheetTargets, setSheetTargets] = useState<Task[] | null>(null)
   const [viewingHistory, setViewingHistory] = useState<Task | null>(null)
@@ -69,9 +70,11 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
   }, [])
 
   const groups = useMemo(() => {
+    const active: Task[] = []
     const late: Task[] = []
     const due: Task[] = []
     const done: Task[] = []
+    const startingToday: Task[] = []
     const snoozed: { task: Task; until: string }[] = []
 
     for (const task of tasks) {
@@ -79,7 +82,12 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
       const until = snoozes.get(task.id)
       const stillSnoozed = (status === 'late' || status === 'due') && until && new Date(until) > new Date()
 
-      if (stillSnoozed) snoozed.push({ task, until: until as string })
+      if (status === 'active') active.push(task)
+      else if (status === 'scheduled') {
+        // A window opening in a few days does not belong on "today" - only
+        // one whose window starts before this day is out.
+        if (task.starts_at && todayIn(timezone, new Date(task.starts_at)) === today) startingToday.push(task)
+      } else if (stillSnoozed) snoozed.push({ task, until: until as string })
       else if (status === 'late') late.push(task)
       else if (status === 'due') due.push(task)
       else if (status === 'completed_today') done.push(task)
@@ -87,13 +95,15 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
 
     // Oldest due date (and, within a date, earliest reminder time) first -
     // worst overdue first within the late group, soonest first within due.
+    active.sort(compareBySchedule)
     late.sort(compareBySchedule)
     due.sort(compareBySchedule)
     done.sort(compareByCompletion)
+    startingToday.sort((a, b) => (a.starts_at ?? '').localeCompare(b.starts_at ?? ''))
     snoozed.sort((a, b) => a.until.localeCompare(b.until))
-    return { late, due, done, snoozed }
+    return { active, late, due, done, startingToday, snoozed }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, today, snoozes, tick])
+  }, [tasks, today, snoozes, tick, timezone])
 
   // The Snooze action on a notification opens here with ?snooze=1: there is
   // no single task to point at (the notification can cover several), so it
@@ -124,7 +134,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
     return t.task.assignedTo(person?.display_name || person?.email || t.task.someoneElse)
   }
 
-  const remaining = groups.late.length + groups.due.length
+  const remaining = groups.active.length + groups.late.length + groups.due.length
 
   if (tasks.length === 0) {
     return (
@@ -152,6 +162,40 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
                 : t.today.nothingDue}
         </p>
       </header>
+
+      {groups.active.length > 0 && (
+        <section className="task-group">
+          <h3 className="group-title group-title-active">{t.today.groupActive}</h3>
+          {groups.active.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              today={today}
+              spaceName={showSpaceNames ? spaceNames.get(task.space_id) : undefined}
+              assignedName={assignedName(task)}
+              onComplete={() => requestComplete(task)}
+              onOpen={() => setViewingHistory(task)}
+            />
+          ))}
+        </section>
+      )}
+
+      {groups.startingToday.length > 0 && (
+        <section className="task-group">
+          <h3 className="group-title">{t.today.groupStartingToday}</h3>
+          {groups.startingToday.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              today={today}
+              spaceName={showSpaceNames ? spaceNames.get(task.space_id) : undefined}
+              assignedName={assignedName(task)}
+              onComplete={() => requestComplete(task)}
+              onOpen={() => setViewingHistory(task)}
+            />
+          ))}
+        </section>
+      )}
 
       {groups.late.length > 0 && (
         <section className="task-group">

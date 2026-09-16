@@ -10,7 +10,7 @@
 // arithmetic across timezones, no clock reads - the caller decides what
 // "today" is and passes it in.
 
-export type TaskType = 'one_time' | 'recurring'
+export type TaskType = 'one_time' | 'recurring' | 'time_limited'
 export type RecurrenceMode = 'interval' | 'weekly_days'
 export type EndCondition = 'never' | 'after_count' | 'on_date'
 
@@ -20,6 +20,10 @@ export type DueStatus =
   | 'late' // should have been done on an earlier day, and stays late (no cutoff) until completed or deleted
   | 'due' // due today
   | 'upcoming' // not yet
+  | 'scheduled' // a time-limited task, before its window opens
+  | 'active' // a time-limited task, inside its window right now
+  | 'expired' // a time-limited task whose window closed without being completed
+  | 'cancelled' // a time-limited task the person called off themselves
 
 export interface DueTask {
   task_type: TaskType
@@ -34,6 +38,11 @@ export interface DueTask {
   due_date: string
   last_completed_date: string | null
   is_done: boolean
+  /** Only meaningful for task_type 'time_limited'. */
+  starts_at: string | null
+  expires_at: string | null
+  cancelled_at: string | null
+  expired_at: string | null
 }
 
 export interface DueInfo {
@@ -107,7 +116,26 @@ export function minutesOfDayIn(timezone: string, now: Date = new Date()): number
   return (hour % 24) * 60 + minute
 }
 
-export function classify(task: DueTask, today: string): DueInfo {
+/** "HH:MM" for an ISO instant, in the given IANA timezone - used to describe
+ *  a time-limited task's own window rather than a fixed daily reminder_hour. */
+export function formatTimeIn(timezone: string, iso: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(new Date(iso))
+  } catch {
+    return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }).format(
+      new Date(iso),
+    )
+  }
+}
+
+export function classify(task: DueTask, today: string, now: Date = new Date()): DueInfo {
+  if (task.task_type === 'time_limited') return classifyTimeLimited(task, today, now)
+
   if (task.is_done) {
     // Finished for good (one-time task done, or a recurring task that hit its
     // end condition) - but the very evening it happened it still shows as a
@@ -137,13 +165,47 @@ export function classify(task: DueTask, today: string): DueInfo {
   return { status: 'upcoming', daysLate: late, notifiable: false }
 }
 
+/**
+ * A time-limited task's status turns on clock time, not the calendar day -
+ * "active" can start and end within the same afternoon - so this reads
+ * starts_at/expires_at against `now` directly instead of going through
+ * daysBetween(). Terminal states are told apart by which timestamp got set,
+ * the same way last_completed_date already tells a real completion from an
+ * untouched task everywhere else in this file.
+ */
+function classifyTimeLimited(task: DueTask, today: string, now: Date): DueInfo {
+  if (task.is_done) {
+    if (task.cancelled_at) return { status: 'cancelled', daysLate: 0, notifiable: false }
+    if (task.expired_at) return { status: 'expired', daysLate: 0, notifiable: false }
+    if (task.last_completed_date === today) {
+      return { status: 'completed_today', daysLate: 0, notifiable: false }
+    }
+    return { status: 'done', daysLate: 0, notifiable: false }
+  }
+
+  const nowMs = now.getTime()
+  const expiresMs = task.expires_at ? new Date(task.expires_at).getTime() : Infinity
+  const startsMs = task.starts_at ? new Date(task.starts_at).getTime() : -Infinity
+
+  // The window can close well before the periodic sweep flips is_done - the
+  // UI should not keep calling it "active" for up to 15 more minutes just
+  // because the database row has not caught up yet.
+  if (nowMs >= expiresMs) return { status: 'expired', daysLate: 0, notifiable: false }
+  if (nowMs < startsMs) return { status: 'scheduled', daysLate: 0, notifiable: false }
+  return { status: 'active', daysLate: 0, notifiable: true }
+}
+
 /** Rank for list ordering: overdue tasks first, finished ones last. */
 const STATUS_ORDER: Record<DueStatus, number> = {
+  active: -1,
   late: 0,
   due: 1,
   completed_today: 2,
   upcoming: 3,
+  scheduled: 3,
   done: 4,
+  expired: 4,
+  cancelled: 4,
 }
 
 /** Tasks that belong on the "due today" list, worst-overdue first. */
@@ -186,7 +248,7 @@ export interface CompletionOutcome {
  * Pure and total: does not touch the database, just decides the next state.
  */
 export function planCompletion(task: DueTask, completedOn: string): CompletionOutcome {
-  if (task.task_type === 'one_time') {
+  if (task.task_type === 'one_time' || task.task_type === 'time_limited') {
     return { nextDueDate: null, occurrencesCompleted: task.occurrences_completed + 1, finished: true }
   }
 

@@ -4,6 +4,7 @@ import {
   addDays,
   classify,
   daysBetween,
+  formatTimeIn,
   minutesOfDayIn,
   nextWeeklyDate,
   notifiable,
@@ -25,6 +26,10 @@ function task(overrides: Partial<DueTask> = {}): DueTask {
     due_date: '2026-05-10',
     last_completed_date: null,
     is_done: false,
+    starts_at: null,
+    expires_at: null,
+    cancelled_at: null,
+    expired_at: null,
     ...overrides,
   }
 }
@@ -86,6 +91,60 @@ describe('classify', () => {
       expect(info.notifiable).toBe(true)
       expect(info.status).toBe('late')
     }
+  })
+})
+
+describe('classifying a time-limited task', () => {
+  function windowTask(overrides: Partial<DueTask> = {}): DueTask {
+    return task({
+      task_type: 'time_limited',
+      recurrence_mode: null,
+      interval_days: null,
+      starts_at: '2026-05-10T17:00:00.000Z',
+      expires_at: '2026-05-10T20:00:00.000Z',
+      ...overrides,
+    })
+  }
+
+  it('is scheduled before the window opens', () => {
+    const info = classify(windowTask(), '2026-05-10', new Date('2026-05-10T16:00:00.000Z'))
+    expect(info.status).toBe('scheduled')
+    expect(info.notifiable).toBe(false)
+  })
+
+  it('is active inside the window, and notifiable', () => {
+    const info = classify(windowTask(), '2026-05-10', new Date('2026-05-10T18:00:00.000Z'))
+    expect(info.status).toBe('active')
+    expect(info.notifiable).toBe(true)
+  })
+
+  it('is expired once the window closes, even before the database row catches up', () => {
+    const info = classify(windowTask(), '2026-05-10', new Date('2026-05-10T20:00:00.000Z'))
+    expect(info.status).toBe('expired')
+    expect(info.notifiable).toBe(false)
+  })
+
+  it('tells a completion, a cancellation and an expiry apart once is_done is true', () => {
+    const completed = windowTask({ is_done: true, last_completed_date: '2026-05-10' })
+    expect(classify(completed, '2026-05-10').status).toBe('completed_today')
+
+    const completedEarlier = windowTask({ is_done: true, last_completed_date: '2026-05-09' })
+    expect(classify(completedEarlier, '2026-05-10').status).toBe('done')
+
+    const cancelled = windowTask({ is_done: true, cancelled_at: '2026-05-10T18:00:00.000Z' })
+    expect(classify(cancelled, '2026-05-10').status).toBe('cancelled')
+
+    const expired = windowTask({ is_done: true, expired_at: '2026-05-10T20:00:00.000Z' })
+    expect(classify(expired, '2026-05-10').status).toBe('expired')
+  })
+
+  it('crosses midnight without treating the second day as a new window', () => {
+    const spansDays = windowTask({
+      starts_at: '2026-05-10T22:00:00.000Z',
+      expires_at: '2026-05-14T10:00:00.000Z',
+    })
+    expect(classify(spansDays, '2026-05-12', new Date('2026-05-12T09:00:00.000Z')).status).toBe('active')
+    expect(classify(spansDays, '2026-05-14', new Date('2026-05-14T11:00:00.000Z')).status).toBe('expired')
   })
 })
 
@@ -156,6 +215,11 @@ describe('timezone helpers', () => {
   it('reports midnight as zero rather than 1440', () => {
     expect(minutesOfDayIn('UTC', new Date('2026-06-01T00:10:00Z'))).toBe(10)
   })
+
+  it('formats an instant as HH:MM in a named timezone', () => {
+    expect(formatTimeIn('UTC', '2026-06-01T16:05:00Z')).toBe('16:05')
+    expect(formatTimeIn('Asia/Jerusalem', '2026-06-01T16:05:00Z')).toBe('19:05')
+  })
 })
 
 describe('nextWeeklyDate', () => {
@@ -174,6 +238,12 @@ describe('nextWeeklyDate', () => {
 describe('planCompletion', () => {
   it('finishes a one-time task for good', () => {
     const t = task({ task_type: 'one_time', recurrence_mode: null, interval_days: null, due_date: '2026-05-10' })
+    const outcome = planCompletion(t, '2026-05-10')
+    expect(outcome).toEqual({ nextDueDate: null, occurrencesCompleted: 1, finished: true })
+  })
+
+  it('finishes a time-limited task for good, the same as a one-time task', () => {
+    const t = task({ task_type: 'time_limited', recurrence_mode: null, interval_days: null, due_date: '2026-05-10' })
     const outcome = planCompletion(t, '2026-05-10')
     expect(outcome).toEqual({ nextDueDate: null, occurrencesCompleted: 1, finished: true })
   })

@@ -308,6 +308,7 @@ button { font: inherit; cursor: pointer; }
 }
 
 .group-title-late { color: var(--late); }
+.group-title-active { color: var(--accent-strong); }
 
 /* Completed tasks collapse behind a native <details> - closed by default,
    since what still needs doing matters more than a record of what doesn't. */
@@ -343,10 +344,14 @@ button { font: inherit; cursor: pointer; }
 
 .task-late { border-inline-start: 4px solid var(--late); }
 .task-due { border-inline-start: 4px solid var(--accent); }
+/* More than a due-today task: a time-limited window is relevant right now
+   and closes for good soon, so the whole card is tinted, not just the
+   leading stripe. */
+.task-active { border-inline-start: 4px solid var(--accent); background: var(--accent-soft); }
 /* Dims only the info side, not the whole card: a completed task should read
    as settled, but the button that fixes a mistaken tap stays fully legible. */
 .task-completed_today .task-main { opacity: 0.62; }
-.task-done .task-main { opacity: 0.5; }
+.task-done .task-main, .task-expired .task-main, .task-cancelled .task-main { opacity: 0.5; }
 
 /* A leading checkbox, not a wide trailing button: the tappable area is the
    full card height (a generous touch target), but the visible circle is
@@ -442,6 +447,7 @@ button { font: inherit; cursor: pointer; }
 
 .badge-late { background: var(--late-soft); color: var(--late); }
 .badge-due { background: var(--accent-soft); color: var(--accent-strong); }
+.badge-active { background: var(--accent); color: #fff; }
 .badge-points {
   background: var(--gold-soft);
   color: var(--gold);

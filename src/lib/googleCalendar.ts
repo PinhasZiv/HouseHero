@@ -58,8 +58,17 @@ function buildRecurrenceRule(task: Task): string | null {
  * the event's start time rather than a separate field.
  */
 export function googleCalendarUrl(task: Task): string {
-  const start = wallClockDate(task.due_date, task.reminder_hour, task.reminder_minute)
-  const end = new Date(start.getTime() + 30 * 60_000)
+  // A time-limited task already carries a real window - use it as-is rather
+  // than the 30-minute placeholder every other task type gets from its
+  // single due date + reminder time.
+  const start =
+    task.task_type === 'time_limited' && task.starts_at
+      ? new Date(task.starts_at)
+      : wallClockDate(task.due_date, task.reminder_hour, task.reminder_minute)
+  const end =
+    task.task_type === 'time_limited' && task.expires_at
+      ? new Date(task.expires_at)
+      : new Date(start.getTime() + 30 * 60_000)
 
   const params = new URLSearchParams({
     action: 'TEMPLATE',

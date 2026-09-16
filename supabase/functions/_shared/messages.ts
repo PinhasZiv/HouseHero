@@ -75,6 +75,20 @@ export function composeReminder(
   return { title, body }
 }
 
+/** A time-limited task's own reminder, inside its window - `untilTime` is
+ *  already formatted in the recipient's own timezone ("20:00"), since this
+ *  file stays pure and leaves timezone conversion to the caller. */
+export function composeTimeLimitedReminder(
+  taskName: string,
+  untilTime: string,
+  language: Language,
+): { title: string; body: string } {
+  if (language === 'en') {
+    return { title: taskName, body: `Still open - valid until ${untilTime}` }
+  }
+  return { title: taskName, body: `עדיין פתוחה · בתוקף עד ${untilTime}` }
+}
+
 export const TEST_NOTIFICATION: Record<Language, { title: string; body: string }> = {
   he: {
     title: 'HouseHero מוכן',

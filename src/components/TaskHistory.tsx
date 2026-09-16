@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import * as api from '../lib/api'
-import { describeInterval, describeWeeklyDays, formatDate, formatTime, personLabel } from '../lib/format'
+import { describeInterval, describeWeeklyDays, formatDate, formatSnoozeUntil, formatTime, personLabel } from '../lib/format'
 import { googleCalendarUrl } from '../lib/googleCalendar'
 import { useI18n } from '../lib/i18n'
 import { useApp } from '../state/AppState'
@@ -25,7 +25,7 @@ interface TaskHistoryProps {
  * everything else about that completion as if it had not happened.
  */
 export function TaskHistory({ task, onClose }: TaskHistoryProps) {
-  const { people, session } = useApp()
+  const { people, session, today } = useApp()
   const { t, language } = useI18n()
   const toast = useToast()
   const selfId = session?.user.id ?? null
@@ -50,9 +50,11 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
   const scheduleLabel =
     task.task_type === 'one_time'
       ? t.history.detail.oneTime
-      : task.recurrence_mode === 'weekly_days'
-        ? describeWeeklyDays(task.weekly_days ?? [], language)
-        : describeInterval(task.interval_days ?? 1, language)
+      : task.task_type === 'time_limited'
+        ? null
+        : task.recurrence_mode === 'weekly_days'
+          ? describeWeeklyDays(task.weekly_days ?? [], language)
+          : describeInterval(task.interval_days ?? 1, language)
 
   const assignedLabel = !task.assigned_to
     ? t.common.everyone
@@ -99,11 +101,23 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
           <dt>{t.history.detail.points}</dt>
           <dd>{t.task.pointsBadge(task.points)}</dd>
 
-          <dt>{t.history.detail.schedule}</dt>
-          <dd>{scheduleLabel}</dd>
+          {task.task_type === 'time_limited' ? (
+            <>
+              <dt>{t.taskForm.windowStart}</dt>
+              <dd>{task.starts_at ? formatSnoozeUntil(task.starts_at, today, language) : null}</dd>
 
-          <dt>{t.history.detail.reminder}</dt>
-          <dd>{formatTime(task.reminder_hour, task.reminder_minute)}</dd>
+              <dt>{t.taskForm.windowEnd}</dt>
+              <dd>{task.expires_at ? formatSnoozeUntil(task.expires_at, today, language) : null}</dd>
+            </>
+          ) : (
+            <>
+              <dt>{t.history.detail.schedule}</dt>
+              <dd>{scheduleLabel}</dd>
+
+              <dt>{t.history.detail.reminder}</dt>
+              <dd>{formatTime(task.reminder_hour, task.reminder_minute)}</dd>
+            </>
+          )}
 
           <dt>{t.history.detail.assignedTo}</dt>
           <dd>{assignedLabel}</dd>

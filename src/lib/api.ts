@@ -4,6 +4,7 @@ import { supabase } from './supabase'
 import type {
   Member,
   Profile,
+  ReminderPolicy,
   Reward,
   RewardRedemption,
   Space,
@@ -130,9 +131,14 @@ export interface NewTask {
   reminderMinute: number
   dueDate: string
   assignedTo?: string | null
+  /** Only meaningful when taskType is 'time_limited'. */
+  startsAt?: string | null
+  expiresAt?: string | null
+  reminderPolicy?: ReminderPolicy | null
 }
 
 function taskInsertPayload(task: NewTask) {
+  const isTimeLimited = task.taskType === 'time_limited'
   return {
     space_id: task.spaceId,
     title: task.title.trim(),
@@ -147,10 +153,17 @@ function taskInsertPayload(task: NewTask) {
       task.taskType === 'recurring' && task.endCondition === 'after_count' ? task.endAfterCount : null,
     end_date: task.taskType === 'recurring' && task.endCondition === 'on_date' ? task.endDate : null,
     points: task.points,
-    reminder_hour: task.reminderHour,
-    reminder_minute: task.reminderMinute,
-    due_date: task.dueDate,
+    // due_date/reminder_hour/reminder_minute are NOT NULL for every task type,
+    // but a time-limited task is never actually classified from them - its
+    // status comes from starts_at/expires_at instead - so these just mirror
+    // the window's own start/end rather than exposing their own form fields.
+    reminder_hour: isTimeLimited ? new Date(task.startsAt ?? task.dueDate).getUTCHours() : task.reminderHour,
+    reminder_minute: isTimeLimited ? new Date(task.startsAt ?? task.dueDate).getUTCMinutes() : task.reminderMinute,
+    due_date: isTimeLimited ? (task.expiresAt ?? task.dueDate).slice(0, 10) : task.dueDate,
     assigned_to: task.assignedTo || null,
+    starts_at: isTimeLimited ? (task.startsAt ?? null) : null,
+    expires_at: isTimeLimited ? (task.expiresAt ?? null) : null,
+    reminder_policy: isTimeLimited ? (task.reminderPolicy ?? null) : null,
   }
 }
 
@@ -178,6 +191,22 @@ export async function updateTask(taskId: string, task: NewTask): Promise<Task> {
 export async function deleteTask(taskId: string): Promise<void> {
   const { error } = await supabase.from('tasks').delete().eq('id', taskId)
   if (error) throw error
+}
+
+/**
+ * Calls off a time-limited task before its window closes on its own - a
+ * plain field update, not an RPC, since there is no schedule to advance and
+ * no points to award or reverse, unlike completing one.
+ */
+export async function cancelTask(taskId: string): Promise<Task> {
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({ is_done: true, cancelled_at: new Date().toISOString() })
+    .eq('id', taskId)
+    .select()
+    .single()
+  if (error) throw error
+  return data as Task
 }
 
 /**
