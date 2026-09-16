@@ -180,7 +180,7 @@ export const en: Strings = {
     intervalAria: 'Days between repeats',
     weeklyDaysLabel: 'On which days',
     endCondition: 'When to stop',
-    endNever: 'Never - keeps recurring',
+    endNever: 'Never',
     endAfterCount: 'After a number of times',
     endOnDate: 'On a specific date',
     endAfterCountLabel: 'Number of times',
