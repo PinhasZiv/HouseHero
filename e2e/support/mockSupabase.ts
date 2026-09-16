@@ -282,6 +282,11 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
         redemption.decided_at = new Date().toISOString()
         return json(route, wantsSingle ? redemption : [redemption])
       }
+      if (fn === 'leave_space') {
+        const spaceId = body.p_space as string
+        db.spaces = db.spaces.filter((s) => s.id !== spaceId)
+        return json(route, null)
+      }
       return json(route, { message: `unmocked rpc: ${fn}` }, 404)
     }
 
@@ -298,6 +303,12 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
     }
 
     if (table === 'spaces' && method === 'GET') return json(route, db.spaces)
+
+    if (table === 'spaces' && method === 'DELETE') {
+      const id = eqValue(url, 'id')
+      db.spaces = db.spaces.filter((s) => s.id !== id)
+      return json(route, [])
+    }
 
     if (table === 'space_members' && method === 'GET') {
       // fetchMembers() joins the profile inline, which is what the assignee

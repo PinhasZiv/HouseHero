@@ -20,6 +20,7 @@
   --text-muted: #6a6785;
   --border: #e1dff0;
   --late: #c0392b;
+  --late-strong: #a12e21;
   --late-soft: #fbe7e4;
   --due: #a3690c;
   --due-soft: #fdf1dc;
@@ -43,6 +44,7 @@
     --text-muted: #a6a1c6;
     --border: #302a52;
     --late: #ff9a8a;
+    --late-strong: #ffb3a6;
     --late-soft: #3a1c14;
     --due: #e8c06a;
     --due-soft: #33280f;
@@ -621,6 +623,13 @@ button { font: inherit; cursor: pointer; }
 
 .btn-danger-text { background: none; color: var(--late); padding: 10px 0; }
 
+/* A stronger, filled treatment for a destructive action that affects more
+ * than just the person tapping it (deleting a shared space for everyone,
+ * say) - kept visually distinct from btn-danger-text's plain link styling,
+ * which stays reserved for a destructive action that only affects yourself. */
+.btn-danger { background: var(--late); color: #fff; }
+.btn-danger:active { background: var(--late-strong); }
+
 .btn-small { min-height: 38px; padding: 8px 12px; font-size: 0.9rem; }
 
 .btn-google {
@@ -901,6 +910,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
    one line without touching the 2-3-segment pickers elsewhere. */
 .owner-filter { gap: 2px; padding: 2px; margin-bottom: 14px; }
 .owner-filter .segment { padding: 8px 2px; font-size: 0.82rem; white-space: nowrap; }
+
+/* "אף פעם" ("Never") is short, but the normal segment padding/font-size still
+   wrapped it onto two lines while its two siblings stayed on one - the same
+   fix as .owner-filter above, just for this row. */
+.end-condition .segment { padding: 9px 4px; font-size: 0.86rem; white-space: nowrap; }
 
 .segment {
   flex: 1;

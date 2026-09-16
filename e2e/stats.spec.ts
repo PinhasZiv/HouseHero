@@ -81,14 +81,14 @@ test.describe('stats screen', () => {
 
     // One physical completion, done by two people together - not two.
     await expect(page.locator('.stat-tile', { hasText: 'מאז ומתמיד' }).locator('.points-value')).toHaveText('1')
-    await expect(page.locator('.card', { hasText: 'המשימה שהושלמה הכי הרבה' })).toContainText('משימה אחת הושלמו')
+    await expect(page.locator('.card', { hasText: 'המשימה שהושלמה הכי הרבה' })).toContainText('משימה אחת הושלמה')
 
     // Each participant still personally shows one completion and their own
     // points - the fix is about the shared event, not personal credit.
     const leaderboard = page.locator('.leaderboard-row')
     await expect(leaderboard).toHaveCount(2)
-    await expect(leaderboard.filter({ hasText: 'אני' })).toContainText('משימה אחת הושלמו')
-    await expect(leaderboard.filter({ hasText: 'דנה' })).toContainText('משימה אחת הושלמו')
+    await expect(leaderboard.filter({ hasText: 'אני' })).toContainText('משימה אחת הושלמה')
+    await expect(leaderboard.filter({ hasText: 'דנה' })).toContainText('משימה אחת הושלמה')
 
     // Each did one of the two personal completions that went into the
     // household's total - an even 50/50 contribution split.

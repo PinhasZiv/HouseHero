@@ -519,7 +519,7 @@ export function TaskForm({ today, existing, duplicateFrom, members, onCancel, on
 
             <fieldset className="field">
               <legend>{t.taskForm.endCondition}</legend>
-              <div className="segmented segmented-wrap">
+              <div className="segmented segmented-wrap end-condition">
                 <button
                   type="button"
                   className={endCondition === 'never' ? 'segment segment-active' : 'segment'}
