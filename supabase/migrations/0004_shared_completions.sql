@@ -48,6 +48,13 @@ alter table public.task_completions alter column actor_id set not null;
 
 create index if not exists task_completions_group_idx on public.task_completions(completion_group) where completion_group is not null;
 
+-- last_completed_date is a DATE, which cannot order same-day completions
+-- against each other - needed once a "completed" section sorts by how
+-- recently each task was finished rather than by its (now irrelevant) due
+-- date.
+alter table public.tasks add column if not exists last_completed_at timestamptz;
+alter table public.task_completions add column if not exists prev_last_completed_at timestamptz;
+
 -- The insert policy allowed only user_id = auth.uid() - no longer true once
 -- a completion can credit someone other than whoever is inserting it.
 -- complete_task() is SECURITY DEFINER and bypasses RLS regardless (same as
@@ -140,12 +147,12 @@ begin
     insert into public.task_completions (
       task_id, space_id, user_id, actor_id, points_awarded, completed_on, completion_group,
       prev_due_date, prev_last_completed_date, prev_last_completed_by,
-      prev_is_done, prev_occurrences_completed
+      prev_is_done, prev_occurrences_completed, prev_last_completed_at
     )
     values (
       target.id, target.space_id, member_id, auth.uid(), target.points, p_today, group_id,
       target.due_date, target.last_completed_date, target.last_completed_by,
-      target.is_done, target.occurrences_completed
+      target.is_done, target.occurrences_completed, target.last_completed_at
     )
     returning * into event;
 
@@ -162,6 +169,7 @@ begin
   update public.tasks
   set due_date              = case when finished then target.due_date else next_due end,
       last_completed_date   = p_today,
+      last_completed_at     = now(),
       last_completed_by     = credited,
       last_completed_actor  = auth.uid(),
       occurrences_completed = occurrences,
@@ -214,6 +222,7 @@ begin
   update public.tasks
   set due_date              = event.prev_due_date,
       last_completed_date   = event.prev_last_completed_date,
+      last_completed_at     = event.prev_last_completed_at,
       last_completed_by     = event.prev_last_completed_by,
       last_completed_actor  = null,
       is_done               = event.prev_is_done,

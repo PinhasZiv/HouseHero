@@ -86,6 +86,8 @@ test.describe('task completion history', () => {
     await seed(page, db)
     await page.goto('/')
 
+    // Completed today, so it sits in the collapsed "completed" section.
+    await page.locator('.completed-group summary').click()
     const card = page.locator('.task-card', { hasText: 'לשטוף כלים' })
     await expect(card).toBeVisible()
     await card.locator('.task-main').click()
@@ -100,6 +102,7 @@ test.describe('task completion history', () => {
     // The pencil icon reaches the edit form; tapping the card body opened
     // history instead, exactly like on the Today screen.
     await page.getByRole('button', { name: 'משימות' }).click()
+    await page.locator('.completed-group summary').click()
     const tasksCard = page.locator('.task-card', { hasText: 'לשטוף כלים' })
     await tasksCard.getByRole('button', { name: 'עריכת לשטוף כלים' }).click()
     await expect(page.locator('.sheet', { hasText: 'עריכת משימה' })).toBeVisible()
@@ -126,6 +129,7 @@ test.describe('task completion history', () => {
           reminder_minute: 30,
           due_date: isoDaysFromToday(1),
           last_completed_date: null,
+          last_completed_at: null,
           last_completed_by: null,
           last_completed_actor: null,
           is_done: false,
@@ -172,6 +176,7 @@ test.describe('task completion history', () => {
           reminder_minute: 0,
           due_date: isoDaysFromToday(2),
           last_completed_date: null,
+          last_completed_at: null,
           last_completed_by: null,
           last_completed_actor: null,
           is_done: false,
@@ -252,6 +257,8 @@ test.describe('task completion history', () => {
     await seed(page, db)
     await page.goto('/')
 
+    // Completed today, so it sits in the collapsed "completed" section.
+    await page.locator('.completed-group summary').click()
     const card = page.locator('.task-card', { hasText: 'לנקות את המטבח' })
     await card.locator('.task-main').click()
 

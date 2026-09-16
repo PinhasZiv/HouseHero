@@ -51,6 +51,10 @@ export interface Task {
   reminder_minute: number
   due_date: string
   last_completed_date: string | null
+  /** Precise timestamp of the most recent completion - unlike
+   *  last_completed_date (a plain day), this orders same-day completions
+   *  against each other, for the completed-tasks section. */
+  last_completed_at: string | null
   /** Everyone credited for the most recent completion - one id for a normal
    *  completion, several when it was logged as done by more than one person. */
   last_completed_by: string[] | null

@@ -27,6 +27,7 @@ export interface FakeTask {
   reminder_minute: number
   due_date: string
   last_completed_date: string | null
+  last_completed_at: string | null
   last_completed_by: string[] | null
   last_completed_actor: string | null
   is_done: boolean
@@ -161,6 +162,7 @@ function applyCompleteTask(db: FakeDb, taskId: string, today: string, completedB
     task.due_date = next.toISOString().slice(0, 10)
   }
   task.last_completed_date = today
+  task.last_completed_at = new Date().toISOString()
   task.last_completed_actor = FAKE_USER_ID
   task.occurrences_completed += 1
 
@@ -283,6 +285,7 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
         id: `task-${db.tasks.length + 1}`,
         occurrences_completed: 0,
         last_completed_date: null,
+        last_completed_at: null,
         last_completed_by: null,
         last_completed_actor: null,
         is_done: false,

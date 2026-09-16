@@ -309,6 +309,23 @@ button { font: inherit; cursor: pointer; }
 
 .group-title-late { color: var(--late); }
 
+/* Completed tasks collapse behind a native <details> - closed by default,
+   since what still needs doing matters more than a record of what doesn't. */
+.completed-summary {
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+.completed-summary::-webkit-details-marker { display: none; }
+.completed-summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-inline-end: 6px;
+  transition: transform 0.15s ease;
+}
+.completed-group[open] .completed-summary::before { transform: rotate(90deg); }
+.completed-group .task-card { margin-top: 8px; }
+
 .task-card {
   display: flex;
   align-items: stretch;

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as api from '../lib/api'
 import type { CompletionChoice } from '../lib/api'
-import { classify } from '../lib/taskDue'
+import { classify, compareByCompletion, compareBySchedule } from '../lib/taskDue'
 import { useApp } from '../state/AppState'
 import { useCompletion } from '../state/useCompletion'
 import { CompletionSheet } from './CompletionSheet'
@@ -78,32 +78,45 @@ export function TasksScreen() {
     }
   }, [currentSpace])
 
-  const spaceTasks = useMemo(
-    () =>
-      tasks
-        .filter((task) => task.space_id === currentSpace?.id)
-        .sort((a, b) => {
-          // Anything needing attention rises to the top; the rest by due date.
-          const aActive = classify(a, today).status !== 'upcoming' && !a.is_done
-          const bActive = classify(b, today).status !== 'upcoming' && !b.is_done
-          if (aActive !== bActive) return aActive ? -1 : 1
-          if (a.is_done !== b.is_done) return a.is_done ? 1 : -1
-          return a.due_date.localeCompare(b.due_date)
-        }),
-    [tasks, currentSpace, today],
-  )
+  // Completed tasks (finished for good, or a recurring task just done today)
+  // sink below every open task - late and due alike - into their own section
+  // at the bottom, since what still needs doing matters more than a record
+  // of what's already handled.
+  const { openTasks, completedTasks } = useMemo(() => {
+    const open: Task[] = []
+    const completed: Task[] = []
+    for (const task of tasks) {
+      if (task.space_id !== currentSpace?.id) continue
+      const status = classify(task, today).status
+      if (task.is_done || status === 'completed_today') completed.push(task)
+      else open.push(task)
+    }
+    open.sort((a, b) => {
+      // Anything needing attention rises above what's merely upcoming; within
+      // each, oldest due date (then earliest reminder time) first.
+      const aUpcoming = classify(a, today).status === 'upcoming'
+      const bUpcoming = classify(b, today).status === 'upcoming'
+      if (aUpcoming !== bUpcoming) return aUpcoming ? 1 : -1
+      return compareBySchedule(a, b)
+    })
+    completed.sort(compareByCompletion)
+    return { openTasks: open, completedTasks: completed }
+  }, [tasks, currentSpace, today])
+
+  const spaceTasks = useMemo(() => [...openTasks, ...completedTasks], [openTasks, completedTasks])
 
   const ownerGroups = useMemo(() => {
     const mine: Task[] = []
     const everyone: Task[] = []
     const others: Task[] = []
-    for (const task of spaceTasks) {
+    for (const task of openTasks) {
       if (!task.assigned_to) everyone.push(task)
       else if (task.assigned_to === session?.user.id) mine.push(task)
       else others.push(task)
     }
     return { mine, everyone, others }
-  }, [spaceTasks, session])
+  }, [openTasks, session])
+
 
   if (!currentSpace) return null
 
@@ -186,6 +199,13 @@ export function TasksScreen() {
     (showEveryone ? ownerGroups.everyone.length : 0) +
     (showOthers ? ownerGroups.others.length : 0)
 
+  const completedVisible = completedTasks.filter((task) => {
+    if (ownerFilter === 'all') return true
+    if (ownerFilter === 'mine') return task.assigned_to === session?.user.id
+    if (ownerFilter === 'everyone') return !task.assigned_to
+    return !!task.assigned_to && task.assigned_to !== session?.user.id
+  })
+
   return (
     <div className="screen fade-in">
       <header className="screen-header">
@@ -266,7 +286,16 @@ export function TasksScreen() {
             </section>
           )}
 
-          {visibleCount === 0 && (
+          {completedVisible.length > 0 && (
+            <details className="task-group completed-group">
+              <summary className="group-title completed-summary">
+                {t.tasks.groupCompleted(completedVisible.length)}
+              </summary>
+              {completedVisible.map(renderCard)}
+            </details>
+          )}
+
+          {visibleCount === 0 && completedVisible.length === 0 && (
             <div className="empty-state">
               <p>{t.tasks.empty}</p>
             </div>

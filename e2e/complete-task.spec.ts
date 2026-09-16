@@ -37,6 +37,7 @@ function baseTask(overrides: { id: string; title: string; points: number }) {
     // due-today/overdue group it starts in.
     due_date: isoDaysFromToday(-2),
     last_completed_date: null,
+    last_completed_at: null,
     last_completed_by: null,
     last_completed_actor: null,
     is_done: false,
@@ -67,10 +68,12 @@ test.describe('completing a task', () => {
     await expect(page.getByRole('heading', { name: 'מי ביצע את זה?' })).toBeVisible()
     await page.getByRole('button', { name: 'אישור' }).click()
 
-    // A toast confirms the points, and the task now sits in "בוצעו היום"
-    // rather than the due list.
+    // A toast confirms the points, and the task now sits in the collapsed
+    // "בוצעו היום" section rather than the due list.
     await expect(page.getByText('+25 נקודות', { exact: false })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'בוצעו היום' })).toBeVisible()
+    const doneSection = page.locator('.completed-group', { hasText: 'בוצעו היום' })
+    await expect(doneSection).toBeVisible()
+    await doneSection.locator('summary').click()
     await expect(page.locator('.task-card', { hasText: 'להרכיב את הארון' })).toContainText('בוצעה על ידך')
 
     // The server actually recorded the completion and the points.

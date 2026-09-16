@@ -33,6 +33,7 @@ function baseTask(overrides: Partial<FakeDb['tasks'][number]>): FakeDb['tasks'][
     reminder_minute: 0,
     due_date: isoDaysFromToday(0),
     last_completed_date: null,
+    last_completed_at: null,
     last_completed_by: null,
     last_completed_actor: null,
     is_done: false,

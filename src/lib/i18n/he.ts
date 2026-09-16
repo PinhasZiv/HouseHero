@@ -200,6 +200,7 @@ export const he = {
     groupMine: 'המשימות שלי',
     groupEveryone: 'משימות של כולם',
     groupOthers: 'משויכות לאחרים',
+    groupCompleted: (n: number) => `משימות שבוצעו (${n})`,
   },
 
   rewards: {

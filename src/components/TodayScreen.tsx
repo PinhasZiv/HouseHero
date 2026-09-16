@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CompletionChoice } from '../lib/api'
-import { classify } from '../lib/taskDue'
+import { classify, compareByCompletion, compareBySchedule } from '../lib/taskDue'
 import { useApp } from '../state/AppState'
 import { useSnooze } from '../state/useSnooze'
 import { useCompletion } from '../state/useCompletion'
@@ -85,8 +85,11 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
       else if (status === 'completed_today') done.push(task)
     }
 
-    // Worst overdue first within the late group; snoozed by soonest return.
-    late.sort((a, b) => classify(b, today).daysLate - classify(a, today).daysLate)
+    // Oldest due date (and, within a date, earliest reminder time) first -
+    // worst overdue first within the late group, soonest first within due.
+    late.sort(compareBySchedule)
+    due.sort(compareBySchedule)
+    done.sort(compareByCompletion)
     snoozed.sort((a, b) => a.until.localeCompare(b.until))
     return { late, due, done, snoozed }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -206,10 +209,14 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
       )}
 
       {groups.done.length > 0 && (
-        <section className="task-group">
+        <details className="task-group completed-group">
           {/* Stays on screen for the rest of the day, so a second person
-              opening the app sees it was handled, not an unexplained gap. */}
-          <h3 className="group-title">{t.today.groupDone}</h3>
+              opening the app sees it was handled, not an unexplained gap.
+              Collapsed by default: what still needs doing matters more than
+              what is already behind you. */}
+          <summary className="group-title completed-summary">
+            {t.today.groupDone} ({groups.done.length})
+          </summary>
           {groups.done.map((task) => (
             <TaskCard
               key={task.id}
@@ -221,7 +228,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
               onOpen={() => setViewingHistory(task)}
             />
           ))}
-        </section>
+        </details>
       )}
 
       {sheetTargets && (

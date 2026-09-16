@@ -198,6 +198,7 @@ export const en: Strings = {
     groupMine: 'My tasks',
     groupEveryone: "Everyone's tasks",
     groupOthers: "Assigned to others",
+    groupCompleted: (n: number) => `Completed tasks (${n})`,
   },
 
   rewards: {
