@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import * as api from '../lib/api'
 import { describeInterval, describeWeeklyDays, formatDate, formatTime, personLabel } from '../lib/format'
+import { googleCalendarUrl } from '../lib/googleCalendar'
 import { useI18n } from '../lib/i18n'
 import { useApp } from '../state/AppState'
 import type { Task, TaskHistoryEntry } from '../lib/types'
+import { CalendarIcon } from './Icons'
 import { useToast } from './Toast'
 
 interface TaskHistoryProps {
@@ -119,6 +121,16 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
             </>
           )}
         </dl>
+
+        <a
+          className="btn btn-ghost btn-small"
+          href={googleCalendarUrl(task)}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <CalendarIcon size={16} />
+          {t.history.addToGoogleCalendar}
+        </a>
 
         <h3 className="group-title">{t.history.sectionTitle}</h3>
 

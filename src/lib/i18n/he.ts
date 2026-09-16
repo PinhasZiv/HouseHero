@@ -113,6 +113,7 @@ export const he = {
   },
 
   history: {
+    addToGoogleCalendar: 'הוספה ליומן Google',
     sectionTitle: 'היסטוריית הביצוע',
     empty: 'עוד לא בוצעה אף פעם.',
     entry: (who: string, points: number) => `${who} · +${points} נק'`,

@@ -120,6 +120,15 @@ export function ChartIcon({ size = 20 }: IconProps) {
   )
 }
 
+export function CalendarIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2" />
+      <path d="M3.5 9.5h17M8 3v3.5M16 3v3.5" />
+    </svg>
+  )
+}
+
 export function DotsIcon({ size = 20 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">

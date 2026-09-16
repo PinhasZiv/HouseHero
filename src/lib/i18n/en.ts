@@ -111,6 +111,7 @@ export const en: Strings = {
   },
 
   history: {
+    addToGoogleCalendar: 'Add to Google Calendar',
     sectionTitle: 'Completion history',
     empty: 'Not completed yet.',
     entry: (who: string, points: number) => `${who} · +${points} pts`,
