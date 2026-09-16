@@ -135,17 +135,19 @@ function eqValue(url: URL, column: string): string | null {
   return raw?.startsWith('eq.') ? raw.slice(3) : null
 }
 
-/** Credits one person's points, whether that's the signed-in profile or one of otherPeople. */
+/** Credits (or, with a negative delta, reverts) one person's points - whether
+ *  that's the signed-in profile or one of otherPeople. Floors at 0, matching
+ *  undo_last_completion()'s greatest(0, ...). */
 function awardPoints(db: FakeDb, userId: string, points: number) {
   if (userId === db.profile.id) {
-    db.profile.lifetime_points += points
-    db.profile.spendable_points += points
+    db.profile.lifetime_points = Math.max(0, db.profile.lifetime_points + points)
+    db.profile.spendable_points = Math.max(0, db.profile.spendable_points + points)
     return
   }
   const person = db.otherPeople.find((p) => p.id === userId)
   if (person) {
-    person.lifetime_points += points
-    person.spendable_points += points
+    person.lifetime_points = Math.max(0, person.lifetime_points + points)
+    person.spendable_points = Math.max(0, person.spendable_points + points)
   }
 }
 
@@ -188,6 +190,32 @@ function applyCompleteTask(db: FakeDb, taskId: string, today: string, completedB
   return firstEvent
 }
 
+/** Applies undo_last_completion's rules well enough for the cases the suite exercises. */
+function applyUndoLastCompletion(db: FakeDb, taskId: string) {
+  const task = db.tasks.find((t) => t.id === taskId)
+  if (!task) return null
+
+  const relevant = db.taskCompletions.filter((c) => c.task_id === taskId)
+  if (relevant.length === 0) return null
+  const last = relevant.reduce((a, b) => (a.created_at > b.created_at ? a : b))
+  const group = relevant.filter((c) => last.completion_group && c.completion_group === last.completion_group)
+  const toRemove = group.length > 0 ? group : [last]
+
+  for (const event of toRemove) {
+    awardPoints(db, event.user_id, -event.points_awarded)
+    db.taskCompletions.splice(db.taskCompletions.indexOf(event), 1)
+  }
+
+  task.is_done = false
+  task.last_completed_date = null
+  task.last_completed_at = null
+  task.last_completed_by = null
+  task.last_completed_actor = null
+  task.occurrences_completed = Math.max(0, task.occurrences_completed - 1)
+
+  return task
+}
+
 export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void> {
   await page.route('**/rest/v1/**', async (route) => {
     const request = route.request()
@@ -208,6 +236,11 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
         )
         if (!event) return json(route, { message: 'no_such_task' }, 404)
         return json(route, wantsSingle ? event : [event])
+      }
+      if (fn === 'undo_last_completion') {
+        const task = applyUndoLastCompletion(db, body.p_task as string)
+        if (!task) return json(route, { message: 'nothing_to_undo' }, 404)
+        return json(route, wantsSingle ? task : [task])
       }
       if (fn === 'request_redemption') {
         const reward = db.rewards.find((r) => r.id === body.p_reward)

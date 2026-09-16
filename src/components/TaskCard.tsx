@@ -47,6 +47,12 @@ interface TaskCardProps {
  * One task, in whichever of its states it is in. The visual weight is
  * deliberately uneven: an overdue task should be impossible to miss, and one
  * already completed today should look closed rather than like another chore.
+ *
+ * The done/not-done toggle lives as a single leading checkbox - the same
+ * shape as Todoist, Reminders and Google Tasks - rather than a pair of wide
+ * trailing buttons. That was taking up to half the card's width on its own,
+ * which is why long titles used to truncate so eagerly: the majority of a
+ * list row belongs to its primary content, not its controls.
  */
 export function TaskCard({
   task,
@@ -66,6 +72,12 @@ export function TaskCard({
   const [busy, setBusy] = useState(false)
   const [justCompleted, setJustCompleted] = useState(false)
   const info = classify(task, today)
+
+  const isChecked = info.status === 'completed_today' || info.status === 'done'
+  // Undoing only ever applies the same day it happened - an older completion
+  // stays checked, but settled, with nothing left to tap.
+  const canCheck = !isChecked && Boolean(onComplete)
+  const canUncheck = isChecked && info.status === 'completed_today' && Boolean(onUndo)
 
   async function complete(event: React.MouseEvent<HTMLButtonElement>) {
     if (!onComplete || busy) return
@@ -100,6 +112,11 @@ export function TaskCard({
     }
   }
 
+  async function toggle(event: React.MouseEvent<HTMLButtonElement>) {
+    if (canCheck) return complete(event)
+    if (canUncheck) return undo()
+  }
+
   async function cancelSnooze() {
     if (!onCancelSnooze || busy) return
     setBusy(true)
@@ -119,6 +136,19 @@ export function TaskCard({
 
   return (
     <article className={`task-card task-${info.status} ${justCompleted ? 'task-just-completed' : ''}`}>
+      {(onComplete || onUndo) && (
+        <button
+          type="button"
+          className={`task-checkbox ${isChecked ? 'task-checkbox-checked' : ''}`}
+          onClick={toggle}
+          disabled={busy || (!canCheck && !canUncheck)}
+          aria-pressed={isChecked}
+          aria-label={isChecked ? t.task.unwaterAria(task.title) : t.task.completeAria(task.title)}
+        >
+          <span className="task-checkbox-circle">{isChecked && <CheckIcon size={15} />}</span>
+        </button>
+      )}
+
       <button type="button" className="task-main" onClick={onOpen} disabled={!onOpen}>
         <div className="task-headline">
           {/* A task's title can be Hebrew or English; plaintext lets each name
@@ -128,11 +158,6 @@ export function TaskCard({
             <span className="badge badge-late">{t.task.badgeLate(info.daysLate)}</span>
           )}
           {info.status === 'due' && <span className="badge badge-due">{t.task.badgeDue}</span>}
-          {info.status === 'completed_today' && (
-            <span className="badge badge-done">
-              <CheckIcon size={14} /> {t.task.badgeDone}
-            </span>
-          )}
           <span className="badge badge-points">
             <StarIcon size={12} /> {t.task.pointsBadge(task.points)}
           </span>
@@ -163,55 +188,27 @@ export function TaskCard({
         </p>
       </button>
 
-      {onComplete && info.status !== 'completed_today' && (
-        <button
-          type="button"
-          className="complete-button"
-          onClick={complete}
-          disabled={busy}
-          aria-label={t.task.completeAria(task.title)}
-        >
-          <CheckIcon size={20} />
-          <span>{busy ? '...' : t.task.complete}</span>
-        </button>
-      )}
-
-      {onUndo && info.status === 'completed_today' && (
-        <button
-          type="button"
-          className="complete-button complete-button-muted"
-          onClick={undo}
-          disabled={busy}
-          aria-label={t.task.unwaterAria(task.title)}
-        >
-          <UndoIcon size={20} />
-          <span>{busy ? '...' : t.task.undoCompletion}</span>
-        </button>
-      )}
-
       {onSnooze && (
         <button
           type="button"
-          className="complete-button complete-button-muted"
+          className="icon-button"
           onClick={onSnooze}
           disabled={busy}
           aria-label={t.task.snoozeAria(task.title)}
         >
-          <ClockIcon size={20} />
-          <span>{t.task.snooze}</span>
+          <ClockIcon size={18} />
         </button>
       )}
 
       {onCancelSnooze && (
         <button
           type="button"
-          className="complete-button complete-button-muted"
+          className="icon-button"
           onClick={cancelSnooze}
           disabled={busy}
           aria-label={t.task.cancelSnoozeAria(task.title)}
         >
-          <UndoIcon size={20} />
-          <span>{busy ? '...' : t.task.cancelSnooze}</span>
+          <UndoIcon size={18} />
         </button>
       )}
 
