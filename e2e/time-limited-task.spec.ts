@@ -44,7 +44,15 @@ function windowTask(overrides: Partial<FakeTask> & { id: string; title: string }
     created_at: new Date().toISOString(),
     starts_at: null,
     expires_at: null,
-    reminder_policy: { mode: 'interval', intervalMinutes: 30, finalReminderMinutesBeforeExpiry: null },
+    reminder_policy: {
+      mode: 'interval',
+      intervalMinutes: 30,
+      intervalUnit: 'minutes',
+      dailyIntervalDays: null,
+      dailyHour: null,
+      dailyMinute: null,
+      finalReminderMinutesBeforeExpiry: null,
+    },
     cancelled_at: null,
     expired_at: null,
     ...overrides,
@@ -61,7 +69,7 @@ test.describe('creating a time-limited task', () => {
 
     await page.locator('#task-title').fill('לקנות חלב בדרך הביתה')
     await page.getByRole('button', { name: 'מוגבלת בזמן' }).click()
-    await page.getByRole('button', { name: 'כל X דקות' }).click()
+    await page.getByRole('button', { name: 'כל X' }).click()
     await page.locator('.sheet').getByRole('button', { name: 'הוספת משימה' }).click()
 
     await expect(page.getByText('לקנות חלב בדרך הביתה נוספה.')).toBeVisible()
@@ -69,7 +77,43 @@ test.describe('creating a time-limited task', () => {
     expect(created?.task_type).toBe('time_limited')
     expect(created?.starts_at).toBeTruthy()
     expect(created?.expires_at).toBeTruthy()
-    expect(created?.reminder_policy).toEqual({ mode: 'interval', intervalMinutes: 30, finalReminderMinutesBeforeExpiry: null })
+    expect(created?.reminder_policy).toEqual({
+      mode: 'interval',
+      intervalMinutes: 30,
+      intervalUnit: 'minutes',
+      dailyIntervalDays: null,
+      dailyHour: null,
+      dailyMinute: null,
+      finalReminderMinutesBeforeExpiry: null,
+    })
+  })
+
+  test('can pick an hours cadence or a daily cadence with a time of day', async ({ page }) => {
+    const db = makeFakeDb({})
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'משימות' }).click()
+    await page.getByRole('button', { name: 'הוספת המשימה הראשונה' }).click()
+
+    await page.locator('#task-title').fill('לאסוף חבילה מהדואר')
+    await page.getByRole('button', { name: 'מוגבלת בזמן' }).click()
+    await page.getByRole('button', { name: 'כל X' }).click()
+    await page.getByRole('button', { name: 'ימים', exact: true }).click()
+    await page.getByRole('spinbutton', { name: 'מספר הימים בין תזכורת לתזכורת' }).fill('2')
+    await page.getByLabel('שעת התזכורת היומית').fill('08:30')
+    await page.locator('.sheet').getByRole('button', { name: 'הוספת משימה' }).click()
+
+    await expect(page.getByText('לאסוף חבילה מהדואר נוספה.')).toBeVisible()
+    const created = db.tasks.find((t) => t.title === 'לאסוף חבילה מהדואר')
+    expect(created?.reminder_policy).toEqual({
+      mode: 'daily',
+      intervalMinutes: null,
+      intervalUnit: null,
+      dailyIntervalDays: 2,
+      dailyHour: 8,
+      dailyMinute: 30,
+      finalReminderMinutesBeforeExpiry: null,
+    })
   })
 })
 
