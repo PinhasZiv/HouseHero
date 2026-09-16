@@ -136,11 +136,12 @@ export function TaskForm({ today, existing, members, onCancel, onSave, onDelete 
 
         <label className="field">
           <span>{t.taskForm.description}</span>
-          <input
+          <textarea
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             placeholder={t.taskForm.descriptionPlaceholder}
-            maxLength={200}
+            maxLength={2000}
+            rows={4}
           />
         </label>
 
