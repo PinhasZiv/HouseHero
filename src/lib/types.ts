@@ -73,7 +73,7 @@ export interface Task {
   expired_at: string | null
 }
 
-export type ReminderPolicyMode = 'none' | 'start_only' | 'interval'
+export type ReminderPolicyMode = 'none' | 'start_only' | 'interval' | 'daily'
 
 /**
  * How a time-limited task reminds someone inside its window. `mode: 'none'`
@@ -83,8 +83,17 @@ export type ReminderPolicyMode = 'none' | 'start_only' | 'interval'
  */
 export interface ReminderPolicy {
   mode: ReminderPolicyMode
-  /** Required when mode is 'interval'; the gap between repeats, in minutes. */
+  /** Required when mode is 'interval'; the gap between repeats, in minutes -
+   *  an hours-based cadence is stored pre-multiplied by 60. */
   intervalMinutes: number | null
+  /** Display-only companion to intervalMinutes: which unit the form last
+   *  showed it in. Scheduling only ever reads intervalMinutes itself. */
+  intervalUnit: 'minutes' | 'hours' | null
+  /** Required when mode is 'daily'; remind every this many days. */
+  dailyIntervalDays: number | null
+  /** Required when mode is 'daily'; the local time of day to remind at. */
+  dailyHour: number | null
+  dailyMinute: number | null
   /** An extra reminder this many minutes before expires_at, on top of
    *  whatever `mode` already sends - null means no extra reminder. */
   finalReminderMinutesBeforeExpiry: number | null

@@ -350,18 +350,24 @@ Deno.serve(async (request) => {
 
   for (const task of timeLimitedTasks) {
     if (justExpiredIds.includes(task.id)) continue
-    const slots = dueReminderSlots(
-      { id: task.id, startsAt: task.starts_at as string, expiresAt: task.expires_at as string, reminderPolicy: task.reminder_policy },
-      now,
-      WINDOW_MINUTES,
-    )
-    if (!slots.length) continue
 
     const targets = task.assigned_to ? [task.assigned_to] : (membersBySpace.get(task.space_id) ?? [])
     for (const userId of targets) {
       const profile = profilesById.get(userId)
       const subs = subsByUser.get(userId)
       if (!profile || !subs?.length) continue
+
+      // A daily cadence fires by this recipient's own local wall-clock time,
+      // so - unlike the interval/start-only modes, both a fixed offset from
+      // startsAt's absolute instant - the slot computation itself needs
+      // their timezone, not just the delivery check.
+      const slots = dueReminderSlots(
+        { id: task.id, startsAt: task.starts_at as string, expiresAt: task.expires_at as string, reminderPolicy: task.reminder_policy },
+        now,
+        WINDOW_MINUTES,
+        profile.timezone,
+      )
+      if (!slots.length) continue
 
       for (const slot of slots) {
         if (dryRun) {

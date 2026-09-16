@@ -36,7 +36,15 @@ export interface FakeTask {
   created_at: string
   starts_at: string | null
   expires_at: string | null
-  reminder_policy: { mode: string; intervalMinutes: number | null; finalReminderMinutesBeforeExpiry: number | null } | null
+  reminder_policy: {
+    mode: string
+    intervalMinutes: number | null
+    intervalUnit: 'minutes' | 'hours' | null
+    dailyIntervalDays: number | null
+    dailyHour: number | null
+    dailyMinute: number | null
+    finalReminderMinutesBeforeExpiry: number | null
+  } | null
   cancelled_at: string | null
   expired_at: string | null
 }

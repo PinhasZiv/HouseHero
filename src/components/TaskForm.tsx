@@ -42,7 +42,9 @@ interface TaskFormProps {
 }
 
 const INTERVAL_PRESETS = [1, 7, 14, 30]
-const REMINDER_INTERVAL_PRESETS = [15, 30, 60]
+const REMINDER_MINUTE_PRESETS = [15, 30, 60]
+const REMINDER_HOUR_PRESETS = [1, 2, 4, 6, 12]
+const REMINDER_DAILY_INTERVAL_PRESETS = [1, 2, 3, 7]
 
 /** A little in the future, so a fresh window never opens pre-filled with an
  *  end time that already reads as invalid. */
@@ -87,9 +89,16 @@ export function TaskForm({ today, existing, duplicateFrom, members, onCancel, on
   const [reminderMode, setReminderMode] = useState<ReminderPolicyMode>(
     source?.reminder_policy?.mode ?? 'interval',
   )
-  const [reminderIntervalMinutes, setReminderIntervalMinutes] = useState(
-    source?.reminder_policy?.intervalMinutes ?? 30,
+  const [intervalUnit, setIntervalUnit] = useState<'minutes' | 'hours'>(
+    source?.reminder_policy?.intervalUnit ?? 'minutes',
   )
+  const [reminderIntervalValue, setReminderIntervalValue] = useState(() => {
+    const storedMinutes = source?.reminder_policy?.intervalMinutes ?? 30
+    return source?.reminder_policy?.intervalUnit === 'hours' ? storedMinutes / 60 : storedMinutes
+  })
+  const [dailyIntervalDays, setDailyIntervalDays] = useState(source?.reminder_policy?.dailyIntervalDays ?? 1)
+  const [dailyHour, setDailyHour] = useState(source?.reminder_policy?.dailyHour ?? 9)
+  const [dailyMinute, setDailyMinute] = useState(source?.reminder_policy?.dailyMinute ?? 0)
   const [finalReminderEnabled, setFinalReminderEnabled] = useState(
     source?.reminder_policy?.finalReminderMinutesBeforeExpiry != null,
   )
@@ -131,11 +140,21 @@ export function TaskForm({ today, existing, duplicateFrom, members, onCancel, on
       if (!startsAt || !expiresAt || new Date(expiresAt) <= new Date(startsAt)) {
         return setError(t.taskForm.errorWindowOrder)
       }
+      if (reminderMode === 'interval' && intervalUnit === 'minutes') {
+        if (!Number.isInteger(reminderIntervalValue) || reminderIntervalValue < 5 || reminderIntervalValue > 1440) {
+          return setError(t.taskForm.errorReminderIntervalMinutes)
+        }
+      }
+      if (reminderMode === 'interval' && intervalUnit === 'hours') {
+        if (!Number.isInteger(reminderIntervalValue) || reminderIntervalValue < 1 || reminderIntervalValue > 72) {
+          return setError(t.taskForm.errorReminderIntervalHours)
+        }
+      }
       if (
-        reminderMode === 'interval' &&
-        (!Number.isInteger(reminderIntervalMinutes) || reminderIntervalMinutes < 5 || reminderIntervalMinutes > 1440)
+        reminderMode === 'daily' &&
+        (!Number.isInteger(dailyIntervalDays) || dailyIntervalDays < 1 || dailyIntervalDays > 30)
       ) {
-        return setError(t.taskForm.errorReminderInterval)
+        return setError(t.taskForm.errorReminderDaily)
       }
       if (
         finalReminderEnabled &&
@@ -149,7 +168,16 @@ export function TaskForm({ today, existing, duplicateFrom, members, onCancel, on
       taskType === 'time_limited'
         ? {
             mode: reminderMode,
-            intervalMinutes: reminderMode === 'interval' ? reminderIntervalMinutes : null,
+            intervalMinutes:
+              reminderMode === 'interval'
+                ? intervalUnit === 'hours'
+                  ? reminderIntervalValue * 60
+                  : reminderIntervalValue
+                : null,
+            intervalUnit: reminderMode === 'interval' ? intervalUnit : null,
+            dailyIntervalDays: reminderMode === 'daily' ? dailyIntervalDays : null,
+            dailyHour: reminderMode === 'daily' ? dailyHour : null,
+            dailyMinute: reminderMode === 'daily' ? dailyMinute : null,
             finalReminderMinutesBeforeExpiry: finalReminderEnabled ? finalReminderMinutes : null,
           }
         : null
@@ -281,38 +309,117 @@ export function TaskForm({ today, existing, duplicateFrom, members, onCancel, on
                 </button>
                 <button
                   type="button"
-                  className={reminderMode === 'interval' ? 'segment segment-active' : 'segment'}
+                  className={reminderMode === 'interval' || reminderMode === 'daily' ? 'segment segment-active' : 'segment'}
                   onClick={() => setReminderMode('interval')}
                 >
                   {t.taskForm.reminderPolicyInterval}
                 </button>
               </div>
 
-              {reminderMode === 'interval' && (
+              {(reminderMode === 'interval' || reminderMode === 'daily') && (
                 <>
-                  <div className="preset-row">
-                    {REMINDER_INTERVAL_PRESETS.map((n) => (
-                      <button
-                        key={n}
-                        type="button"
-                        className={reminderIntervalMinutes === n ? 'preset preset-active' : 'preset'}
-                        onClick={() => setReminderIntervalMinutes(n)}
-                      >
-                        {n}
-                      </button>
-                    ))}
+                  <div className="segmented">
+                    <button
+                      type="button"
+                      className={reminderMode === 'interval' && intervalUnit === 'minutes' ? 'segment segment-active' : 'segment'}
+                      onClick={() => {
+                        setReminderMode('interval')
+                        setIntervalUnit('minutes')
+                        setReminderIntervalValue(30)
+                      }}
+                    >
+                      {t.taskForm.minutesUnit}
+                    </button>
+                    <button
+                      type="button"
+                      className={reminderMode === 'interval' && intervalUnit === 'hours' ? 'segment segment-active' : 'segment'}
+                      onClick={() => {
+                        setReminderMode('interval')
+                        setIntervalUnit('hours')
+                        setReminderIntervalValue(2)
+                      }}
+                    >
+                      {t.taskForm.hoursUnit}
+                    </button>
+                    <button
+                      type="button"
+                      className={reminderMode === 'daily' ? 'segment segment-active' : 'segment'}
+                      onClick={() => setReminderMode('daily')}
+                    >
+                      {t.taskForm.intervalUnit}
+                    </button>
                   </div>
-                  <div className="inline-field">
-                    <input
-                      type="number"
-                      min={5}
-                      max={1440}
-                      value={reminderIntervalMinutes}
-                      onChange={(event) => setReminderIntervalMinutes(Number(event.target.value))}
-                      aria-label={t.taskForm.reminderIntervalAria}
-                    />
-                    <span>{t.taskForm.minutesUnit}</span>
-                  </div>
+
+                  {reminderMode === 'interval' && (
+                    <>
+                      <div className="preset-row">
+                        {(intervalUnit === 'minutes' ? REMINDER_MINUTE_PRESETS : REMINDER_HOUR_PRESETS).map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            className={reminderIntervalValue === n ? 'preset preset-active' : 'preset'}
+                            onClick={() => setReminderIntervalValue(n)}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="inline-field">
+                        <input
+                          type="number"
+                          min={intervalUnit === 'minutes' ? 5 : 1}
+                          max={intervalUnit === 'minutes' ? 1440 : 72}
+                          value={reminderIntervalValue}
+                          onChange={(event) => setReminderIntervalValue(Number(event.target.value))}
+                          aria-label={t.taskForm.reminderIntervalAria}
+                        />
+                        <span>{intervalUnit === 'minutes' ? t.taskForm.minutesUnit : t.taskForm.hoursUnit}</span>
+                      </div>
+                    </>
+                  )}
+
+                  {reminderMode === 'daily' && (
+                    <>
+                      <div className="preset-row">
+                        {REMINDER_DAILY_INTERVAL_PRESETS.map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            className={dailyIntervalDays === n ? 'preset preset-active' : 'preset'}
+                            onClick={() => setDailyIntervalDays(n)}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="inline-field">
+                        <input
+                          type="number"
+                          min={1}
+                          max={30}
+                          value={dailyIntervalDays}
+                          onChange={(event) => setDailyIntervalDays(Number(event.target.value))}
+                          aria-label={t.taskForm.reminderDailyIntervalAria}
+                        />
+                        <span>{t.taskForm.intervalUnit}</span>
+                      </div>
+                      <label className="field">
+                        <span>{t.taskForm.reminderDailyTimeLabel}</span>
+                        <input
+                          type="time"
+                          value={`${String(dailyHour).padStart(2, '0')}:${String(dailyMinute).padStart(2, '0')}`}
+                          onChange={(event) => {
+                            const [h, m] = event.target.value.split(':').map(Number)
+                            if (Number.isFinite(h) && Number.isFinite(m)) {
+                              setDailyHour(h)
+                              setDailyMinute(m)
+                            }
+                          }}
+                          aria-label={t.taskForm.reminderDailyTimeAria}
+                        />
+                      </label>
+                    </>
+                  )}
                 </>
               )}
             </fieldset>
