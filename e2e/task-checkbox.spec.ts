@@ -133,4 +133,37 @@ test.describe('the task checkbox', () => {
     await expect(checkbox).toHaveClass(/task-checkbox-checked/)
     await expect(checkbox).toBeDisabled()
   })
+
+  test('a recurring task someone else completed today still shows a checked, disabled checkbox on the Today screen', async ({ page }) => {
+    const OTHER_ID = '33333333-3333-4333-8333-333333333333'
+    const db = makeFakeDb({
+      tasks: [
+        {
+          id: 'task-1', space_id: FAKE_SPACE_ID, title: 'להכניס מדיח', description: null,
+          task_type: 'recurring', recurrence_mode: 'interval', interval_days: 1, weekly_days: null,
+          end_condition: 'never', end_after_count: null, end_date: null, occurrences_completed: 1,
+          points: 5, reminder_hour: 9, reminder_minute: 0, due_date: isoDaysFromToday(1),
+          // Completed today by someone else entirely - the signed-in viewer
+          // neither did it nor tapped Done for anyone, so they have no way
+          // to undo it. That must not make the checkbox disappear.
+          last_completed_date: isoDaysFromToday(0), last_completed_at: new Date().toISOString(),
+          last_completed_by: [OTHER_ID], last_completed_actor: OTHER_ID,
+          is_done: false, assigned_to: null, created_by: FAKE_USER_ID, created_at: new Date().toISOString(),
+          starts_at: null, expires_at: null, reminder_policy: null, cancelled_at: null, expired_at: null,
+        },
+      ],
+      otherPeople: [
+        { id: OTHER_ID, display_name: 'Ofir', avatar_url: null, email: 'ofir@example.com', lifetime_points: 5, spendable_points: 5 },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.locator('.completed-group summary').click()
+
+    const card = page.locator('.completed-group .task-card', { hasText: 'להכניס מדיח' })
+    await expect(card).toContainText('Ofir')
+    const checkbox = card.locator('.task-checkbox')
+    await expect(checkbox).toHaveClass(/task-checkbox-checked/)
+    await expect(checkbox).toBeDisabled()
+  })
 })
