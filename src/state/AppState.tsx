@@ -12,6 +12,7 @@ import type { Session } from '@supabase/supabase-js'
 import { errorMessage } from '../lib/errors'
 import { getLanguage, isLanguage, setLanguage } from '../lib/i18n'
 import { restorePushIfGranted } from '../lib/push'
+import { reconcileReloadedTasks } from '../lib/reconcileTasks'
 import { COLD_START_RETRY_DELAYS_MS, withRetry } from '../lib/retry'
 import { supabase } from '../lib/supabase'
 import { todayIn } from '../lib/taskDue'
@@ -80,6 +81,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [today, setToday] = useState(() => todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone))
 
+  // Task ids the realtime channel has patched in since the current reload()
+  // started - see reconcileReloadedTasks for why reload() needs this.
+  const touchedTaskIdsRef = useRef<Set<string>>(new Set())
+
   const timezone = profile?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
   const userId = session?.user.id ?? null
 
@@ -113,6 +118,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const reload = useCallback(async () => {
     if (!userId) return
     setError(null)
+    touchedTaskIdsRef.current = new Set()
     const fetchEverything = () =>
       Promise.all([
         api.fetchProfile(userId),
@@ -134,7 +140,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setProfile(nextProfile)
       adoptLanguage(nextProfile)
       setSpaces(nextSpaces)
-      setTasks(nextTasks)
+      setTasks((current) => reconcileReloadedTasks(current, nextTasks, touchedTaskIdsRef.current))
       setPeople(new Map(nextPeople.map((person) => [person.id, person])))
       setSnoozes(new Map(nextSnoozes.map((row) => [row.task_id, row.snoozed_until])))
       setCurrentSpaceIdState((current) => {
@@ -185,9 +191,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .channel('tasks-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
         if (payload.eventType === 'DELETE') {
-          setTasks((current) => current.filter((task) => task.id !== (payload.old as Task).id))
+          const removedId = (payload.old as Task).id
+          touchedTaskIdsRef.current.add(removedId)
+          setTasks((current) => current.filter((task) => task.id !== removedId))
         } else {
           const incoming = payload.new as Task
+          touchedTaskIdsRef.current.add(incoming.id)
           setTasks((current) => {
             const without = current.filter((task) => task.id !== incoming.id)
             return [...without, incoming]
