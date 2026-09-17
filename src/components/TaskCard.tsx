@@ -153,7 +153,14 @@ export function TaskCard({
 
   return (
     <article className={`task-card task-${info.status} ${justCompleted ? 'task-just-completed' : ''}`}>
-      {(onComplete || onUndo) && (
+      {/* A completed task always shows its checkmark, even when this viewer
+          has no way to act on it (didn't do it and isn't the one who tapped
+          Done) - the same checked-but-disabled state already used for an
+          old completion nobody can undo anymore. Without isChecked here,
+          whether the checkbox appears at all quietly depended on who
+          completed it, so two tasks finished the same way could look
+          inconsistent side by side. */}
+      {(onComplete || onUndo || isChecked) && (
         <button
           type="button"
           className={`task-checkbox ${isChecked ? 'task-checkbox-checked' : ''}`}
