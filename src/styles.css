@@ -601,6 +601,47 @@ button { font: inherit; cursor: pointer; }
 .contribution-fill { height: 100%; border-radius: 4px; background: var(--accent); }
 .contribution-share { font-size: 0.78rem; color: var(--text-muted); font-weight: 600; min-width: 2.4em; text-align: end; }
 
+/* A person's task breakdown, on the Stats screen - laid out as a table
+   (task | times | points) rather than one sentence per task, so the numbers
+   are scannable at a glance. Each row is its own native <details>, the same
+   collapse mechanism the completed-tasks list already uses, so the exact
+   date and time of every occurrence is one tap away without cluttering the
+   table itself. */
+.stats-breakdown-row {
+  display: grid;
+  grid-template-columns: 1fr 50px 60px;
+  gap: 8px;
+  align-items: center;
+}
+.stats-breakdown-row > span:not(:first-child) { text-align: center; font-variant-numeric: tabular-nums; }
+
+.stats-breakdown-header {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding-block-end: 6px;
+  border-block-end: 1px solid var(--border);
+}
+
+.stats-breakdown-details { border-block-end: 1px solid var(--border); }
+.stats-breakdown-summary { cursor: pointer; user-select: none; list-style: none; padding: 10px 0; }
+.stats-breakdown-summary::-webkit-details-marker { display: none; }
+.stats-breakdown-title::before {
+  content: '▸';
+  display: inline-block;
+  margin-inline-end: 6px;
+  transition: transform 0.15s ease;
+}
+.stats-breakdown-details[open] .stats-breakdown-title::before { transform: rotate(90deg); }
+.stats-breakdown-details .history-list { margin-inline-start: 18px; margin-block-end: 8px; }
+
+.stats-breakdown-total {
+  font-weight: 700;
+  padding-block-start: 10px;
+  margin-block-start: 4px;
+  border-block-start: 2px solid var(--border);
+}
+
 /* ------------------------------------------------------------ buttons --- */
 
 .btn {

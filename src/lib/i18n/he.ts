@@ -280,6 +280,10 @@ export const he = {
     breakdownAria: (name: string) => `פירוט המשימות של ${name}`,
     breakdownEmpty: 'לא בוצעו עדיין משימות.',
     moreCompletions: (n: number) => (n === 1 ? 'ועוד פעם אחת' : n === 2 ? 'ועוד פעמיים' : `ועוד ${n} פעמים`),
+    columnTask: 'משימה',
+    columnTimes: 'פעמים',
+    columnPoints: 'נקודות',
+    total: 'סה"כ',
   },
 
   space: {
