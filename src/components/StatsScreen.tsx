@@ -18,15 +18,25 @@ interface TaskBreakdown {
   taskId: string
   title: string
   count: number
+  /** Sum of points_awarded across every one of this person's completions of
+   *  this task - not count * the task's current point value, which would be
+   *  wrong the moment that value ever changed. */
+  points: number
   /** Most recent first. */
   timestamps: string[]
 }
 
 /**
- * Every task one person has completed, and exactly when - opened by tapping
- * their row in the leaderboard. A recurring task's repeat count falls out of
- * this the same way a one-time task's single completion does: both are just
- * "how many rows did this task get", no special-casing needed.
+ * Every task one person has completed - how many times, and how many points
+ * that added up to - opened by tapping their row in the leaderboard. Laid
+ * out as a table rather than prose (task | times | points) so the numbers
+ * are scannable at a glance instead of each needing its own sentence; a
+ * recurring task's repeat count falls out of the same grouping as a
+ * one-time task's single completion, no special-casing needed. Each row
+ * expands (the same native <details> the completed-tasks list already
+ * uses) to the exact date and time of every occurrence, since that detail
+ * is still there for whoever wants it - just not in the way of everyone
+ * else's first glance at the totals.
  */
 function PersonStatsSheet({
   name,
@@ -40,6 +50,9 @@ function PersonStatsSheet({
   onClose: () => void
 }) {
   const { t } = useI18n()
+  const totalCount = breakdown.reduce((sum, task) => sum + task.count, 0)
+  const totalPoints = breakdown.reduce((sum, task) => sum + task.points, 0)
+
   return (
     <div className="sheet-backdrop" onClick={onClose} role="presentation">
       <div className="sheet" onClick={(event) => event.stopPropagation()}>
@@ -48,23 +61,39 @@ function PersonStatsSheet({
         {breakdown.length === 0 ? (
           <p className="muted">{t.stats.breakdownEmpty}</p>
         ) : (
-          breakdown.map((task) => (
-            <section key={task.taskId} className="task-group">
-              <h3 className="group-title">
-                {task.title} · {t.stats.completionsCount(task.count)}
-              </h3>
-              <ul className="history-list">
-                {task.timestamps.slice(0, MAX_TIMESTAMPS_SHOWN).map((iso, index) => (
-                  <li key={index} className="history-row">
-                    <span className="history-date">{formatDateTime(iso, language)}</span>
-                  </li>
-                ))}
-              </ul>
-              {task.count > MAX_TIMESTAMPS_SHOWN && (
-                <p className="muted small">{t.stats.moreCompletions(task.count - MAX_TIMESTAMPS_SHOWN)}</p>
-              )}
-            </section>
-          ))
+          <div className="stats-breakdown">
+            <div className="stats-breakdown-row stats-breakdown-header">
+              <span>{t.stats.columnTask}</span>
+              <span>{t.stats.columnTimes}</span>
+              <span>{t.stats.columnPoints}</span>
+            </div>
+
+            {breakdown.map((task) => (
+              <details key={task.taskId} className="stats-breakdown-details">
+                <summary className="stats-breakdown-row stats-breakdown-summary">
+                  <span className="stats-breakdown-title">{task.title}</span>
+                  <span>{task.count}</span>
+                  <span>{task.points}</span>
+                </summary>
+                <ul className="history-list">
+                  {task.timestamps.slice(0, MAX_TIMESTAMPS_SHOWN).map((iso, index) => (
+                    <li key={index} className="history-row">
+                      <span className="history-date">{formatDateTime(iso, language)}</span>
+                    </li>
+                  ))}
+                </ul>
+                {task.count > MAX_TIMESTAMPS_SHOWN && (
+                  <p className="muted small">{t.stats.moreCompletions(task.count - MAX_TIMESTAMPS_SHOWN)}</p>
+                )}
+              </details>
+            ))}
+
+            <div className="stats-breakdown-row stats-breakdown-total">
+              <span>{t.stats.total}</span>
+              <span>{totalCount}</span>
+              <span>{totalPoints}</span>
+            </div>
+          </div>
         )}
 
         <div className="sheet-actions">
@@ -153,15 +182,17 @@ export function StatsScreen() {
         taskId: row.task_id,
         title: row.task?.title ?? '?',
         count: 0,
+        points: 0,
         timestamps: [],
       }
       entry.count += 1
+      entry.points += row.points_awarded
       entry.timestamps.push(row.created_at)
       byTask.set(row.task_id, entry)
     }
     return [...byTask.values()]
       .map((entry) => ({ ...entry, timestamps: [...entry.timestamps].sort((a, b) => b.localeCompare(a)) }))
-      .sort((a, b) => b.count - a.count)
+      .sort((a, b) => b.points - a.points)
   }, [completions, selected])
 
   if (!currentSpace) return null

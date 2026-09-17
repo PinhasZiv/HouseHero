@@ -279,7 +279,7 @@ test.describe('stats screen', () => {
     await expect(leaderboard.filter({ hasText: 'דנה' }).locator('.contribution-share')).toHaveText('50%')
   })
 
-  test('tapping a person opens a breakdown of every task they completed and when', async ({ page }) => {
+  test('tapping a person opens a table of every task they completed, times, and points', async ({ page }) => {
     const db = makeFakeDb({
       tasks: [
         {
@@ -292,11 +292,22 @@ test.describe('stats screen', () => {
           is_done: false, assigned_to: null, created_by: FAKE_USER_ID, created_at: new Date().toISOString(),
           starts_at: null, expires_at: null, reminder_policy: null, cancelled_at: null, expired_at: null,
         },
+        {
+          id: 'task-hard', space_id: FAKE_SPACE_ID, title: 'לנקות את הגראז', description: null,
+          task_type: 'one_time', recurrence_mode: null, interval_days: null, weekly_days: null,
+          end_condition: 'never', end_after_count: null, end_date: null, occurrences_completed: 1,
+          points: 25, reminder_hour: 9, reminder_minute: 0, due_date: isoDaysFromToday(1),
+          last_completed_date: isoDaysFromToday(0), last_completed_at: new Date().toISOString(),
+          last_completed_by: [FAKE_USER_ID], last_completed_actor: FAKE_USER_ID,
+          is_done: true, assigned_to: null, created_by: FAKE_USER_ID, created_at: new Date().toISOString(),
+          starts_at: null, expires_at: null, reminder_policy: null, cancelled_at: null, expired_at: null,
+        },
       ],
       taskCompletions: [
         { id: 'e-1', task_id: 'task-easy', user_id: FAKE_USER_ID, points_awarded: 10, completed_on: isoDaysFromToday(-2), created_at: '2026-01-01T08:00:00.000Z', completion_group: null },
         { id: 'e-2', task_id: 'task-easy', user_id: FAKE_USER_ID, points_awarded: 10, completed_on: isoDaysFromToday(-1), created_at: '2026-01-02T08:00:00.000Z', completion_group: null },
         { id: 'e-3', task_id: 'task-easy', user_id: FAKE_USER_ID, points_awarded: 10, completed_on: isoDaysFromToday(0), created_at: '2026-01-03T08:00:00.000Z', completion_group: null },
+        { id: 'e-4', task_id: 'task-hard', user_id: FAKE_USER_ID, points_awarded: 25, completed_on: isoDaysFromToday(0), created_at: '2026-01-04T08:00:00.000Z', completion_group: null },
       ],
     })
     await seed(page, db)
@@ -305,10 +316,31 @@ test.describe('stats screen', () => {
 
     await page.locator('.leaderboard-row', { hasText: 'אני' }).getByRole('button').click()
 
-    const sheet = page.locator('.sheet', { hasText: 'לקפל כביסה' })
+    const sheet = page.locator('.sheet', { hasText: 'אני' })
     await expect(sheet).toBeVisible()
-    // The repeat count for the recurring task, plus one row per occurrence.
-    await expect(sheet.getByRole('heading', { name: 'לקפל כביסה', level: 3 })).toContainText('3 משימות הושלמו')
-    await expect(sheet.locator('.history-row')).toHaveCount(3)
+
+    // Sorted by points, highest first: the recurring task's 3 x 10 = 30
+    // outranks the one-time task's single 25.
+    const laundryRow = sheet.locator('.stats-breakdown-summary', { hasText: 'לקפל כביסה' })
+    const garageRow = sheet.locator('.stats-breakdown-summary', { hasText: 'לנקות את הגראז' })
+    await expect(laundryRow).toContainText('3')
+    await expect(laundryRow).toContainText('30')
+    await expect(garageRow).toContainText('1')
+    await expect(garageRow).toContainText('25')
+
+    // No plain-text "X tasks completed" sentence - just the numbers.
+    await expect(sheet).not.toContainText('הושלמו')
+
+    // The total row sums both tasks.
+    const totalRow = sheet.locator('.stats-breakdown-total')
+    await expect(totalRow).toContainText('4')
+    await expect(totalRow).toContainText('55')
+
+    // The exact dates are hidden until that row is expanded.
+    const laundryDates = sheet.locator('.stats-breakdown-details', { hasText: 'לקפל כביסה' }).locator('.history-row')
+    await expect(laundryDates.first()).not.toBeVisible()
+    await laundryRow.click()
+    await expect(laundryDates).toHaveCount(3)
+    await expect(laundryDates.first()).toBeVisible()
   })
 })

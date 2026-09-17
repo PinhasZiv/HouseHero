@@ -278,6 +278,10 @@ export const en: Strings = {
     breakdownAria: (name: string) => `${name}'s task breakdown`,
     breakdownEmpty: 'No tasks completed yet.',
     moreCompletions: (n: number) => (n === 1 ? '1 more time' : `${n} more times`),
+    columnTask: 'Task',
+    columnTimes: 'Times',
+    columnPoints: 'Points',
+    total: 'Total',
   },
 
   space: {
