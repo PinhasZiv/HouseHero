@@ -1,18 +1,89 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as api from '../lib/api'
 import { daysBetween } from '../lib/taskDue'
+import { formatDateTime } from '../lib/format'
 import { useI18n } from '../lib/i18n'
+import type { Language } from '../lib/i18n/types'
 import { useApp } from '../state/AppState'
 import { useToast } from './Toast'
 import { ChartIcon, StarIcon } from './Icons'
 import type { StatsCompletion } from '../lib/api'
 
+/** How many of a task's completion timestamps to list before just counting
+ *  the rest - a task done daily for a year is 300+ rows, not a list anyone
+ *  wants to scroll through to find out they did it a lot. */
+const MAX_TIMESTAMPS_SHOWN = 20
+
+interface TaskBreakdown {
+  taskId: string
+  title: string
+  count: number
+  /** Most recent first. */
+  timestamps: string[]
+}
+
+/**
+ * Every task one person has completed, and exactly when - opened by tapping
+ * their row in the leaderboard. A recurring task's repeat count falls out of
+ * this the same way a one-time task's single completion does: both are just
+ * "how many rows did this task get", no special-casing needed.
+ */
+function PersonStatsSheet({
+  name,
+  breakdown,
+  language,
+  onClose,
+}: {
+  name: string
+  breakdown: TaskBreakdown[]
+  language: Language
+  onClose: () => void
+}) {
+  const { t } = useI18n()
+  return (
+    <div className="sheet-backdrop" onClick={onClose} role="presentation">
+      <div className="sheet" onClick={(event) => event.stopPropagation()}>
+        <h2>{name}</h2>
+
+        {breakdown.length === 0 ? (
+          <p className="muted">{t.stats.breakdownEmpty}</p>
+        ) : (
+          breakdown.map((task) => (
+            <section key={task.taskId} className="task-group">
+              <h3 className="group-title">
+                {task.title} · {t.stats.completionsCount(task.count)}
+              </h3>
+              <ul className="history-list">
+                {task.timestamps.slice(0, MAX_TIMESTAMPS_SHOWN).map((iso, index) => (
+                  <li key={index} className="history-row">
+                    <span className="history-date">{formatDateTime(iso, language)}</span>
+                  </li>
+                ))}
+              </ul>
+              {task.count > MAX_TIMESTAMPS_SHOWN && (
+                <p className="muted small">{t.stats.moreCompletions(task.count - MAX_TIMESTAMPS_SHOWN)}</p>
+              )}
+            </section>
+          ))
+        )}
+
+        <div className="sheet-actions">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            {t.common.close}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /** Points, completion counts, and "who did what" for the current space. */
 export function StatsScreen() {
   const { currentSpace, today, people, session } = useApp()
-  const { t } = useI18n()
+  const { t, language } = useI18n()
   const toast = useToast()
   const [completions, setCompletions] = useState<StatsCompletion[] | null>(null)
+  const [selected, setSelected] = useState<{ userId: string; name: string } | null>(null)
 
   useEffect(() => {
     if (!currentSpace) return
@@ -73,6 +144,26 @@ export function StatsScreen() {
     return { leaderboard, topTask, total, last7Days, totalPoints }
   }, [completions, today])
 
+  const selectedBreakdown = useMemo<TaskBreakdown[]>(() => {
+    if (!selected || !completions) return []
+    const byTask = new Map<string, TaskBreakdown>()
+    for (const row of completions) {
+      if (row.user_id !== selected.userId) continue
+      const entry = byTask.get(row.task_id) ?? {
+        taskId: row.task_id,
+        title: row.task?.title ?? '?',
+        count: 0,
+        timestamps: [],
+      }
+      entry.count += 1
+      entry.timestamps.push(row.created_at)
+      byTask.set(row.task_id, entry)
+    }
+    return [...byTask.values()]
+      .map((entry) => ({ ...entry, timestamps: [...entry.timestamps].sort((a, b) => b.localeCompare(a)) }))
+      .sort((a, b) => b.count - a.count)
+  }, [completions, selected])
+
   if (!currentSpace) return null
 
   return (
@@ -106,20 +197,27 @@ export function StatsScreen() {
                 const share = stats.totalPoints > 0 ? Math.round((entry.points / stats.totalPoints) * 100) : 0
                 return (
                   <li key={userId} className="leaderboard-row">
-                    <span className="leaderboard-rank">{index + 1}</span>
-                    <span className="leaderboard-name">{name}</span>
-                    <span className="leaderboard-points">
-                      <StarIcon size={13} /> {entry.points}
-                    </span>
-                    <span className="muted small">{t.stats.completionsCount(entry.count)}</span>
-                    {stats.leaderboard.length > 1 && (
-                      <div className="contribution-bar">
-                        <div className="contribution-track" aria-hidden="true">
-                          <div className="contribution-fill" style={{ width: `${share}%` }} />
+                    <button
+                      type="button"
+                      className="leaderboard-row-button"
+                      onClick={() => setSelected({ userId, name })}
+                      aria-label={t.stats.breakdownAria(name)}
+                    >
+                      <span className="leaderboard-rank">{index + 1}</span>
+                      <span className="leaderboard-name">{name}</span>
+                      <span className="leaderboard-points">
+                        <StarIcon size={13} /> {entry.points}
+                      </span>
+                      <span className="muted small">{t.stats.completionsCount(entry.count)}</span>
+                      {stats.leaderboard.length > 1 && (
+                        <div className="contribution-bar">
+                          <div className="contribution-track" aria-hidden="true">
+                            <div className="contribution-fill" style={{ width: `${share}%` }} />
+                          </div>
+                          <span className="contribution-share">{share}%</span>
                         </div>
-                        <span className="contribution-share">{share}%</span>
-                      </div>
-                    )}
+                      )}
+                    </button>
                   </li>
                 )
               })}
@@ -144,6 +242,15 @@ export function StatsScreen() {
             </section>
           )}
         </>
+      )}
+
+      {selected && (
+        <PersonStatsSheet
+          name={selected.name}
+          breakdown={selectedBreakdown}
+          language={language}
+          onClose={() => setSelected(null)}
+        />
       )}
     </div>
   )

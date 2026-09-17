@@ -161,7 +161,18 @@ export function TasksScreen() {
   async function saveTask(draft: TaskDraft) {
     if (!editing) return
     const previousAssignee = editing.assigned_to
-    const updated = await api.updateTask(editing.id, draftToNewTask(draft, currentSpace!.id))
+    // Converting an already-completed recurring task to one_time/time_limited
+    // must not silently reopen it - those types have only a single
+    // completion to give, and it already happened under the recurring
+    // identity, even though completing it never touched is_done (a
+    // recurring task's own completion just advances due_date instead).
+    const wasRecurring = editing.task_type === 'recurring'
+    const alreadyFinished =
+      wasRecurring && draft.taskType !== 'recurring' && editing.occurrences_completed > 0
+    const updated = await api.updateTask(editing.id, {
+      ...draftToNewTask(draft, currentSpace!.id),
+      alreadyFinished,
+    })
     patchTask(updated)
     setEditing(null)
     // Only a genuinely new assignment to someone else notifies - not every

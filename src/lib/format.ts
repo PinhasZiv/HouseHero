@@ -136,6 +136,26 @@ export function formatSnoozeUntil(iso: string, today: string, language: Language
   return `${relativeDay(targetDay, today, language)} ${time}`
 }
 
+/** "יום ה׳, 3 בספט׳ · 14:30" / "Thu, 3 Sep · 14:30" - a completion's exact
+ *  date and time, for a person's own completion history. Unlike formatDate
+ *  (which parses a bare YYYY-MM-DD as UTC midnight to dodge timezone drift),
+ *  this takes a real timestamptz instant and renders it in this device's own
+ *  timezone, the same way formatSnoozeUntil already does. */
+export function formatDateTime(iso: string, language: Language): string {
+  const date = new Date(iso)
+  const dateLabel = date.toLocaleDateString(LOCALES[language], {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+  const timeLabel = date.toLocaleTimeString(LOCALES[language], {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  return `${dateLabel} · ${timeLabel}`
+}
+
 /** "כל יום" / "פעם בשבוע" / "every day" / "weekly" */
 export function describeInterval(intervalDays: number, language: Language): string {
   if (language === 'en') {

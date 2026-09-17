@@ -135,6 +135,15 @@ export interface NewTask {
   startsAt?: string | null
   expiresAt?: string | null
   reminderPolicy?: ReminderPolicy | null
+  /** Set when this edit converts an already-completed-at-least-once
+   *  recurring task into one_time/time_limited - those types have only a
+   *  single completion to give, and this one already happened under the
+   *  task's previous, recurring identity. Without this, the edit would
+   *  otherwise leave is_done untouched (still false) with whatever due date
+   *  the last recurring completion had already advanced it to, so the task
+   *  reopens itself the moment that date arrives - see saveTask() in
+   *  TasksScreen.tsx for where this gets computed. */
+  alreadyFinished?: boolean
 }
 
 function taskInsertPayload(task: NewTask) {
@@ -164,6 +173,7 @@ function taskInsertPayload(task: NewTask) {
     starts_at: isTimeLimited ? (task.startsAt ?? null) : null,
     expires_at: isTimeLimited ? (task.expiresAt ?? null) : null,
     reminder_policy: isTimeLimited ? (task.reminderPolicy ?? null) : null,
+    ...(task.alreadyFinished ? { is_done: true } : {}),
   }
 }
 
@@ -413,6 +423,10 @@ export interface StatsCompletion {
   user_id: string
   points_awarded: number
   completed_on: string
+  /** The exact instant this completion was logged - completed_on is only a
+   *  calendar day, so this is what a person's own completion breakdown
+   *  shows the time of. */
+  created_at: string
   task: { title: string } | null
   /** Non-null only when several people were credited for the same
    * completion - every row it produced shares this id, so counting "how
@@ -425,7 +439,7 @@ export interface StatsCompletion {
 export async function fetchStatsCompletions(spaceId: string): Promise<StatsCompletion[]> {
   const { data, error } = await supabase
     .from('task_completions')
-    .select('task_id, user_id, points_awarded, completed_on, completion_group, task:tasks(title)')
+    .select('task_id, user_id, points_awarded, completed_on, created_at, completion_group, task:tasks(title)')
     .eq('space_id', spaceId)
     .order('completed_on', { ascending: false })
     .limit(1000)

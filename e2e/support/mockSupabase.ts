@@ -398,6 +398,7 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
             user_id: row.user_id,
             points_awarded: row.points_awarded,
             completed_on: row.completed_on,
+            created_at: row.created_at,
             completion_group: row.completion_group,
             task: { title: db.tasks.find((t) => t.id === row.task_id)?.title ?? null },
           }))
