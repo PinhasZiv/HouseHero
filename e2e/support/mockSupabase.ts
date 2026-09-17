@@ -361,6 +361,12 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
       return json(route, wantsSingle ? task : [task])
     }
 
+    if (table === 'tasks' && method === 'DELETE') {
+      const taskId = eqValue(url, 'id')
+      db.tasks = db.tasks.filter((t) => t.id !== taskId)
+      return json(route, [])
+    }
+
     if (table === 'task_snoozes') {
       if (method === 'GET') {
         const rows = [...db.snoozes.entries()].map(([task_id, snoozed_until]) => ({ task_id, snoozed_until }))
@@ -405,6 +411,12 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
     }
 
     if (table === 'rewards' && method === 'GET') return json(route, db.rewards)
+
+    if (table === 'rewards' && method === 'DELETE') {
+      const rewardId = eqValue(url, 'id')
+      db.rewards = db.rewards.filter((r) => r.id !== rewardId)
+      return json(route, [])
+    }
 
     if (table === 'reward_redemptions' && method === 'GET') return json(route, db.redemptions)
 

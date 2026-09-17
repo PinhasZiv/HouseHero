@@ -6,6 +6,7 @@ import { useI18n } from '../lib/i18n'
 import { toDatetimeLocalValue } from '../lib/snoozeOptions'
 import type { EndCondition, RecurrenceMode, TaskType } from '../lib/taskDue'
 import type { Member, ReminderPolicy, ReminderPolicyMode, Task } from '../lib/types'
+import { ConfirmSheet } from './ConfirmSheet'
 
 export interface TaskDraft {
   title: string
@@ -107,6 +108,7 @@ export function TaskForm({ today, existing, duplicateFrom, members, onCancel, on
   )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   useEffect(() => {
     document.getElementById('task-title')?.focus()
@@ -211,6 +213,7 @@ export function TaskForm({ today, existing, duplicateFrom, members, onCancel, on
   }
 
   return (
+    <>
     <div className="sheet-backdrop" onClick={onCancel} role="presentation">
       <form
         className="sheet"
@@ -642,24 +645,22 @@ export function TaskForm({ today, existing, duplicateFrom, members, onCancel, on
         </div>
 
         {onDelete && (
-          <button
-            type="button"
-            className="btn btn-danger-text"
-            onClick={async () => {
-              if (!window.confirm(t.taskForm.confirmDelete(existing?.title ?? ''))) return
-              setBusy(true)
-              try {
-                await onDelete()
-              } catch (cause) {
-                setError(errorMessage(cause))
-                setBusy(false)
-              }
-            }}
-          >
+          <button type="button" className="btn btn-danger-text" onClick={() => setConfirmingDelete(true)}>
             {t.taskForm.delete}
           </button>
         )}
       </form>
     </div>
+
+    {onDelete && confirmingDelete && (
+      <ConfirmSheet
+        title={t.taskForm.delete}
+        message={t.taskForm.confirmDelete(existing?.title ?? '')}
+        confirmLabel={t.taskForm.delete}
+        onConfirm={onDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
+    )}
+    </>
   )
 }

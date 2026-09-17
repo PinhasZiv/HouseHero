@@ -6,6 +6,7 @@ import { useI18n } from '../lib/i18n'
 import { useApp } from '../state/AppState'
 import { useToast } from './Toast'
 import { PointsBar } from './PointsBar'
+import { ConfirmSheet } from './ConfirmSheet'
 import { GiftIcon, PencilIcon, PlusIcon } from './Icons'
 import type { Reward, RewardRedemption } from '../lib/types'
 
@@ -32,6 +33,7 @@ function RewardForm({
   const [cost, setCost] = useState(existing?.cost ?? 50)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   async function save(event: React.FormEvent) {
     event.preventDefault()
@@ -48,72 +50,71 @@ function RewardForm({
   }
 
   return (
-    <div className="sheet-backdrop" onClick={onCancel} role="presentation">
-      <form className="sheet" onClick={(event) => event.stopPropagation()} onSubmit={save}>
-        <h2>{existing ? t.rewards.titleEdit : t.rewards.titleNew}</h2>
+    <>
+      <div className="sheet-backdrop" onClick={onCancel} role="presentation">
+        <form className="sheet" onClick={(event) => event.stopPropagation()} onSubmit={save}>
+          <h2>{existing ? t.rewards.titleEdit : t.rewards.titleNew}</h2>
 
-        <label className="field">
-          <span>{t.rewards.name}</span>
-          <input
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder={t.rewards.namePlaceholder}
-            maxLength={80}
-            autoFocus
-          />
-        </label>
+          <label className="field">
+            <span>{t.rewards.name}</span>
+            <input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder={t.rewards.namePlaceholder}
+              maxLength={80}
+              autoFocus
+            />
+          </label>
 
-        <label className="field">
-          <span>{t.taskForm.description}</span>
-          <input
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            maxLength={200}
-          />
-        </label>
+          <label className="field">
+            <span>{t.taskForm.description}</span>
+            <input
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              maxLength={200}
+            />
+          </label>
 
-        <label className="field">
-          <span>{t.rewards.costLabel}</span>
-          <input
-            type="number"
-            min={1}
-            max={100000}
-            value={cost}
-            onChange={(event) => setCost(Number(event.target.value))}
-          />
-        </label>
+          <label className="field">
+            <span>{t.rewards.costLabel}</span>
+            <input
+              type="number"
+              min={1}
+              max={100000}
+              value={cost}
+              onChange={(event) => setCost(Number(event.target.value))}
+            />
+          </label>
 
-        {error && <p className="error-text">{error}</p>}
+          {error && <p className="error-text">{error}</p>}
 
-        <div className="sheet-actions">
-          <button type="button" className="btn btn-ghost" onClick={onCancel}>
-            {t.common.cancel}
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={busy}>
-            {busy ? t.common.saving : existing ? t.common.save : t.rewards.add}
-          </button>
-        </div>
+          <div className="sheet-actions">
+            <button type="button" className="btn btn-ghost" onClick={onCancel}>
+              {t.common.cancel}
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={busy}>
+              {busy ? t.common.saving : existing ? t.common.save : t.rewards.add}
+            </button>
+          </div>
 
-        {onDelete && (
-          <button
-            type="button"
-            className="btn btn-danger-text"
-            onClick={async () => {
-              if (!window.confirm(t.rewards.confirmDelete(existing?.title ?? ''))) return
-              setBusy(true)
-              try {
-                await onDelete()
-              } catch (cause) {
-                setError(errorMessage(cause))
-                setBusy(false)
-              }
-            }}
-          >
-            {t.rewards.delete}
-          </button>
-        )}
-      </form>
-    </div>
+          {onDelete && (
+            <button type="button" className="btn btn-danger-text" onClick={() => setConfirmingDelete(true)}>
+              {t.rewards.delete}
+            </button>
+          )}
+        </form>
+      </div>
+
+      {onDelete && confirmingDelete && (
+        <ConfirmSheet
+          title={t.rewards.delete}
+          message={t.rewards.confirmDelete(existing?.title ?? '')}
+          confirmLabel={t.rewards.delete}
+          onConfirm={onDelete}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
+    </>
   )
 }
 
