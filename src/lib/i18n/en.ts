@@ -275,6 +275,9 @@ export const en: Strings = {
     noData: 'Not enough data to show yet.',
     last7Days: 'Last 7 days',
     allTime: 'All time',
+    breakdownAria: (name: string) => `${name}'s task breakdown`,
+    breakdownEmpty: 'No tasks completed yet.',
+    moreCompletions: (n: number) => (n === 1 ? '1 more time' : `${n} more times`),
   },
 
   space: {

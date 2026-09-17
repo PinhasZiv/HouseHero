@@ -277,6 +277,9 @@ export const he = {
     noData: 'עוד אין מספיק נתונים להצגה.',
     last7Days: '7 הימים האחרונים',
     allTime: 'מאז ומתמיד',
+    breakdownAria: (name: string) => `פירוט המשימות של ${name}`,
+    breakdownEmpty: 'לא בוצעו עדיין משימות.',
+    moreCompletions: (n: number) => (n === 1 ? 'ועוד פעם אחת' : n === 2 ? 'ועוד פעמיים' : `ועוד ${n} פעמים`),
   },
 
   space: {

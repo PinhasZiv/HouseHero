@@ -278,4 +278,37 @@ test.describe('stats screen', () => {
     await expect(leaderboard.filter({ hasText: 'אני' }).locator('.contribution-share')).toHaveText('50%')
     await expect(leaderboard.filter({ hasText: 'דנה' }).locator('.contribution-share')).toHaveText('50%')
   })
+
+  test('tapping a person opens a breakdown of every task they completed and when', async ({ page }) => {
+    const db = makeFakeDb({
+      tasks: [
+        {
+          id: 'task-easy', space_id: FAKE_SPACE_ID, title: 'לקפל כביסה', description: null,
+          task_type: 'recurring', recurrence_mode: 'interval', interval_days: 1, weekly_days: null,
+          end_condition: 'never', end_after_count: null, end_date: null, occurrences_completed: 3,
+          points: 10, reminder_hour: 9, reminder_minute: 0, due_date: isoDaysFromToday(1),
+          last_completed_date: isoDaysFromToday(0), last_completed_at: new Date().toISOString(),
+          last_completed_by: [FAKE_USER_ID], last_completed_actor: FAKE_USER_ID,
+          is_done: false, assigned_to: null, created_by: FAKE_USER_ID, created_at: new Date().toISOString(),
+          starts_at: null, expires_at: null, reminder_policy: null, cancelled_at: null, expired_at: null,
+        },
+      ],
+      taskCompletions: [
+        { id: 'e-1', task_id: 'task-easy', user_id: FAKE_USER_ID, points_awarded: 10, completed_on: isoDaysFromToday(-2), created_at: '2026-01-01T08:00:00.000Z', completion_group: null },
+        { id: 'e-2', task_id: 'task-easy', user_id: FAKE_USER_ID, points_awarded: 10, completed_on: isoDaysFromToday(-1), created_at: '2026-01-02T08:00:00.000Z', completion_group: null },
+        { id: 'e-3', task_id: 'task-easy', user_id: FAKE_USER_ID, points_awarded: 10, completed_on: isoDaysFromToday(0), created_at: '2026-01-03T08:00:00.000Z', completion_group: null },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
+
+    await page.locator('.leaderboard-row', { hasText: 'אני' }).getByRole('button').click()
+
+    const sheet = page.locator('.sheet', { hasText: 'לקפל כביסה' })
+    await expect(sheet).toBeVisible()
+    // The repeat count for the recurring task, plus one row per occurrence.
+    await expect(sheet.getByRole('heading', { name: 'לקפל כביסה', level: 3 })).toContainText('3 משימות הושלמו')
+    await expect(sheet.locator('.history-row')).toHaveCount(3)
+  })
 })

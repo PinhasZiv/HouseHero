@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { describeWeeklyDays, formatSnoozeUntil, personLabel, weekdayShort } from './format'
+import { describeWeeklyDays, formatDateTime, formatSnoozeUntil, personLabel, weekdayShort } from './format'
 
 describe('personLabel', () => {
   const people = new Map([
@@ -56,6 +56,26 @@ describe('formatSnoozeUntil', () => {
 
   it('names a later day when the snooze is more than a day out', () => {
     expect(formatSnoozeUntil('2026-01-12T18:30:00.000Z', '2026-01-10', 'he')).toBe('מחרתיים 20:30')
+  })
+})
+
+// Like formatSnoozeUntil, deliberately dependent on this device's own
+// timezone - a completion history is about when *you* did it.
+describe('formatDateTime', () => {
+  const originalTz = process.env.TZ
+
+  beforeEach(() => {
+    process.env.TZ = 'Asia/Jerusalem'
+  })
+
+  afterEach(() => {
+    process.env.TZ = originalTz
+  })
+
+  it('renders the exact date and time of a completion, in this device\'s timezone', () => {
+    // 20:30 in Asia/Jerusalem (UTC+2 in January) is 18:30 UTC.
+    expect(formatDateTime('2026-01-10T18:30:00.000Z', 'he')).toBe('שבת, 10 בינו׳ · 20:30')
+    expect(formatDateTime('2026-01-10T18:30:00.000Z', 'en')).toBe('Sat 10 Jan · 20:30')
   })
 })
 
