@@ -119,23 +119,31 @@ test.describe('creating a time-limited task', () => {
 
 test.describe('a time-limited task before its window opens', () => {
   test('shows as scheduled on the Tasks screen, and on Today only when it starts today', async ({ page }) => {
+    // The mocked profile lives in Asia/Jerusalem (UTC+2/+3) - a plain
+    // `Date.now() + 1h` occasionally lands after local midnight whenever the
+    // suite happens to run late in the evening there, which quietly moves
+    // "task-today" onto tomorrow and fails this test. Anchoring both the
+    // fixture and the app's own clock to a fixed midday instant instead
+    // makes the test's outcome independent of when it actually runs.
+    const FIXED_NOW = Date.parse('2026-01-15T09:00:00.000Z') // 11:00 in Asia/Jerusalem
     const db = makeFakeDb({
       tasks: [
         windowTask({
           id: 'task-today',
           title: 'משימה שמתחילה היום',
-          starts_at: new Date(Date.now() + 60 * 60_000).toISOString(),
-          expires_at: new Date(Date.now() + 3 * 60 * 60_000).toISOString(),
+          starts_at: new Date(FIXED_NOW + 60 * 60_000).toISOString(),
+          expires_at: new Date(FIXED_NOW + 3 * 60 * 60_000).toISOString(),
         }),
         windowTask({
           id: 'task-later',
           title: 'לאסוף חבילה בעוד כמה ימים',
-          starts_at: new Date(Date.now() + 3 * 86_400_000).toISOString(),
-          expires_at: new Date(Date.now() + 4 * 86_400_000).toISOString(),
+          starts_at: new Date(FIXED_NOW + 3 * 86_400_000).toISOString(),
+          expires_at: new Date(FIXED_NOW + 4 * 86_400_000).toISOString(),
         }),
       ],
     })
     await seed(page, db)
+    await page.clock.install({ time: FIXED_NOW })
     await page.goto('/')
 
     // Only the one starting later today belongs on "today".
