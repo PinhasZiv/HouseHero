@@ -82,6 +82,79 @@ test.describe('a personal reminder-time override', () => {
     expect(db.reminderOverrides.get('task-trash')).toEqual({ hour: 20, minute: 0 })
   })
 
+  test('a time-limited task on a daily cadence offers the same personal override', async ({ page }) => {
+    const db = makeFakeDb({
+      tasks: [
+        reminderTask({
+          id: 'task-window',
+          title: 'להשקות את הגינה',
+          task_type: 'time_limited',
+          starts_at: new Date(Date.now() - 60 * 60_000).toISOString(),
+          expires_at: new Date(Date.now() + 6 * 3600_000).toISOString(),
+          reminder_policy: {
+            mode: 'daily',
+            intervalMinutes: null,
+            intervalUnit: null,
+            dailyIntervalDays: 1,
+            dailyHour: 17,
+            dailyMinute: 0,
+            finalReminderMinutesBeforeExpiry: null,
+          },
+        }),
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'משימות' }).click()
+    await page.locator('.task-card', { hasText: 'להשקות את הגינה' }).locator('.task-main').click()
+
+    const history = page.locator('div.sheet', { hasText: 'להשקות את הגינה' })
+    await expect(history).toContainText('17:00')
+
+    await history.getByRole('button', { name: 'שינוי שעת התזכורת שלי עבור להשקות את הגינה' }).click()
+    const overrideSheet = page.locator('form.sheet', { hasText: 'שעת התזכורת שלי' })
+    await overrideSheet.locator('input[type="time"]').fill('06:30')
+    await overrideSheet.getByRole('button', { name: 'שמירה' }).click()
+
+    await expect(overrideSheet).toBeHidden()
+    await expect(history).toContainText('06:30 (רק לך)')
+    expect(db.reminderOverrides.get('task-window')).toEqual({ hour: 6, minute: 30 })
+  })
+
+  test('does not offer a personal reminder time for a time-limited task on an interval cadence', async ({ page }) => {
+    const db = makeFakeDb({
+      tasks: [
+        reminderTask({
+          id: 'task-interval',
+          title: 'לבדוק את התנור',
+          task_type: 'time_limited',
+          starts_at: new Date(Date.now() - 60 * 60_000).toISOString(),
+          expires_at: new Date(Date.now() + 6 * 3600_000).toISOString(),
+          reminder_policy: {
+            mode: 'interval',
+            intervalMinutes: 30,
+            intervalUnit: 'minutes',
+            dailyIntervalDays: null,
+            dailyHour: null,
+            dailyMinute: null,
+            finalReminderMinutesBeforeExpiry: null,
+          },
+        }),
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'משימות' }).click()
+    await page.locator('.task-card', { hasText: 'לבדוק את התנור' }).locator('.task-main').click()
+
+    const history = page.locator('div.sheet', { hasText: 'לבדוק את התנור' })
+    await expect(history).toBeVisible()
+    // start_only/interval are a fixed offset from the window's own opening
+    // instant, the same for everyone - there is no time-of-day here to make
+    // personal, so no reminder row (and no edit button) should appear at all.
+    await expect(history.getByText('שעת תזכורת')).toHaveCount(0)
+  })
+
   test('resetting it reverts to the task\'s own reminder time', async ({ page }) => {
     const db = makeFakeDb({
       tasks: [reminderTask({ id: 'task-dishes', title: 'לשטוף כלים', reminder_hour: 18, reminder_minute: 30 })],

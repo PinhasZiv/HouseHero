@@ -34,6 +34,16 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
   const [editingReminder, setEditingReminder] = useState(false)
   const myOverride = reminderOverrides.get(task.id) ?? null
 
+  // A personal override only makes sense for a wall-clock reminder time - an
+  // ordinary task's reminder_hour/minute, or a time-limited task's own daily
+  // cadence (reminder_policy.dailyHour/dailyMinute). start_only and interval
+  // are a fixed offset from the window's own opening instant, the same for
+  // everyone, with no time-of-day to personalize.
+  const isDailyTimeLimited = task.task_type === 'time_limited' && task.reminder_policy?.mode === 'daily'
+  const showReminderRow = task.task_type !== 'time_limited' || isDailyTimeLimited
+  const defaultReminderHour = isDailyTimeLimited ? (task.reminder_policy?.dailyHour ?? 0) : task.reminder_hour
+  const defaultReminderMinute = isDailyTimeLimited ? (task.reminder_policy?.dailyMinute ?? 0) : task.reminder_minute
+
   useEffect(() => {
     let cancelled = false
     api
@@ -133,13 +143,17 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
             <>
               <dt>{t.history.detail.schedule}</dt>
               <dd>{scheduleLabel}</dd>
+            </>
+          )}
 
+          {showReminderRow && (
+            <>
               <dt>{t.history.detail.reminder}</dt>
               <dd className="task-detail-reminder">
                 <span>
                   {myOverride
                     ? t.history.detail.reminderPersonal(formatTime(myOverride.hour, myOverride.minute))
-                    : formatTime(task.reminder_hour, task.reminder_minute)}
+                    : formatTime(defaultReminderHour, defaultReminderMinute)}
                 </span>
                 {selfId && (
                   <button
@@ -210,8 +224,8 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
     {editingReminder && (
       <ReminderOverrideSheet
         taskTitle={task.title}
-        initialHour={myOverride?.hour ?? task.reminder_hour}
-        initialMinute={myOverride?.minute ?? task.reminder_minute}
+        initialHour={myOverride?.hour ?? defaultReminderHour}
+        initialMinute={myOverride?.minute ?? defaultReminderMinute}
         hasOverride={myOverride !== null}
         onSave={saveReminderOverride}
         onReset={resetReminderOverride}
