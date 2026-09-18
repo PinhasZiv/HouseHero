@@ -48,13 +48,14 @@ describe.each(sqlFiles)('%s fits in the Supabase SQL editor', (name) => {
 })
 
 describe('required migration files are present in order', () => {
-  it('has exactly the five parts, in filename order', () => {
+  it('has exactly the six parts, in filename order', () => {
     expect(sqlFiles).toEqual([
       '0001_init.sql',
       '0002_tasks.sql',
       '0003_rewards.sql',
       '0004_shared_completions.sql',
       '0005_time_limited_tasks.sql',
+      '0006_reminder_overrides.sql',
     ])
   })
 })

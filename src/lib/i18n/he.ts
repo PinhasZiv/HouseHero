@@ -128,10 +128,21 @@ export const he = {
       schedule: 'תבנית',
       oneTime: 'חד-פעמית',
       reminder: 'שעת תזכורת',
+      reminderPersonal: (time: string) => `${time} (רק לך)`,
+      reminderEditAria: (name: string) => `שינוי שעת התזכורת שלי עבור ${name}`,
       assignedTo: 'שייכת ל',
       ends: 'מסתיימת',
       endsAfterCount: (n: number) => `אחרי ${n} פעמים`,
     },
+  },
+
+  reminderOverride: {
+    title: 'שעת התזכורת שלי',
+    body: 'זו התזכורת שאתה מקבל על המשימה הזו. שינוי כאן משפיע רק עליך - לכל אחד אחר במרחב היא עדיין תגיע בשעה שמוגדרת במשימה.',
+    timeLabel: 'שעה',
+    reset: 'איפוס לשעת ברירת המחדל',
+    saved: 'התזכורת שלך למשימה הזו עודכנה.',
+    resetDone: 'חזרת לשעת ברירת המחדל של המשימה.',
   },
 
   snooze: {
