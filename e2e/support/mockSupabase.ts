@@ -3,8 +3,8 @@ import type { Page, Route } from '@playwright/test'
 // A small stand-in for the pieces of the Supabase REST/RPC API the app
 // actually calls on the screens these tests exercise. It is not a general
 // PostgREST clone - just enough query/filter/upsert/rpc support for profiles,
-// spaces, tasks, task_snoozes, task_completions, rewards and
-// reward_redemptions, which is what the api.ts functions issue.
+// spaces, tasks, task_snoozes, task_reminder_overrides, task_completions,
+// rewards and reward_redemptions, which is what the api.ts functions issue.
 
 export const FAKE_USER_ID = '11111111-1111-4111-8111-111111111111'
 export const FAKE_SPACE_ID = '22222222-2222-4222-8222-222222222222'
@@ -86,6 +86,7 @@ export interface FakeDb {
   spaces: { id: string; name: string; invite_code: string; created_by: string; created_at: string }[]
   tasks: FakeTask[]
   snoozes: Map<string, string> // task_id -> snoozed_until, this user only
+  reminderOverrides: Map<string, { hour: number; minute: number }> // task_id -> this user's own reminder time
   taskCompletions: {
     id: string
     task_id: string
@@ -126,6 +127,7 @@ export function makeFakeDb(overrides?: Partial<FakeDb>): FakeDb {
     ],
     tasks: [],
     snoozes: new Map(),
+    reminderOverrides: new Map(),
     taskCompletions: [],
     rewards: [],
     redemptions: [],
@@ -381,6 +383,27 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
       if (method === 'DELETE') {
         const taskId = eqValue(url, 'task_id')
         if (taskId) db.snoozes.delete(taskId)
+        return json(route, [])
+      }
+    }
+
+    if (table === 'task_reminder_overrides') {
+      if (method === 'GET') {
+        const rows = [...db.reminderOverrides.entries()].map(([task_id, { hour, minute }]) => ({
+          task_id,
+          reminder_hour: hour,
+          reminder_minute: minute,
+        }))
+        return json(route, rows)
+      }
+      if (method === 'POST') {
+        const body = request.postDataJSON() as { task_id: string; reminder_hour: number; reminder_minute: number }
+        db.reminderOverrides.set(body.task_id, { hour: body.reminder_hour, minute: body.reminder_minute })
+        return json(route, [], 201)
+      }
+      if (method === 'DELETE') {
+        const taskId = eqValue(url, 'task_id')
+        if (taskId) db.reminderOverrides.delete(taskId)
         return json(route, [])
       }
     }

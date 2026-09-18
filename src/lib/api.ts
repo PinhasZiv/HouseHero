@@ -314,6 +314,46 @@ export async function cancelSnooze(taskId: string, userId: string): Promise<void
   if (error) throw error
 }
 
+/** Every task this person has personally set their own reminder time for. */
+export async function fetchReminderOverrides(
+  userId: string,
+): Promise<{ task_id: string; reminder_hour: number; reminder_minute: number }[]> {
+  const { data, error } = await supabase
+    .from('task_reminder_overrides')
+    .select('task_id, reminder_hour, reminder_minute')
+    .eq('user_id', userId)
+  if (error) throw error
+  return data ?? []
+}
+
+/**
+ * Sets this one person's own reminder time for one task. Personal, not
+ * shared: it never touches the task row, so anyone else in the space still
+ * gets reminded at the time set on the task itself.
+ */
+export async function setReminderOverride(
+  taskId: string,
+  userId: string,
+  reminderHour: number,
+  reminderMinute: number,
+): Promise<void> {
+  const { error } = await supabase.from('task_reminder_overrides').upsert(
+    { task_id: taskId, user_id: userId, reminder_hour: reminderHour, reminder_minute: reminderMinute },
+    { onConflict: 'task_id,user_id' },
+  )
+  if (error) throw error
+}
+
+/** Reverts back to the task's own reminder time. */
+export async function clearReminderOverride(taskId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('task_reminder_overrides')
+    .delete()
+    .eq('task_id', taskId)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
 /** Recent completions for a task, newest first. */
 export async function fetchHistory(taskId: string, limit = 20): Promise<TaskHistoryEntry[]> {
   const { data, error } = await supabase

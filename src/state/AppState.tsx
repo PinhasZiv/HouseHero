@@ -24,6 +24,12 @@ type Person = Pick<
   'id' | 'display_name' | 'avatar_url' | 'email' | 'lifetime_points' | 'spendable_points'
 >
 
+/** One person's own reminder time for one task, overriding the task's own. */
+export interface ReminderOverride {
+  hour: number
+  minute: number
+}
+
 interface AppContextValue {
   session: Session | null
   profile: Profile | null
@@ -50,6 +56,14 @@ interface AppContextValue {
   snoozes: Map<string, string>
   /** Applies a snooze (or its cancellation, with `until: null`) locally. */
   patchSnooze: (taskId: string, until: string | null) => void
+  /**
+   * This person's own reminder-time overrides, by task id. A task with no
+   * entry here is reminded at its own reminder_hour/minute, like everyone
+   * else in the space.
+   */
+  reminderOverrides: Map<string, ReminderOverride>
+  /** Applies an override (or clears it, with `override: null`) locally. */
+  patchReminderOverride: (taskId: string, override: ReminderOverride | null) => void
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
@@ -76,6 +90,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [people, setPeople] = useState<Map<string, Person>>(new Map())
   const [snoozes, setSnoozes] = useState<Map<string, string>>(new Map())
+  const [reminderOverrides, setReminderOverrides] = useState<Map<string, ReminderOverride>>(new Map())
   const [currentSpaceId, setCurrentSpaceIdState] = useState<string | null>(readStoredSpace)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -126,6 +141,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         api.fetchAllTasks(),
         api.fetchPeople(),
         api.fetchSnoozes(userId),
+        api.fetchReminderOverrides(userId),
       ])
     try {
       // A cold start (opening the PWA after it sat backgrounded, or from
@@ -136,13 +152,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // on its own, which is all "press try again" ever did, so this retries
       // silently rather than making it a manual step.
       const result = await withRetry(fetchEverything, COLD_START_RETRY_DELAYS_MS)
-      const [nextProfile, nextSpaces, nextTasks, nextPeople, nextSnoozes] = result
+      const [nextProfile, nextSpaces, nextTasks, nextPeople, nextSnoozes, nextReminderOverrides] = result
       setProfile(nextProfile)
       adoptLanguage(nextProfile)
       setSpaces(nextSpaces)
       setTasks((current) => reconcileReloadedTasks(current, nextTasks, touchedTaskIdsRef.current))
       setPeople(new Map(nextPeople.map((person) => [person.id, person])))
       setSnoozes(new Map(nextSnoozes.map((row) => [row.task_id, row.snoozed_until])))
+      setReminderOverrides(
+        new Map(nextReminderOverrides.map((row) => [row.task_id, { hour: row.reminder_hour, minute: row.reminder_minute }])),
+      )
       setCurrentSpaceIdState((current) => {
         const stillValid = current && nextSpaces.some((space) => space.id === current)
         return stillValid ? current : (nextSpaces[0]?.id ?? null)
@@ -177,6 +196,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTasks([])
       setPeople(new Map())
       setSnoozes(new Map())
+      setReminderOverrides(new Map())
       return
     }
     setLoading(true)
@@ -285,6 +305,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const patchReminderOverride = useCallback((taskId: string, override: ReminderOverride | null) => {
+    setReminderOverrides((current) => {
+      const next = new Map(current)
+      if (override) next.set(taskId, override)
+      else next.delete(taskId)
+      return next
+    })
+  }, [])
+
   const value = useMemo<AppContextValue>(
     () => ({
       session,
@@ -304,11 +333,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       removeTask,
       snoozes,
       patchSnooze,
+      reminderOverrides,
+      patchReminderOverride,
     }),
     [
       session, profile, spaces, tasks, people, today, currentSpaceId,
       setCurrentSpaceId, loading, authReady, error, reload, patchTask, removeTask,
-      snoozes, patchSnooze,
+      snoozes, patchSnooze, reminderOverrides, patchReminderOverride,
     ],
   )
 

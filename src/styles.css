@@ -831,6 +831,25 @@ button { font: inherit; cursor: pointer; }
 .task-detail-grid dt { color: var(--text-muted); }
 .task-detail-grid dd { margin: 0; font-weight: 600; }
 
+/* The reminder row's value sits next to a small pencil rather than filling
+   the whole dd - the row is the only one in this list with an action. */
+.task-detail-reminder { display: flex; align-items: center; gap: 6px; }
+
+.icon-button-small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-muted);
+  flex: none;
+}
+
+.icon-button-small:active { background: var(--border); color: var(--text); }
+
 /* ----------------------------------------------------------- history --- */
 
 .history-list {

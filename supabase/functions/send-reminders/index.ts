@@ -41,6 +41,13 @@ interface Subscription extends PushTarget {
   failure_count: number
 }
 
+interface ReminderOverride {
+  task_id: string
+  user_id: string
+  reminder_hour: number
+  reminder_minute: number
+}
+
 // How long after a task's chosen time we will still deliver. Wide enough to
 // absorb cron jitter and a cold start; the per-day log stops it repeating.
 const WINDOW_MINUTES = Number(Deno.env.get('REMINDER_WINDOW_MINUTES') ?? '60')
@@ -110,7 +117,7 @@ Deno.serve(async (request) => {
   const now = new Date()
   const nowIso = now.toISOString()
 
-  const [profiles, subscriptions, memberships, tasks, spaces, snoozes] = await Promise.all([
+  const [profiles, subscriptions, memberships, tasks, spaces, snoozes, reminderOverrides] = await Promise.all([
     admin.from('profiles').select('id, display_name, timezone, language'),
     admin.from('push_subscriptions').select('id, user_id, endpoint, p256dh, auth, failure_count'),
     admin.from('space_members').select('space_id, user_id'),
@@ -125,9 +132,12 @@ Deno.serve(async (request) => {
       .eq('is_done', false),
     admin.from('spaces').select('id, name'),
     admin.from('task_snoozes').select('task_id, user_id, snoozed_until'),
+    admin.from('task_reminder_overrides').select('task_id, user_id, reminder_hour, reminder_minute'),
   ])
 
-  const failed = [profiles, subscriptions, memberships, tasks, spaces, snoozes].find((r) => r.error)
+  const failed = [profiles, subscriptions, memberships, tasks, spaces, snoozes, reminderOverrides].find(
+    (r) => r.error,
+  )
   if (failed?.error) {
     console.error('load failed', failed.error)
     return new Response(JSON.stringify({ error: failed.error.message }), {
@@ -165,6 +175,13 @@ Deno.serve(async (request) => {
     if (row.snoozed_until > nowIso) activeSnooze.add(`${row.task_id}:${row.user_id}`)
   }
 
+  // A personal reminder time for one (task, user) pair - always wins over the
+  // task's own reminder_hour/minute for that one person, whether the task is
+  // shared or assigned specifically to them.
+  const reminderOverrideByKey = new Map<string, ReminderOverride>(
+    ((reminderOverrides.data ?? []) as ReminderOverride[]).map((row) => [`${row.task_id}:${row.user_id}`, row]),
+  )
+
   // Every user who should be considered for a task: the assignee alone if the
   // task has one, otherwise every member of its space.
   const tasksForUser = new Map<string, Task[]>()
@@ -198,7 +215,10 @@ Deno.serve(async (request) => {
         if (task.task_type === 'time_limited') return false
         if (!info.notifiable) return false
         if (activeSnooze.has(`${task.id}:${userId}`)) return false
-        const taskMinutes = task.reminder_hour * 60 + task.reminder_minute
+        const override = reminderOverrideByKey.get(`${task.id}:${userId}`)
+        const taskMinutes = override
+          ? override.reminder_hour * 60 + override.reminder_minute
+          : task.reminder_hour * 60 + task.reminder_minute
         const sinceDue = nowMinutes - taskMinutes
         return sinceDue >= 0 && sinceDue < WINDOW_MINUTES
       })

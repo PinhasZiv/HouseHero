@@ -5,7 +5,8 @@ import { googleCalendarUrl } from '../lib/googleCalendar'
 import { useI18n } from '../lib/i18n'
 import { useApp } from '../state/AppState'
 import type { Task, TaskHistoryEntry } from '../lib/types'
-import { CalendarIcon } from './Icons'
+import { CalendarIcon, PencilIcon } from './Icons'
+import { ReminderOverrideSheet } from './ReminderOverrideSheet'
 import { useToast } from './Toast'
 
 interface TaskHistoryProps {
@@ -25,11 +26,13 @@ interface TaskHistoryProps {
  * everything else about that completion as if it had not happened.
  */
 export function TaskHistory({ task, onClose }: TaskHistoryProps) {
-  const { people, session, today } = useApp()
+  const { people, session, today, reminderOverrides, patchReminderOverride } = useApp()
   const { t, language } = useI18n()
   const toast = useToast()
   const selfId = session?.user.id ?? null
   const [entries, setEntries] = useState<TaskHistoryEntry[] | null>(null)
+  const [editingReminder, setEditingReminder] = useState(false)
+  const myOverride = reminderOverrides.get(task.id) ?? null
 
   useEffect(() => {
     let cancelled = false
@@ -90,7 +93,24 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
       return { key: entry.id, date: entry.completed_on, label }
     })
 
+  async function saveReminderOverride(hour: number, minute: number) {
+    if (!selfId) return
+    await api.setReminderOverride(task.id, selfId, hour, minute)
+    patchReminderOverride(task.id, { hour, minute })
+    setEditingReminder(false)
+    toast.show(t.reminderOverride.saved)
+  }
+
+  async function resetReminderOverride() {
+    if (!selfId) return
+    await api.clearReminderOverride(task.id, selfId)
+    patchReminderOverride(task.id, null)
+    setEditingReminder(false)
+    toast.show(t.reminderOverride.resetDone)
+  }
+
   return (
+    <>
     <div className="sheet-backdrop" onClick={onClose} role="presentation">
       <div className="sheet" onClick={(event) => event.stopPropagation()}>
         <h2>{task.title}</h2>
@@ -115,7 +135,23 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
               <dd>{scheduleLabel}</dd>
 
               <dt>{t.history.detail.reminder}</dt>
-              <dd>{formatTime(task.reminder_hour, task.reminder_minute)}</dd>
+              <dd className="task-detail-reminder">
+                <span>
+                  {myOverride
+                    ? t.history.detail.reminderPersonal(formatTime(myOverride.hour, myOverride.minute))
+                    : formatTime(task.reminder_hour, task.reminder_minute)}
+                </span>
+                {selfId && (
+                  <button
+                    type="button"
+                    className="icon-button icon-button-small"
+                    onClick={() => setEditingReminder(true)}
+                    aria-label={t.history.detail.reminderEditAria(task.title)}
+                  >
+                    <PencilIcon size={14} />
+                  </button>
+                )}
+              </dd>
             </>
           )}
 
@@ -170,5 +206,18 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
         </div>
       </div>
     </div>
+
+    {editingReminder && (
+      <ReminderOverrideSheet
+        taskTitle={task.title}
+        initialHour={myOverride?.hour ?? task.reminder_hour}
+        initialMinute={myOverride?.minute ?? task.reminder_minute}
+        hasOverride={myOverride !== null}
+        onSave={saveReminderOverride}
+        onReset={resetReminderOverride}
+        onClose={() => setEditingReminder(false)}
+      />
+    )}
+    </>
   )
 }

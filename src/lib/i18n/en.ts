@@ -126,10 +126,21 @@ export const en: Strings = {
       schedule: 'Schedule',
       oneTime: 'One-time',
       reminder: 'Reminder time',
+      reminderPersonal: (time: string) => `${time} (just for you)`,
+      reminderEditAria: (name: string) => `Change my reminder time for ${name}`,
       assignedTo: 'Assigned to',
       ends: 'Ends',
       endsAfterCount: (n: number) => `After ${n} times`,
     },
+  },
+
+  reminderOverride: {
+    title: 'My reminder time',
+    body: "This is the reminder you get for this task. Changing it here only affects you - everyone else in the space still gets reminded at the task's own time.",
+    timeLabel: 'Time',
+    reset: 'Reset to the task’s default',
+    saved: 'Your reminder for this task was updated.',
+    resetDone: "You're back to the task's default reminder time.",
   },
 
   snooze: {
