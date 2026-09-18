@@ -377,12 +377,21 @@ Deno.serve(async (request) => {
       const subs = subsByUser.get(userId)
       if (!profile || !subs?.length) continue
 
-      // A daily cadence fires by this recipient's own local wall-clock time,
-      // so - unlike the interval/start-only modes, both a fixed offset from
-      // startsAt's absolute instant - the slot computation itself needs
-      // their timezone, not just the delivery check.
+      // A daily cadence fires by this recipient's own local wall-clock time -
+      // the same shape as an ordinary task's reminder_hour/minute, and the
+      // only reminder_policy mode where a personal override even makes sense
+      // (start_only/interval are a fixed offset from starts_at's absolute
+      // instant, not a time of day anyone could move to suit them). Reuses
+      // the very same task_reminder_overrides row a non-time-limited task
+      // would use, since the two columns line up one to one.
+      const override =
+        task.reminder_policy?.mode === 'daily' ? reminderOverrideByKey.get(`${task.id}:${userId}`) : undefined
+      const effectivePolicy = override
+        ? { ...(task.reminder_policy as ReminderPolicy), dailyHour: override.reminder_hour, dailyMinute: override.reminder_minute }
+        : task.reminder_policy
+
       const slots = dueReminderSlots(
-        { id: task.id, startsAt: task.starts_at as string, expiresAt: task.expires_at as string, reminderPolicy: task.reminder_policy },
+        { id: task.id, startsAt: task.starts_at as string, expiresAt: task.expires_at as string, reminderPolicy: effectivePolicy },
         now,
         WINDOW_MINUTES,
         profile.timezone,
