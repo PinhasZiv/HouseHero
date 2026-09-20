@@ -171,13 +171,20 @@ function awardPoints(db: FakeDb, userId: string, points: number) {
 }
 
 /** Applies complete_task's rules well enough for the one_time/interval cases the suite exercises. */
-function applyCompleteTask(db: FakeDb, taskId: string, today: string, completedBy: string[] | null) {
+function applyCompleteTask(
+  db: FakeDb,
+  taskId: string,
+  today: string,
+  completedBy: string[] | null,
+  completedAt: string | null,
+) {
   const task = db.tasks.find((t) => t.id === taskId)
   if (!task) return null
 
   // Captured before due_date advances below - mirrors complete_task()
   // storing the pre-completion due_date on every event it logs.
   const prevDueDate = task.due_date
+  const at = completedAt ?? new Date().toISOString()
 
   if (task.task_type === 'one_time' || task.task_type === 'time_limited') {
     task.is_done = true
@@ -187,7 +194,7 @@ function applyCompleteTask(db: FakeDb, taskId: string, today: string, completedB
     task.due_date = next.toISOString().slice(0, 10)
   }
   task.last_completed_date = today
-  task.last_completed_at = new Date().toISOString()
+  task.last_completed_at = at
   task.last_completed_actor = FAKE_USER_ID
   task.occurrences_completed += 1
 
@@ -201,7 +208,7 @@ function applyCompleteTask(db: FakeDb, taskId: string, today: string, completedB
       user_id: userId,
       points_awarded: task.points,
       completed_on: today,
-      created_at: new Date().toISOString(),
+      created_at: at,
       completion_group: groupId,
       prev_due_date: prevDueDate,
     }
@@ -257,6 +264,7 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
           body.p_task as string,
           body.p_today as string,
           (body.p_completed_by as string[] | null) ?? null,
+          (body.p_completed_at as string | null) ?? null,
         )
         if (!event) return json(route, { message: 'no_such_task' }, 404)
         return json(route, wantsSingle ? event : [event])

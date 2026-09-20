@@ -112,6 +112,9 @@ export const en: Strings = {
     multiSelectTitle: 'Pick who did it',
     confirmSelection: 'Confirm',
     you: 'me',
+    differentTimeToggle: 'Log this for a different time',
+    whenLabel: 'When did this happen?',
+    invalidTime: 'The time must be now or in the past.',
   },
 
   history: {

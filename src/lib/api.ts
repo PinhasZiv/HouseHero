@@ -241,6 +241,10 @@ export interface CompletionChoice {
   /** Everyone to credit with the task's full point value - not split
    * between them. Omitted or empty defaults to whoever calls this. */
   userIds?: string[]
+  /** ISO instant this actually happened, when it was not just now - "I did
+   *  the dishes last night, forgot to check it off". Omitted defaults to the
+   *  moment this call reaches the server, same as always. */
+  completedAt?: string
 }
 
 /**
@@ -249,8 +253,9 @@ export interface CompletionChoice {
  * the "I can see it needs doing right now" case.
  *
  * By default this credits whoever calls it, same as always. `choice` lets
- * the caller instead credit someone else, or several people at once - see
- * complete_task() for how each is recorded.
+ * the caller instead credit someone else, or several people at once, and/or
+ * log it for an earlier moment - see complete_task() for how each is
+ * recorded and why a future completedAt is rejected there too.
  */
 export async function completeTask(
   taskId: string,
@@ -262,6 +267,10 @@ export async function completeTask(
       p_task: taskId,
       p_today: today,
       p_completed_by: choice.userIds && choice.userIds.length > 0 ? choice.userIds : null,
+      // Left out entirely (rather than sending the client's own clock) when
+      // nothing was picked, so the common case still gets the server's own
+      // now() - the one clock every device already has to agree with.
+      ...(choice.completedAt ? { p_completed_at: choice.completedAt } : {}),
     })
     .single()
   if (error) throw error

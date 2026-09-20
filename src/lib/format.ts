@@ -115,6 +115,19 @@ export function formatTime(hour: number, minute: number): string {
 }
 
 /**
+ * Formats a Date for an `<input type="datetime-local">` value: local
+ * wall-clock fields only, no timezone suffix - the browser already renders
+ * and edits it in local time, so nothing here should re-encode a timezone.
+ */
+export function toDatetimeLocalValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  )
+}
+
+/**
  * "20:30" if the snooze ends later today, else "מחר 08:00" / "tomorrow
  * 08:00" - whichever tells you fastest whether to expect it again today.
  *
