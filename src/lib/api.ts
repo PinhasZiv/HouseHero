@@ -467,7 +467,11 @@ export interface StatsCompletion {
    *  calendar day, so this is what a person's own completion breakdown
    *  shows the time of. */
   created_at: string
-  task: { title: string } | null
+  /** The task's own due_date at the moment of this completion - captured for
+   *  undo, and reused here to tell whether it landed on time or late without
+   *  needing a separate column of its own. */
+  prev_due_date: string
+  task: { title: string; task_type: TaskType } | null
   /** Non-null only when several people were credited for the same
    * completion - every row it produced shares this id, so counting "how
    * many times has this been done" can count that group once, not once
@@ -479,7 +483,10 @@ export interface StatsCompletion {
 export async function fetchStatsCompletions(spaceId: string): Promise<StatsCompletion[]> {
   const { data, error } = await supabase
     .from('task_completions')
-    .select('task_id, user_id, points_awarded, completed_on, created_at, completion_group, task:tasks(title)')
+    .select(
+      'task_id, user_id, points_awarded, completed_on, created_at, prev_due_date, completion_group, ' +
+        'task:tasks(title, task_type)',
+    )
     .eq('space_id', spaceId)
     .order('completed_on', { ascending: false })
     .limit(1000)

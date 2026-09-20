@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { FAKE_SPACE_ID, FAKE_USER_ID, installSupabaseMock, makeFakeDb, seedSession, type FakeDb } from './support/mockSupabase'
+import { FAKE_SPACE_ID, FAKE_USER_ID, installSupabaseMock, makeFakeDb, seedSession, type FakeDb, type FakeTask } from './support/mockSupabase'
 
 const OTHER_ID = '33333333-3333-4333-8333-333333333333'
 
@@ -13,6 +13,44 @@ async function seed(page: import('@playwright/test').Page, db: FakeDb) {
   await seedSession(page)
   await page.addInitScript(() => window.localStorage.setItem('househero.language', 'he'))
   await installSupabaseMock(page, db)
+}
+
+function statsTask(overrides: Partial<FakeTask> & { id: string; title: string }): FakeTask {
+  return {
+    space_id: FAKE_SPACE_ID,
+    description: null,
+    task_type: 'recurring',
+    recurrence_mode: 'interval',
+    interval_days: 1,
+    weekly_days: null,
+    end_condition: 'never',
+    end_after_count: null,
+    end_date: null,
+    occurrences_completed: 1,
+    points: 10,
+    reminder_hour: 9,
+    reminder_minute: 0,
+    due_date: isoDaysFromToday(1),
+    last_completed_date: isoDaysFromToday(0),
+    last_completed_at: new Date().toISOString(),
+    last_completed_by: [FAKE_USER_ID],
+    last_completed_actor: FAKE_USER_ID,
+    is_done: false,
+    assigned_to: null,
+    created_by: FAKE_USER_ID,
+    created_at: new Date().toISOString(),
+    starts_at: null,
+    expires_at: null,
+    reminder_policy: null,
+    cancelled_at: null,
+    expired_at: null,
+    ...overrides,
+  }
+}
+
+const HE_WEEKDAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
+function weekdayOf(isoDate: string): string {
+  return HE_WEEKDAYS[new Date(`${isoDate}T00:00:00Z`).getUTCDay()]
 }
 
 test.describe('stats screen', () => {
@@ -342,5 +380,122 @@ test.describe('stats screen', () => {
     await laundryRow.click()
     await expect(laundryDates).toHaveCount(3)
     await expect(laundryDates.first()).toBeVisible()
+  })
+
+  test('shows the weekly trend as a simple table of the last 6 weeks', async ({ page }) => {
+    const db = makeFakeDb({
+      tasks: [statsTask({ id: 'task-a', title: 'לנקות את המטבח' })],
+      taskCompletions: [
+        { id: 'e-this-week', task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 10, completed_on: isoDaysFromToday(0), created_at: new Date().toISOString(), completion_group: null },
+        { id: 'e-last-week', task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 10, completed_on: isoDaysFromToday(-8), created_at: new Date(Date.now() - 8 * 86_400_000).toISOString(), completion_group: null },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
+
+    const card = page.locator('.card', { hasText: 'מגמה שבועית' })
+    await expect(card.locator('.stats-breakdown-row', { hasText: 'השבוע' })).toContainText('1')
+    await expect(card.locator('.stats-breakdown-row', { hasText: 'לפני שבוע' })).toContainText('1')
+  })
+
+  test('the on-time tile reflects completions before vs after the task\'s own due date', async ({ page }) => {
+    const db = makeFakeDb({
+      tasks: [statsTask({ id: 'task-a', title: 'להוציא זבל' })],
+      taskCompletions: [
+        {
+          id: 'e-ontime', task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 10,
+          completed_on: isoDaysFromToday(0), created_at: new Date().toISOString(), completion_group: null,
+          prev_due_date: isoDaysFromToday(0),
+        },
+        {
+          id: 'e-late', task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 10,
+          completed_on: isoDaysFromToday(-1), created_at: new Date(Date.now() - 86_400_000).toISOString(), completion_group: null,
+          prev_due_date: isoDaysFromToday(-4),
+        },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
+
+    await expect(page.locator('.stat-tile', { hasText: 'בזמן' }).locator('.points-value')).toHaveText('50%')
+  })
+
+  test('flags the most neglected task - repeatedly late, not a single unlucky day', async ({ page }) => {
+    const db = makeFakeDb({
+      tasks: [
+        statsTask({ id: 'task-neglected', title: 'לנקות את הגינה' }),
+        statsTask({ id: 'task-once-late', title: 'לצחצח נעליים' }),
+      ],
+      taskCompletions: [
+        // Repeatedly late - averages 3 days late across two completions.
+        {
+          id: 'e-1', task_id: 'task-neglected', user_id: FAKE_USER_ID, points_awarded: 10,
+          completed_on: isoDaysFromToday(0), created_at: new Date().toISOString(), completion_group: null,
+          prev_due_date: isoDaysFromToday(-2),
+        },
+        {
+          id: 'e-2', task_id: 'task-neglected', user_id: FAKE_USER_ID, points_awarded: 10,
+          completed_on: isoDaysFromToday(-5), created_at: new Date(Date.now() - 5 * 86_400_000).toISOString(), completion_group: null,
+          prev_due_date: isoDaysFromToday(-9),
+        },
+        // Late exactly once - a single unlucky day should not count as a pattern.
+        {
+          id: 'e-3', task_id: 'task-once-late', user_id: FAKE_USER_ID, points_awarded: 10,
+          completed_on: isoDaysFromToday(0), created_at: new Date().toISOString(), completion_group: null,
+          prev_due_date: isoDaysFromToday(-10),
+        },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
+
+    const card = page.locator('.card', { hasText: 'המשימה הכי מוזנחת' })
+    await expect(card).toContainText('לנקות את הגינה')
+    await expect(card).not.toContainText('לצחצח נעליים')
+  })
+
+  test('shows the busiest day of the week across all history', async ({ page }) => {
+    const busyDate1 = '2026-01-08'
+    const busyDate2 = '2026-01-15' // exactly 7 days later - guaranteed the same weekday
+    const quietDate = '2026-01-10' // a different weekday, only one completion
+    const db = makeFakeDb({
+      tasks: [statsTask({ id: 'task-a', title: 'לקפל כביסה' })],
+      taskCompletions: [
+        { id: 'e-1', task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 10, completed_on: busyDate1, created_at: `${busyDate1}T08:00:00.000Z`, completion_group: null },
+        { id: 'e-2', task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 10, completed_on: busyDate2, created_at: `${busyDate2}T08:00:00.000Z`, completion_group: null },
+        { id: 'e-3', task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 10, completed_on: quietDate, created_at: `${quietDate}T08:00:00.000Z`, completion_group: null },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
+
+    const card = page.locator('.card', { hasText: 'היום העמוס בשבוע' })
+    await expect(card).toContainText(weekdayOf(busyDate1))
+  })
+
+  test('flags a space member who has never completed anything', async ({ page }) => {
+    const db = makeFakeDb({
+      tasks: [statsTask({ id: 'task-a', title: 'לשטוף כלים' })],
+      taskCompletions: [
+        { id: 'e-1', task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 10, completed_on: isoDaysFromToday(0), created_at: new Date().toISOString(), completion_group: null },
+      ],
+      otherPeople: [
+        { id: OTHER_ID, display_name: 'דנה כהן', avatar_url: null, email: 'dana@example.com', lifetime_points: 0, spendable_points: 0 },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
+
+    const card = page.locator('.card', { hasText: 'לא היה פעיל לאחרונה' })
+    await expect(card).toBeVisible()
+    const danaRow = card.locator('.history-row', { hasText: 'דנה' })
+    await expect(danaRow).toContainText('אף משימה לא בוצעה עדיין')
+    // The active user did complete something recently - not listed here.
+    await expect(card.locator('.history-row', { hasText: 'אני' })).toHaveCount(0)
   })
 })

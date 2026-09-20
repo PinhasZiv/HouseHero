@@ -183,13 +183,20 @@ export function weekdayShort(index: number, language: Language): string {
   return language === 'en' ? en[index] : he[index]
 }
 
+const WEEKDAY_NAMES: Record<Language, string[]> = {
+  he: ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'],
+  en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+}
+
+/** Full weekday name, e.g. for "the busiest day is ___". index: 0=Sunday..6=Saturday. */
+export function weekdayName(index: number, language: Language): string {
+  return WEEKDAY_NAMES[language][index]
+}
+
 /** "שני, רביעי" / "Mon, Wed" - the chosen weekdays, in week order. */
 export function describeWeeklyDays(weeklyDays: number[], language: Language): string {
-  const he = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
-  const en = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  const names = language === 'en' ? en : he
   return [...weeklyDays]
     .sort((a, b) => a - b)
-    .map((d) => names[d])
-    .join(language === 'en' ? ', ' : ', ')
+    .map((d) => weekdayName(d, language))
+    .join(', ')
 }
