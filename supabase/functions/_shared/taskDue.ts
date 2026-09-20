@@ -133,6 +133,56 @@ export function formatTimeIn(timezone: string, iso: string): string {
   }
 }
 
+/** The recurrence fields cycleLateness() actually needs - a structural
+ *  subset of DueTask, so a caller with just these four fields (a past
+ *  completion's own task record, say) can use it without assembling a full
+ *  DueTask it does not otherwise have. */
+export interface CyclicTask {
+  task_type: TaskType
+  recurrence_mode: RecurrenceMode | null
+  interval_days: number | null
+  weekly_days: number[] | null
+}
+
+/**
+ * Wraps an already-overdue gap to the most recently passed point on the
+ * task's own repeating schedule, rather than the raw distance from the
+ * original due date.
+ *
+ * For most chores here, being a little late on any one occurrence is not
+ * itself the problem - what matters is whether it is still outstanding once
+ * its own next occurrence would have come around. So once a full cycle goes
+ * by unaddressed, the count resets and starts again from that point: two and
+ * a half cycles late reads as "half a cycle late", not as an ever-growing
+ * tally of every cycle ever missed. A one-time task, or a recurring one
+ * missing the fields its own mode needs, has no such repeating grid, so the
+ * raw gap passes through unchanged.
+ */
+export function cycleLateness(task: CyclicTask, dueDate: string, rawDaysLate: number): number {
+  if (rawDaysLate <= 0 || task.task_type !== 'recurring') return rawDaysLate
+
+  if (task.recurrence_mode === 'interval' && task.interval_days) {
+    return rawDaysLate % task.interval_days
+  }
+
+  if (task.recurrence_mode === 'weekly_days' && task.weekly_days?.length) {
+    // Walks the grid the task would have kept had it never been touched -
+    // one nextWeeklyDate() step at a time, since the gaps between chosen
+    // weekdays are not necessarily even - until the next step would
+    // overshoot `to`, leaving `gridPoint` as the most recent one not after it.
+    const to = addDays(dueDate, rawDaysLate)
+    let gridPoint = dueDate
+    let next = nextWeeklyDate(task.weekly_days, gridPoint)
+    while (daysBetween(next, to) >= 0) {
+      gridPoint = next
+      next = nextWeeklyDate(task.weekly_days, gridPoint)
+    }
+    return daysBetween(gridPoint, to)
+  }
+
+  return rawDaysLate
+}
+
 export function classify(task: DueTask, today: string, now: Date = new Date()): DueInfo {
   if (task.task_type === 'time_limited') return classifyTimeLimited(task, today, now)
 
@@ -152,17 +202,20 @@ export function classify(task: DueTask, today: string, now: Date = new Date()): 
     return { status: 'completed_today', daysLate: 0, notifiable: false }
   }
 
-  const late = daysBetween(task.due_date, today)
+  const rawLate = daysBetween(task.due_date, today)
 
-  if (late > 0) {
+  if (rawLate > 0) {
     // No cutoff: an overdue task keeps nagging every day until it is done or
-    // deleted - unlike a plant, a chore does not become fine to ignore.
+    // deleted - unlike a plant, a chore does not become fine to ignore. But
+    // the count itself wraps to the current cycle - see cycleLateness().
+    const late = cycleLateness(task, task.due_date, rawLate)
+    if (late === 0) return { status: 'due', daysLate: 0, notifiable: true }
     return { status: 'late', daysLate: late, notifiable: true }
   }
-  if (late === 0) {
+  if (rawLate === 0) {
     return { status: 'due', daysLate: 0, notifiable: true }
   }
-  return { status: 'upcoming', daysLate: late, notifiable: false }
+  return { status: 'upcoming', daysLate: rawLate, notifiable: false }
 }
 
 /**
