@@ -1,5 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { describeWeeklyDays, formatDateTime, formatSnoozeUntil, personLabel, weekdayShort } from './format'
+import { describeWeeklyDays, formatDateTime, formatSnoozeUntil, personLabel, toDatetimeLocalValue, weekdayShort } from './format'
+
+describe('toDatetimeLocalValue', () => {
+  it('zero-pads every field to the shape a datetime-local input expects', () => {
+    const date = new Date(2026, 0, 3, 9, 5) // 3 Jan 2026, 09:05 local
+    expect(toDatetimeLocalValue(date)).toBe('2026-01-03T09:05')
+  })
+
+  it('round-trips through the Date constructor unchanged', () => {
+    const date = new Date(2026, 8, 21, 23, 59)
+    const value = toDatetimeLocalValue(date)
+    const parsed = new Date(value)
+    expect(parsed.getFullYear()).toBe(2026)
+    expect(parsed.getMonth()).toBe(8)
+    expect(parsed.getDate()).toBe(21)
+    expect(parsed.getHours()).toBe(23)
+    expect(parsed.getMinutes()).toBe(59)
+  })
+})
 
 describe('personLabel', () => {
   const people = new Map([

@@ -233,4 +233,74 @@ test.describe('completing a task', () => {
     expect(db.tasks[0].last_completed_by).toEqual(expect.arrayContaining([FAKE_USER_ID, OTHER_ID]))
     expect(db.tasks[0].last_completed_by).toHaveLength(2)
   })
+
+  test('logging a completion for a past date records that date, not today', async ({ page }) => {
+    const db = makeFakeDb({
+      tasks: [baseTask({ id: 'task-once', title: 'להכניס מדיח', points: 8 })],
+    })
+    await seed(page, db)
+    await page.goto('/')
+
+    const card = page.locator('.task-card', { hasText: 'להכניס מדיח' })
+    await card.getByRole('button', { name: /סימון .* כבוצעה/ }).click()
+    await expect(page.getByRole('heading', { name: 'מי ביצע את זה?' })).toBeVisible()
+
+    await page.getByRole('button', { name: 'לתעד עבור זמן אחר' }).click()
+    const yesterday = isoDaysFromToday(-1)
+    await page.locator('input[type="datetime-local"]').fill(`${yesterday}T20:15`)
+    await page.getByRole('button', { name: 'אישור' }).click()
+
+    await expect(page.getByText('+8 נקודות', { exact: false })).toBeVisible()
+    expect(db.tasks[0].is_done).toBe(true)
+    expect(db.tasks[0].last_completed_date).toBe(yesterday)
+    expect(db.taskCompletions[0].completed_on).toBe(yesterday)
+  })
+
+  test('refuses to log a completion for a time in the future', async ({ page }) => {
+    const db = makeFakeDb({
+      tasks: [baseTask({ id: 'task-once', title: 'לצבוע את הגדר', points: 10 })],
+    })
+    await seed(page, db)
+    await page.goto('/')
+
+    const card = page.locator('.task-card', { hasText: 'לצבוע את הגדר' })
+    await card.getByRole('button', { name: /סימון .* כבוצעה/ }).click()
+    await page.getByRole('button', { name: 'לתעד עבור זמן אחר' }).click()
+    await page.locator('input[type="datetime-local"]').fill(`${isoDaysFromToday(1)}T09:00`)
+    await page.getByRole('button', { name: 'אישור' }).click()
+
+    await expect(page.getByText('הזמן חייב להיות עכשיו או בעבר.')).toBeVisible()
+    expect(db.tasks[0].is_done).toBe(false)
+    expect(db.taskCompletions).toHaveLength(0)
+  })
+
+  test('backdating a recurring task computes its next due date from the chosen day, not from today', async ({ page }) => {
+    const db = makeFakeDb({
+      tasks: [
+        {
+          id: 'task-daily', space_id: FAKE_SPACE_ID, title: 'להוציא זבל', description: null,
+          task_type: 'recurring', recurrence_mode: 'interval', interval_days: 1, weekly_days: null,
+          end_condition: 'never', end_after_count: null, end_date: null, occurrences_completed: 0,
+          points: 5, reminder_hour: 9, reminder_minute: 0, due_date: isoDaysFromToday(0),
+          last_completed_date: null, last_completed_at: null, last_completed_by: null, last_completed_actor: null,
+          is_done: false, assigned_to: null, created_by: FAKE_USER_ID, created_at: new Date().toISOString(),
+          starts_at: null, expires_at: null, reminder_policy: null, cancelled_at: null, expired_at: null,
+        },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+
+    await page.locator('.task-checkbox').click()
+    await page.getByRole('button', { name: 'לתעד עבור זמן אחר' }).click()
+    await page.locator('input[type="datetime-local"]').fill(`${isoDaysFromToday(-1)}T20:00`)
+    await page.locator('.sheet').getByRole('button', { name: 'אישור' }).click()
+
+    await expect(page.getByText('+5 נקודות', { exact: false })).toBeVisible()
+    // Completed "yesterday" - the next occurrence is today, not tomorrow,
+    // which is what would happen if this had silently used today instead of
+    // the chosen day to schedule the next one.
+    expect(db.tasks[0].due_date).toBe(isoDaysFromToday(0))
+    expect(db.taskCompletions[0].completed_on).toBe(isoDaysFromToday(-1))
+  })
 })

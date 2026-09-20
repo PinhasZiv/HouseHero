@@ -16,19 +16,6 @@ export function snoozeUntilInMinutes(minutes: number, now: Date = new Date()): s
 }
 
 /**
- * Formats a Date for an `<input type="datetime-local">` value: local
- * wall-clock fields only, no timezone suffix - the browser already renders
- * and edits it in local time, so nothing here should re-encode a timezone.
- */
-export function toDatetimeLocalValue(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
-  )
-}
-
-/**
  * Whether a chosen custom instant is actually usable: parses (a
  * `datetime-local` value with no timezone is read as local time, exactly
  * like `toDatetimeLocalValue` writes it) and must land in the future.

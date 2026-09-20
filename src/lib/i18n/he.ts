@@ -114,6 +114,9 @@ export const he = {
     multiSelectTitle: 'בחירה מרובה',
     confirmSelection: 'אישור',
     you: 'אני',
+    differentTimeToggle: 'לתעד עבור זמן אחר',
+    whenLabel: 'מתי זה קרה?',
+    invalidTime: 'הזמן חייב להיות עכשיו או בעבר.',
   },
 
   history: {

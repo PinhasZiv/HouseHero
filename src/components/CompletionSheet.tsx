@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import * as api from '../lib/api'
 import type { CompletionChoice } from '../lib/api'
+import { isValidCompletionInstant } from '../lib/completionOptions'
 import { errorMessage } from '../lib/errors'
-import { firstName } from '../lib/format'
+import { firstName, toDatetimeLocalValue } from '../lib/format'
 import { useI18n } from '../lib/i18n'
 import type { Member, Task } from '../lib/types'
+import { ClockIcon } from './Icons'
 
 interface CompletionSheetProps {
   task: Task
@@ -37,6 +39,8 @@ export function CompletionSheet({ task, selfId, onChoose, onClose }: CompletionS
   const [selected, setSelected] = useState<Set<string>>(() => new Set([selfId]))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [customTimeOpen, setCustomTimeOpen] = useState(false)
+  const [customTimeValue, setCustomTimeValue] = useState(() => toDatetimeLocalValue(new Date()))
 
   useEffect(() => {
     let cancelled = false
@@ -66,12 +70,17 @@ export function CompletionSheet({ task, selfId, onChoose, onClose }: CompletionS
 
   async function confirm() {
     if (busy) return
+    if (customTimeOpen && !isValidCompletionInstant(customTimeValue)) {
+      setError(t.completion.invalidTime)
+      return
+    }
     const userIds =
       mode === 'everyone' ? roster.map((member) => member.user_id) : mode === 'custom' ? [...selected] : [selfId]
+    const completedAt = customTimeOpen ? new Date(customTimeValue).toISOString() : undefined
     setBusy(true)
     setError(null)
     try {
-      await onChoose({ userIds })
+      await onChoose({ userIds, completedAt })
     } catch (cause) {
       setError(errorMessage(cause))
       setBusy(false)
@@ -140,6 +149,23 @@ export function CompletionSheet({ task, selfId, onChoose, onClose }: CompletionS
               )
             })}
           </div>
+        )}
+
+        {customTimeOpen ? (
+          <label className="field">
+            <span>{t.completion.whenLabel}</span>
+            <input
+              type="datetime-local"
+              value={customTimeValue}
+              max={toDatetimeLocalValue(new Date())}
+              disabled={busy}
+              onChange={(event) => setCustomTimeValue(event.target.value)}
+            />
+          </label>
+        ) : (
+          <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => setCustomTimeOpen(true)}>
+            <ClockIcon size={18} /> {t.completion.differentTimeToggle}
+          </button>
         )}
 
         <button type="button" className="btn btn-primary" disabled={confirmDisabled} onClick={() => void confirm()}>

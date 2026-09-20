@@ -1,12 +1,8 @@
 import { useState } from 'react'
 import { errorMessage } from '../lib/errors'
+import { toDatetimeLocalValue } from '../lib/format'
 import { useI18n } from '../lib/i18n'
-import {
-  SNOOZE_PRESETS,
-  isValidSnoozeInstant,
-  snoozeUntilInMinutes,
-  toDatetimeLocalValue,
-} from '../lib/snoozeOptions'
+import { SNOOZE_PRESETS, isValidSnoozeInstant, snoozeUntilInMinutes } from '../lib/snoozeOptions'
 import type { Task } from '../lib/types'
 import { ClockIcon } from './Icons'
 

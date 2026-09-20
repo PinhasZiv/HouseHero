@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { SNOOZE_PRESETS, isValidSnoozeInstant, snoozeUntilInMinutes, toDatetimeLocalValue } from './snoozeOptions'
+import { toDatetimeLocalValue } from './format'
+import { SNOOZE_PRESETS, isValidSnoozeInstant, snoozeUntilInMinutes } from './snoozeOptions'
 
 describe('snoozeUntilInMinutes', () => {
   it('adds the given number of minutes to now', () => {
@@ -12,24 +13,6 @@ describe('snoozeUntilInMinutes', () => {
   it('crosses a day boundary correctly', () => {
     const now = new Date('2026-01-10T23:30:00.000Z')
     expect(snoozeUntilInMinutes(60, now)).toBe('2026-01-11T00:30:00.000Z')
-  })
-})
-
-describe('toDatetimeLocalValue', () => {
-  it('zero-pads every field to the shape a datetime-local input expects', () => {
-    const date = new Date(2026, 0, 3, 9, 5) // 3 Jan 2026, 09:05 local
-    expect(toDatetimeLocalValue(date)).toBe('2026-01-03T09:05')
-  })
-
-  it('round-trips through the Date constructor unchanged', () => {
-    const date = new Date(2026, 8, 21, 23, 59)
-    const value = toDatetimeLocalValue(date)
-    const parsed = new Date(value)
-    expect(parsed.getFullYear()).toBe(2026)
-    expect(parsed.getMonth()).toBe(8)
-    expect(parsed.getDate()).toBe(21)
-    expect(parsed.getHours()).toBe(23)
-    expect(parsed.getMinutes()).toBe(59)
   })
 })
 

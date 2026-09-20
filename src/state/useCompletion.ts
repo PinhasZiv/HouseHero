@@ -1,5 +1,5 @@
 import { firstName } from '../lib/format'
-import { planCompletion } from '../lib/taskDue'
+import { planCompletion, todayIn } from '../lib/taskDue'
 import * as api from '../lib/api'
 import type { CompletionChoice } from '../lib/api'
 import { useI18n } from '../lib/i18n'
@@ -29,18 +29,26 @@ export function useCompletion() {
    */
   async function complete(task: Task, choice: CompletionChoice = {}): Promise<boolean> {
     if (!selfId) return false
+    // A backdated completion was chosen against this device's own clock, so
+    // the calendar-day it lands on is read in this device's own timezone too
+    // - the same precedent formatSnoozeUntil already follows for the same
+    // reason. Left out entirely, this is just today, same as always.
+    const completedOn = choice.completedAt
+      ? todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone, new Date(choice.completedAt))
+      : today
+
     // Optimistic: the tap should feel instant even on a slow connection. If
     // the write fails, reload() brings back the real state.
     const previousTask = { ...task }
     const previousProfile = profile ? { ...profile } : null
-    const outcome = planCompletion(task, today)
+    const outcome = planCompletion(task, completedOn)
     const credited = choice.userIds && choice.userIds.length > 0 ? choice.userIds : [selfId]
     const creditsSelf = credited.includes(selfId)
 
     patchTask({
       ...task,
       due_date: outcome.nextDueDate ?? task.due_date,
-      last_completed_date: today,
+      last_completed_date: completedOn,
       last_completed_by: credited,
       last_completed_actor: selfId,
       occurrences_completed: outcome.occurrencesCompleted,
@@ -55,7 +63,7 @@ export function useCompletion() {
     }
 
     try {
-      await api.completeTask(task.id, today, choice)
+      await api.completeTask(task.id, completedOn, choice)
       if (credited.length > 1) {
         toast.show(t.task.completedByGroupToast(task.title, task.points, credited.length))
       } else if (credited[0] !== selfId) {
