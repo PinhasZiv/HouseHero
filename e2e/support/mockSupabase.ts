@@ -95,6 +95,10 @@ export interface FakeDb {
     completed_on: string
     created_at: string
     completion_group: string | null
+    /** The task's own due_date at the moment of this completion - only
+     *  relevant to a test that cares about on-time/late stats, so it
+     *  defaults to completed_on itself (always "on time") when omitted. */
+    prev_due_date?: string
   }[]
   rewards: FakeReward[]
   redemptions: FakeRedemption[]
@@ -171,6 +175,10 @@ function applyCompleteTask(db: FakeDb, taskId: string, today: string, completedB
   const task = db.tasks.find((t) => t.id === taskId)
   if (!task) return null
 
+  // Captured before due_date advances below - mirrors complete_task()
+  // storing the pre-completion due_date on every event it logs.
+  const prevDueDate = task.due_date
+
   if (task.task_type === 'one_time' || task.task_type === 'time_limited') {
     task.is_done = true
   } else if (task.recurrence_mode === 'interval') {
@@ -195,6 +203,7 @@ function applyCompleteTask(db: FakeDb, taskId: string, today: string, completedB
       completed_on: today,
       created_at: new Date().toISOString(),
       completion_group: groupId,
+      prev_due_date: prevDueDate,
     }
     db.taskCompletions.push(event)
     awardPoints(db, userId, task.points)
@@ -416,15 +425,21 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
         // its task's title embedded, for the Stats screen to aggregate.
         const rows = db.taskCompletions
           .filter((row) => db.tasks.find((t) => t.id === row.task_id)?.space_id === spaceId)
-          .map((row) => ({
-            task_id: row.task_id,
-            user_id: row.user_id,
-            points_awarded: row.points_awarded,
-            completed_on: row.completed_on,
-            created_at: row.created_at,
-            completion_group: row.completion_group,
-            task: { title: db.tasks.find((t) => t.id === row.task_id)?.title ?? null },
-          }))
+          .map((row) => {
+            const task = db.tasks.find((t) => t.id === row.task_id)
+            return {
+              task_id: row.task_id,
+              user_id: row.user_id,
+              points_awarded: row.points_awarded,
+              completed_on: row.completed_on,
+              created_at: row.created_at,
+              completion_group: row.completion_group,
+              // Defaults to completed_on itself (always "on time") when a
+              // test fixture does not care about the on-time/late stats.
+              prev_due_date: row.prev_due_date ?? row.completed_on,
+              task: task ? { title: task.title, task_type: task.task_type } : null,
+            }
+          })
           .sort((a, b) => b.completed_on.localeCompare(a.completed_on))
         return json(route, rows)
       }

@@ -282,7 +282,7 @@ button { font: inherit; cursor: pointer; }
 .card > .btn { align-self: stretch; }
 .card > .segmented { align-self: stretch; }
 
-.two-tiles { flex-direction: row; gap: 24px; }
+.stat-tiles { flex-direction: row; gap: 24px; }
 
 .row-between {
   display: flex;

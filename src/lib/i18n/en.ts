@@ -293,6 +293,18 @@ export const en: Strings = {
     columnTimes: 'Times',
     columnPoints: 'Points',
     total: 'Total',
+
+    onTimeLabel: 'On time',
+    weeklyTrendTitle: 'Weekly trend',
+    weeksAgoLabel: (n: number) => (n === 0 ? 'This week' : n === 1 ? 'Last week' : `${n} weeks ago`),
+    neglectedTaskTitle: 'Most neglected task',
+    neglectedTaskBody: (title: string, avgDaysLate: number) =>
+      `${title} · ${days(Math.max(1, Math.round(avgDaysLate)), 'en')} late on average`,
+    busiestDayTitle: 'Busiest day of the week',
+    busiestDayBody: (dayName: string, count: number) => `${dayName} · ${tasksWord(count, 'en')}`,
+    inactiveTitle: "Hasn't been active lately",
+    neverActive: 'No task completed yet',
+    inactiveDays: (n: number) => `${days(n, 'en')} with nothing done`,
   },
 
   space: {

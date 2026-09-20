@@ -295,6 +295,18 @@ export const he = {
     columnTimes: 'פעמים',
     columnPoints: 'נקודות',
     total: 'סה"כ',
+
+    onTimeLabel: 'בזמן',
+    weeklyTrendTitle: 'מגמה שבועית',
+    weeksAgoLabel: (n: number) => (n === 0 ? 'השבוע' : n === 1 ? 'לפני שבוע' : `לפני ${n} שבועות`),
+    neglectedTaskTitle: 'המשימה הכי מוזנחת',
+    neglectedTaskBody: (title: string, avgDaysLate: number) =>
+      `${title} · ${days(Math.max(1, Math.round(avgDaysLate)), 'he')} איחור בממוצע`,
+    busiestDayTitle: 'היום העמוס בשבוע',
+    busiestDayBody: (dayName: string, count: number) => `יום ${dayName} · ${tasksWord(count, 'he')}`,
+    inactiveTitle: 'לא היה פעיל לאחרונה',
+    neverActive: 'אף משימה לא בוצעה עדיין',
+    inactiveDays: (n: number) => `${days(n, 'he')} בלי ביצוע`,
   },
 
   space: {

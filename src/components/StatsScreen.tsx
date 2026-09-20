@@ -1,9 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as api from '../lib/api'
 import { daysBetween } from '../lib/taskDue'
-import { formatDateTime } from '../lib/format'
+import { formatDateTime, weekdayName } from '../lib/format'
 import { useI18n } from '../lib/i18n'
 import type { Language } from '../lib/i18n/types'
+import {
+  busiestWeekday,
+  dedupeCompletionGroups,
+  inactiveMembers,
+  mostNeglectedTask,
+  onTimeRate,
+  weeklyTrend,
+  type OnTimeRate,
+} from '../lib/stats'
 import { useApp } from '../state/AppState'
 import { useToast } from './Toast'
 import { ChartIcon, StarIcon } from './Icons'
@@ -41,11 +50,13 @@ interface TaskBreakdown {
 function PersonStatsSheet({
   name,
   breakdown,
+  onTime,
   language,
   onClose,
 }: {
   name: string
   breakdown: TaskBreakdown[]
+  onTime: OnTimeRate | null
   language: Language
   onClose: () => void
 }) {
@@ -57,6 +68,12 @@ function PersonStatsSheet({
     <div className="sheet-backdrop" onClick={onClose} role="presentation">
       <div className="sheet" onClick={(event) => event.stopPropagation()}>
         <h2>{name}</h2>
+
+        {onTime?.percent != null && (
+          <p className="muted small">
+            {onTime.percent}% {t.stats.onTimeLabel}
+          </p>
+        )}
 
         {breakdown.length === 0 ? (
           <p className="muted">{t.stats.breakdownEmpty}</p>
@@ -112,20 +129,26 @@ export function StatsScreen() {
   const { t, language } = useI18n()
   const toast = useToast()
   const [completions, setCompletions] = useState<StatsCompletion[] | null>(null)
+  const [memberIds, setMemberIds] = useState<string[] | null>(null)
   const [selected, setSelected] = useState<{ userId: string; name: string } | null>(null)
 
   useEffect(() => {
     if (!currentSpace) return
     let cancelled = false
     setCompletions(null)
-    api
-      .fetchStatsCompletions(currentSpace.id)
-      .then((rows) => {
-        if (!cancelled) setCompletions(rows)
+    setMemberIds(null)
+    Promise.all([api.fetchStatsCompletions(currentSpace.id), api.fetchMembers(currentSpace.id)])
+      .then(([rows, members]) => {
+        if (cancelled) return
+        setCompletions(rows)
+        setMemberIds(members.map((member) => member.user_id))
       })
       .catch((cause) => {
         toast.showError(cause)
-        if (!cancelled) setCompletions([])
+        if (!cancelled) {
+          setCompletions([])
+          setMemberIds([])
+        }
       })
     return () => {
       cancelled = true
@@ -138,11 +161,6 @@ export function StatsScreen() {
 
     const byPerson = new Map<string, { count: number; points: number }>()
     const byTask = new Map<string, { title: string; count: number }>()
-    // A completion credited to several people at once inserts one row per
-    // person, all sharing completion_group - it happened once, so it must
-    // only count once here, however many people were credited for it.
-    const seenGroups = new Set<string>()
-    let total = 0
     let last7Days = 0
 
     for (const row of completions) {
@@ -150,12 +168,13 @@ export function StatsScreen() {
       person.count += 1
       person.points += row.points_awarded
       byPerson.set(row.user_id, person)
+    }
 
-      const isNewEvent = !row.completion_group || !seenGroups.has(row.completion_group)
-      if (row.completion_group) seenGroups.add(row.completion_group)
-      if (!isNewEvent) continue
-
-      total += 1
+    // A completion credited to several people at once inserts one row per
+    // person, all sharing completion_group - it happened once, so anything
+    // counting physical events (not personal credit) counts that once too.
+    const events = dedupeCompletionGroups(completions)
+    for (const row of events) {
       const taskKey = row.task_id
       const task = byTask.get(taskKey) ?? { title: row.task?.title ?? '?', count: 0 }
       task.count += 1
@@ -170,8 +189,21 @@ export function StatsScreen() {
     // be worth as much as several easy ones.
     const totalPoints = [...byPerson.values()].reduce((sum, entry) => sum + entry.points, 0)
 
-    return { leaderboard, topTask, total, last7Days, totalPoints }
+    return { leaderboard, topTask, total: events.length, last7Days, totalPoints }
   }, [completions, today])
+
+  // Each of these is independent of the others and of `stats` above - a
+  // separate small computation over the same completions, rather than one
+  // large block that would need re-reading as a whole to change any one of
+  // them.
+  const trend = useMemo(() => weeklyTrend(completions ?? [], today), [completions, today])
+  const onTime = useMemo(() => onTimeRate(completions ?? []), [completions])
+  const neglected = useMemo(() => mostNeglectedTask(completions ?? []), [completions])
+  const busiestDay = useMemo(() => busiestWeekday(completions ?? []), [completions])
+  const inactive = useMemo(
+    () => inactiveMembers(memberIds ?? [], completions ?? [], today),
+    [memberIds, completions, today],
+  )
 
   const selectedBreakdown = useMemo<TaskBreakdown[]>(() => {
     if (!selected || !completions) return []
@@ -195,6 +227,17 @@ export function StatsScreen() {
       .sort((a, b) => b.points - a.points)
   }, [completions, selected])
 
+  const selectedOnTime = useMemo(() => {
+    if (!selected || !completions) return null
+    return onTimeRate(completions.filter((row) => row.user_id === selected.userId))
+  }, [completions, selected])
+
+  function personName(userId: string): string {
+    if (userId === session?.user.id) return t.space.you
+    const person = people.get(userId)
+    return person?.display_name || person?.email || t.task.someoneElse
+  }
+
   if (!currentSpace) return null
 
   return (
@@ -216,11 +259,7 @@ export function StatsScreen() {
             <h3>{t.stats.byPerson}</h3>
             <ul className="leaderboard">
               {stats.leaderboard.map(([userId, entry], index) => {
-                const person = people.get(userId)
-                const name =
-                  userId === session?.user.id
-                    ? t.space.you
-                    : person?.display_name || person?.email || t.task.someoneElse
+                const name = personName(userId)
                 // How much of the household's total effort this person
                 // contributed, weighted by points rather than task count -
                 // only meaningful to show once there is someone to compare
@@ -255,7 +294,7 @@ export function StatsScreen() {
             </ul>
           </section>
 
-          <section className="card two-tiles">
+          <section className="card stat-tiles">
             <div className="stat-tile">
               <span className="points-value">{stats.total}</span>
               <span className="points-label">{t.stats.allTime}</span>
@@ -263,6 +302,30 @@ export function StatsScreen() {
             <div className="stat-tile">
               <span className="points-value">{stats.last7Days}</span>
               <span className="points-label">{t.stats.last7Days}</span>
+            </div>
+            {onTime.percent != null && (
+              <div className="stat-tile">
+                <span className="points-value">{onTime.percent}%</span>
+                <span className="points-label">{t.stats.onTimeLabel}</span>
+              </div>
+            )}
+          </section>
+
+          <section className="card">
+            <h3>{t.stats.weeklyTrendTitle}</h3>
+            <div className="stats-breakdown">
+              <div className="stats-breakdown-row stats-breakdown-header">
+                <span></span>
+                <span>{t.stats.columnTimes}</span>
+                <span>{t.stats.columnPoints}</span>
+              </div>
+              {trend.map((week) => (
+                <div key={week.weeksAgo} className="stats-breakdown-row">
+                  <span>{t.stats.weeksAgoLabel(week.weeksAgo)}</span>
+                  <span>{week.count}</span>
+                  <span>{week.points}</span>
+                </div>
+              ))}
             </div>
           </section>
 
@@ -272,6 +335,38 @@ export function StatsScreen() {
               <p className="muted">{stats.topTask.title} · {t.stats.completionsCount(stats.topTask.count)}</p>
             </section>
           )}
+
+          {neglected && (
+            <section className="card">
+              <h3>{t.stats.neglectedTaskTitle}</h3>
+              <p className="muted">{t.stats.neglectedTaskBody(neglected.title, neglected.avgDaysLate)}</p>
+            </section>
+          )}
+
+          {busiestDay && (
+            <section className="card">
+              <h3>{t.stats.busiestDayTitle}</h3>
+              <p className="muted">{t.stats.busiestDayBody(weekdayName(busiestDay.weekday, language), busiestDay.count)}</p>
+            </section>
+          )}
+
+          {inactive.length > 0 && (
+            <section className="card">
+              <h3>{t.stats.inactiveTitle}</h3>
+              <ul className="history-list">
+                {inactive.map((entry) => (
+                  <li key={entry.userId} className="history-row">
+                    <span>{personName(entry.userId)}</span>
+                    <span className="muted small">
+                      {entry.daysSinceLastCompletion == null
+                        ? t.stats.neverActive
+                        : t.stats.inactiveDays(entry.daysSinceLastCompletion)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </>
       )}
 
@@ -279,6 +374,7 @@ export function StatsScreen() {
         <PersonStatsSheet
           name={selected.name}
           breakdown={selectedBreakdown}
+          onTime={selectedOnTime}
           language={language}
           onClose={() => setSelected(null)}
         />
