@@ -445,7 +445,15 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
               // Defaults to completed_on itself (always "on time") when a
               // test fixture does not care about the on-time/late stats.
               prev_due_date: row.prev_due_date ?? row.completed_on,
-              task: task ? { title: task.title, task_type: task.task_type } : null,
+              task: task
+                ? {
+                    title: task.title,
+                    task_type: task.task_type,
+                    recurrence_mode: task.recurrence_mode,
+                    interval_days: task.interval_days,
+                    weekly_days: task.weekly_days,
+                  }
+                : null,
             }
           })
           .sort((a, b) => b.completed_on.localeCompare(a.completed_on))

@@ -21,7 +21,11 @@ function statsTask(overrides: Partial<FakeTask> & { id: string; title: string })
     description: null,
     task_type: 'recurring',
     recurrence_mode: 'interval',
-    interval_days: 1,
+    // A wide interval by default, so an on-time/late fixture's few-day offset
+    // never accidentally lands past a full cycle and wraps to "on time" via
+    // cycleLateness() - tests that specifically want to exercise the wrap
+    // pass their own tighter interval_days.
+    interval_days: 30,
     weekly_days: null,
     end_condition: 'never',
     end_after_count: null,
@@ -422,6 +426,32 @@ test.describe('stats screen', () => {
     await expect(page.locator('.stat-tile', { hasText: 'בזמן' }).locator('.points-value')).toHaveText('50%')
   })
 
+  test('the on-time tile wraps a recurring task\'s lateness to its own cycle', async ({ page }) => {
+    // A dishwasher every 2 days: one completion exactly one full cycle late
+    // (nothing was actually neglected) and one half a cycle into the next -
+    // that reads as 50% on time, not 0%.
+    const db = makeFakeDb({
+      tasks: [statsTask({ id: 'task-a', title: 'להכניס מדיח', interval_days: 2 })],
+      taskCompletions: [
+        {
+          id: 'e-full-cycle', task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 10,
+          completed_on: isoDaysFromToday(0), created_at: new Date().toISOString(), completion_group: null,
+          prev_due_date: isoDaysFromToday(-2), // exactly one 2-day cycle late: on time
+        },
+        {
+          id: 'e-half-cycle', task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 10,
+          completed_on: isoDaysFromToday(-1), created_at: new Date(Date.now() - 86_400_000).toISOString(), completion_group: null,
+          prev_due_date: isoDaysFromToday(-6), // 5 days late on a 2-day cycle: half a cycle late
+        },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
+
+    await expect(page.locator('.stat-tile', { hasText: 'בזמן' }).locator('.points-value')).toHaveText('50%')
+  })
+
   test('flags the most neglected task - repeatedly late, not a single unlucky day', async ({ page }) => {
     const db = makeFakeDb({
       tasks: [
@@ -455,6 +485,32 @@ test.describe('stats screen', () => {
     const card = page.locator('.card', { hasText: 'המשימה הכי מוזנחת' })
     await expect(card).toContainText('לנקות את הגינה')
     await expect(card).not.toContainText('לצחצח נעליים')
+  })
+
+  test('does not flag a task whose completions only ever missed one cycle, not the pattern of neglect', async ({ page }) => {
+    // Two completions, each landing exactly one interval late - by the wrap
+    // rule neither one was actually neglected, so this task must not show up
+    // as the most neglected one even though the raw gap looks large.
+    const db = makeFakeDb({
+      tasks: [statsTask({ id: 'task-cyclic', title: 'להוציא זבל', interval_days: 3 })],
+      taskCompletions: [
+        {
+          id: 'e-1', task_id: 'task-cyclic', user_id: FAKE_USER_ID, points_awarded: 10,
+          completed_on: isoDaysFromToday(0), created_at: new Date().toISOString(), completion_group: null,
+          prev_due_date: isoDaysFromToday(-3),
+        },
+        {
+          id: 'e-2', task_id: 'task-cyclic', user_id: FAKE_USER_ID, points_awarded: 10,
+          completed_on: isoDaysFromToday(-10), created_at: new Date(Date.now() - 10 * 86_400_000).toISOString(), completion_group: null,
+          prev_due_date: isoDaysFromToday(-13),
+        },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
+
+    await expect(page.locator('.card', { hasText: 'המשימה הכי מוזנחת' })).toHaveCount(0)
   })
 
   test('shows the busiest day of the week across all history', async ({ page }) => {

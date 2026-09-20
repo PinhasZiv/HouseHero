@@ -2,8 +2,18 @@
 // screen already fetches - each one a small, independently testable function
 // rather than logic buried inside the screen's own useMemo blocks.
 
-import { dayOfWeek, daysBetween } from './taskDue'
+import { cycleLateness, dayOfWeek, daysBetween } from './taskDue'
 import type { StatsCompletion } from './api'
+
+/** How late a completion actually reads as, once wrapped to the task's own
+ *  repeating schedule - see cycleLateness() for why a chronically-late
+ *  recurring task does not just accumulate lateness forever. Zero for an
+ *  on-time or early completion. */
+function wrappedDaysLate(row: StatsCompletion): number {
+  const rawLate = daysBetween(row.prev_due_date, row.completed_on)
+  if (rawLate <= 0 || !row.task) return Math.max(0, rawLate)
+  return cycleLateness(row.task, row.prev_due_date, rawLate)
+}
 
 /**
  * A "together" completion inserts one row per person credited, all sharing
@@ -72,7 +82,7 @@ export function onTimeRate(completions: StatsCompletion[]): OnTimeRate {
   let onTime = 0
   let late = 0
   for (const row of eligible) {
-    if (daysBetween(row.prev_due_date, row.completed_on) > 0) late += 1
+    if (wrappedDaysLate(row) > 0) late += 1
     else onTime += 1
   }
   const total = onTime + late
@@ -97,7 +107,7 @@ export function mostNeglectedTask(completions: StatsCompletion[]): NeglectedTask
 
   for (const row of dedupeCompletionGroups(completions)) {
     if (row.task?.task_type === 'time_limited') continue
-    const daysLate = Math.max(0, daysBetween(row.prev_due_date, row.completed_on))
+    const daysLate = wrappedDaysLate(row)
     const entry = byTask.get(row.task_id) ?? { title: row.task?.title ?? '?', totalDaysLate: 0, count: 0 }
     entry.totalDaysLate += daysLate
     entry.count += 1

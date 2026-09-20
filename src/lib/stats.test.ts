@@ -17,7 +17,7 @@ function completion(overrides: Partial<StatsCompletion> & { task_id: string; use
     completed_on: '2026-01-15',
     created_at: '2026-01-15T08:00:00.000Z',
     prev_due_date: '2026-01-15',
-    task: { title: 'task', task_type: 'recurring' },
+    task: { title: 'task', task_type: 'recurring', recurrence_mode: null, interval_days: null, weekly_days: null },
     completion_group: null,
     ...overrides,
   }
@@ -83,7 +83,7 @@ describe('onTimeRate', () => {
         user_id: 'u1',
         prev_due_date: '2026-01-01',
         completed_on: '2026-01-15',
-        task: { title: 'window task', task_type: 'time_limited' },
+        task: { title: 'window task', task_type: 'time_limited', recurrence_mode: null, interval_days: null, weekly_days: null },
       }),
     ]
     expect(onTimeRate(rows)).toEqual({ onTime: 0, late: 0, total: 0, percent: null })
@@ -91,6 +91,35 @@ describe('onTimeRate', () => {
 
   it('returns a null percent when there is nothing to measure', () => {
     expect(onTimeRate([]).percent).toBeNull()
+  })
+
+  // A dishwasher every 2 days, completed exactly one full cycle after its due
+  // date: nothing was actually neglected, since the next cycle had already
+  // come around - so it counts as on time, not late.
+  it('counts a recurring completion as on time once a full cycle has passed', () => {
+    const rows = [
+      completion({
+        task_id: 'a',
+        user_id: 'u1',
+        prev_due_date: '2026-01-10',
+        completed_on: '2026-01-12',
+        task: { title: 'dishwasher', task_type: 'recurring', recurrence_mode: 'interval', interval_days: 2, weekly_days: null },
+      }),
+    ]
+    expect(onTimeRate(rows)).toEqual({ onTime: 1, late: 0, total: 1, percent: 100 })
+  })
+
+  it('still counts a recurring completion late once part of another cycle has passed', () => {
+    const rows = [
+      completion({
+        task_id: 'a',
+        user_id: 'u1',
+        prev_due_date: '2026-01-10',
+        completed_on: '2026-01-15', // 5 days late on a 2-day cycle: half a cycle past the second one
+        task: { title: 'dishwasher', task_type: 'recurring', recurrence_mode: 'interval', interval_days: 2, weekly_days: null },
+      }),
+    ]
+    expect(onTimeRate(rows)).toEqual({ onTime: 0, late: 1, total: 1, percent: 0 })
   })
 })
 
@@ -118,6 +147,17 @@ describe('mostNeglectedTask', () => {
       completion({ task_id: 'a', user_id: 'u1', prev_due_date: '2026-01-08', completed_on: '2026-01-08' }),
     ]
     expect(mostNeglectedTask(rows)).toBeNull()
+  })
+
+  it('measures average lateness wrapped to the task\'s own cycle, not the raw gap', () => {
+    const cyclic = { title: 'dishwasher', task_type: 'recurring' as const, recurrence_mode: 'interval' as const, interval_days: 2, weekly_days: null }
+    const rows = [
+      // 5 days late on a 2-day cycle wraps to 1 (half the cycle), not 5.
+      completion({ task_id: 'a', user_id: 'u1', prev_due_date: '2026-01-01', completed_on: '2026-01-06', task: cyclic }),
+      // Exactly one cycle late wraps to 0.
+      completion({ task_id: 'a', user_id: 'u1', prev_due_date: '2026-01-10', completed_on: '2026-01-12', task: cyclic }),
+    ]
+    expect(mostNeglectedTask(rows)).toMatchObject({ taskId: 'a', avgDaysLate: 0.5, count: 2 })
   })
 })
 

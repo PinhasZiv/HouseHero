@@ -480,7 +480,13 @@ export interface StatsCompletion {
    *  undo, and reused here to tell whether it landed on time or late without
    *  needing a separate column of its own. */
   prev_due_date: string
-  task: { title: string; task_type: TaskType } | null
+  task: {
+    title: string
+    task_type: TaskType
+    recurrence_mode: RecurrenceMode | null
+    interval_days: number | null
+    weekly_days: number[] | null
+  } | null
   /** Non-null only when several people were credited for the same
    * completion - every row it produced shares this id, so counting "how
    * many times has this been done" can count that group once, not once
@@ -494,7 +500,7 @@ export async function fetchStatsCompletions(spaceId: string): Promise<StatsCompl
     .from('task_completions')
     .select(
       'task_id, user_id, points_awarded, completed_on, created_at, prev_due_date, completion_group, ' +
-        'task:tasks(title, task_type)',
+        'task:tasks(title, task_type, recurrence_mode, interval_days, weekly_days)',
     )
     .eq('space_id', spaceId)
     .order('completed_on', { ascending: false })

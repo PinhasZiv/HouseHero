@@ -27,16 +27,20 @@ function task(overrides: Partial<{
   is_done: boolean
   last_completed_date: string | null
   last_completed_at: string | null
+  task_type: 'one_time' | 'recurring'
+  recurrence_mode: 'interval' | 'weekly_days' | null
+  interval_days: number | null
+  weekly_days: number[] | null
 }>) {
   return {
     id: overrides.id!,
     space_id: FAKE_SPACE_ID,
     title: overrides.title!,
     description: null,
-    task_type: 'one_time' as const,
-    recurrence_mode: null,
-    interval_days: null,
-    weekly_days: null,
+    task_type: overrides.task_type ?? ('one_time' as const),
+    recurrence_mode: overrides.recurrence_mode ?? null,
+    interval_days: overrides.interval_days ?? null,
+    weekly_days: overrides.weekly_days ?? null,
     end_condition: 'never' as const,
     end_after_count: null,
     end_date: null,
@@ -94,6 +98,56 @@ test.describe('task ordering', () => {
     await expect(cards).toHaveCount(2)
     await expect(cards.nth(0)).toContainText('איחור ותיק')
     await expect(cards.nth(1)).toContainText('איחור קל')
+  })
+
+  test('a recurring task exactly one cycle overdue shows as due, not late', async ({ page }) => {
+    // A dishwasher every 2 days, untouched for exactly 2 days: nothing was
+    // actually neglected, the next cycle simply arrived - so it belongs in
+    // the due-today group with no "late" badge, not the late group.
+    const db = makeFakeDb({
+      tasks: [
+        task({
+          id: 'dishwasher',
+          title: 'להכניס מדיח',
+          due_date: isoDaysFromToday(-2),
+          task_type: 'recurring',
+          recurrence_mode: 'interval',
+          interval_days: 2,
+        }),
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+
+    await expect(page.locator('.task-group', { hasText: 'באיחור' })).toHaveCount(0)
+    const dueGroup = page.locator('.task-group', { hasText: 'להיום' })
+    const card = dueGroup.locator('.task-card', { hasText: 'להכניס מדיח' })
+    await expect(card).toBeVisible()
+    await expect(card.locator('.badge-late')).toHaveCount(0)
+  })
+
+  test('a recurring task late by part of a later cycle shows the wrapped lateness, not the raw gap', async ({ page }) => {
+    // Same 2-day dishwasher, now 5 days overdue: 2.5 cycles, which wraps to
+    // half a cycle (1 day) late - not "5 days late".
+    const db = makeFakeDb({
+      tasks: [
+        task({
+          id: 'dishwasher',
+          title: 'להכניס מדיח',
+          due_date: isoDaysFromToday(-5),
+          task_type: 'recurring',
+          recurrence_mode: 'interval',
+          interval_days: 2,
+        }),
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+
+    const lateGroup = page.locator('.task-group', { hasText: 'באיחור' })
+    const card = lateGroup.locator('.task-card', { hasText: 'להכניס מדיח' })
+    await expect(card).toBeVisible()
+    await expect(card.locator('.badge-late')).toContainText('איחור של יום')
   })
 
   test('completed tasks are collapsed under "בוצעו היום" on the Today screen until expanded', async ({ page }) => {

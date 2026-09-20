@@ -3,6 +3,7 @@ import {
   actionable,
   addDays,
   classify,
+  cycleLateness,
   daysBetween,
   formatTimeIn,
   minutesOfDayIn,
@@ -10,6 +11,7 @@ import {
   notifiable,
   planCompletion,
   todayIn,
+  type CyclicTask,
   type DueTask,
 } from './taskDue'
 
@@ -91,6 +93,81 @@ describe('classify', () => {
       expect(info.notifiable).toBe(true)
       expect(info.status).toBe('late')
     }
+  })
+
+  // A dishwasher every two days: skipping one cycle entirely means it was not
+  // needed, so exactly one interval late reads as "due", not "late" - but
+  // still notifiable, since it is due again right now.
+  it('wraps an interval task to "due" once exactly one full cycle has passed', () => {
+    const t = task({ recurrence_mode: 'interval', interval_days: 2, due_date: '2026-05-10' })
+    const info = classify(t, '2026-05-12')
+    expect(info.status).toBe('due')
+    expect(info.daysLate).toBe(0)
+    expect(info.notifiable).toBe(true)
+  })
+
+  it('wraps an interval task\'s lateness to the most recent cycle - 2.5 cycles late reads as half a cycle', () => {
+    const t = task({ recurrence_mode: 'interval', interval_days: 2, due_date: '2026-05-10' })
+    const info = classify(t, '2026-05-15') // 5 days late, a 2-day cycle
+    expect(info.status).toBe('late')
+    expect(info.daysLate).toBe(1)
+    expect(info.notifiable).toBe(true)
+  })
+
+  it('wraps a weekly_days task to the most recent matching weekday', () => {
+    // Due Monday 5/11, recurring Mon/Wed. Two weeks (four cycles) plus one
+    // extra day later should read as one day late, not fourteen.
+    const t = task({ recurrence_mode: 'weekly_days', interval_days: null, weekly_days: [1, 3], due_date: '2026-05-11' })
+    const info = classify(t, '2026-05-25') // 14 days late
+    expect(info.status).toBe('due')
+    expect(info.daysLate).toBe(0)
+
+    const infoPlusOne = classify(t, '2026-05-26') // 15 days late
+    expect(infoPlusOne.status).toBe('late')
+    expect(infoPlusOne.daysLate).toBe(1)
+  })
+})
+
+describe('cycleLateness', () => {
+  function cyclic(overrides: Partial<CyclicTask> = {}): CyclicTask {
+    return {
+      task_type: 'recurring',
+      recurrence_mode: 'interval',
+      interval_days: 7,
+      weekly_days: null,
+      ...overrides,
+    }
+  }
+
+  it('leaves a non-recurring task unchanged', () => {
+    expect(cycleLateness(cyclic({ task_type: 'one_time' }), '2026-05-10', 30)).toBe(30)
+  })
+
+  it('leaves a non-positive gap unchanged', () => {
+    expect(cycleLateness(cyclic(), '2026-05-10', 0)).toBe(0)
+  })
+
+  it('wraps an interval task with the modulo of its own interval', () => {
+    const t = cyclic({ interval_days: 4 })
+    expect(cycleLateness(t, '2026-05-10', 3)).toBe(3) // under a cycle: unchanged
+    expect(cycleLateness(t, '2026-05-10', 4)).toBe(0) // exactly one cycle: due
+    expect(cycleLateness(t, '2026-05-10', 11)).toBe(3) // 2.75 cycles: 3 of the 4 days
+  })
+
+  it('falls through unchanged when a recurring task is missing the fields its mode needs', () => {
+    expect(cycleLateness(cyclic({ interval_days: null }), '2026-05-10', 9)).toBe(9)
+    expect(cycleLateness(cyclic({ recurrence_mode: 'weekly_days', weekly_days: [] }), '2026-05-10', 9)).toBe(9)
+    expect(cycleLateness(cyclic({ recurrence_mode: null }), '2026-05-10', 9)).toBe(9)
+  })
+
+  it('walks weekly_days grid points to find the most recent one', () => {
+    const t = cyclic({ recurrence_mode: 'weekly_days', interval_days: null, weekly_days: [1, 3] })
+    // Due Monday 5/11: grid points (unevenly spaced) are Wed 5/13 (+2),
+    // Mon 5/18 (+7), Wed 5/20 (+9), Mon 5/25 (+14), ...
+    expect(cycleLateness(t, '2026-05-11', 2)).toBe(0) // exactly Wed 5/13: due
+    expect(cycleLateness(t, '2026-05-11', 3)).toBe(1) // 1 day past Wed 5/13
+    expect(cycleLateness(t, '2026-05-11', 7)).toBe(0) // exactly Mon 5/18: due
+    expect(cycleLateness(t, '2026-05-11', 11)).toBe(2) // 2 days past Wed 5/20
   })
 })
 
