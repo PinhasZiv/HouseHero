@@ -667,27 +667,35 @@ button { font: inherit; cursor: pointer; }
    the value labelled directly above each bar - a mobile screen has no hover
    to reveal it later. Points are shown elsewhere already (leaderboard, the
    all-time tile); repeating them here as a second bar would need a second
-   scale, so this chart stays to the one story it tells well. */
+   scale, so this chart stays to the one story it tells well.
+
+   Each column keeps a comfortable, fixed width and the whole row scrolls
+   horizontally when it doesn't fit, rather than every label being squeezed
+   and wrapped to stay inside the card - a phone-width screen genuinely does
+   not have room for six full "לפני N שבועות" labels side by side otherwise. */
 .week-chart {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
   height: 110px;
-  padding-top: 20px;
+  padding: 20px 2px 4px;
   box-sizing: border-box;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.week-chart::-webkit-scrollbar { display: none; }
 .week-chart-col {
-  flex: 1;
+  flex: 0 0 44px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
   height: 100%;
   gap: 4px;
-  min-width: 0;
 }
 .week-chart-value {
+  flex-shrink: 0;
   font-size: 0.72rem;
   font-weight: 700;
   color: var(--text-muted);
@@ -695,18 +703,17 @@ button { font: inherit; cursor: pointer; }
 }
 .week-chart-bar {
   width: 100%;
-  max-width: 28px;
+  max-width: 24px;
   background: var(--accent);
   border-radius: 4px 4px 0 0;
   min-height: 3px;
 }
 .week-chart-label {
+  flex-shrink: 0;
   font-size: 0.66rem;
   color: var(--text-muted);
+  text-align: center;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
 }
 
 /* A missed-cycles row - the same track/fill meter language as the

@@ -433,7 +433,12 @@ export function StatsScreen() {
           <section className="card">
             <h3>{t.stats.weeklyTrendTitle}</h3>
             <div className="week-chart" role="img" aria-label={t.stats.weeklyTrendTitle}>
-              {trend.map((week) => {
+              {/* weeklyTrend() itself returns oldest-first (its own documented
+                  contract); rendered newest-first instead, so the current
+                  week - the one column anyone actually opens this for - sits
+                  at the scroll container's start edge and needs no scrolling
+                  to see, regardless of reading direction. */}
+              {[...trend].reverse().map((week) => {
                 const height = Math.round((week.count / weekChartMax) * 100)
                 return (
                   <div key={week.weeksAgo} className="week-chart-col">
