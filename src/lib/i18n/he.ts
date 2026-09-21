@@ -8,7 +8,7 @@
 // literal types here would force the English dictionary to contain these
 // exact strings. Without it, English is only required to match the shape.
 
-import { cyclesWord, days, peopleWord, pointsWord, tasksWord } from '../format'
+import { days, peopleWord, pointsWord, tasksWord } from '../format'
 
 export const he = {
   appName: 'HouseHero',
@@ -285,6 +285,15 @@ export const he = {
     title: 'סטטיסטיקות',
     lifetimeTitle: 'נקודות שנצברו',
     spendableTitle: 'זמינות למימוש',
+
+    rangeAria: 'טווח התקופה',
+    rangeMonth: 'החודש',
+    rangeAllTime: 'הכל',
+
+    sectionActivity: 'פעילות',
+    sectionAttention: 'דורש תשומת לב',
+    sectionTrends: 'מגמות',
+
     byPerson: 'לפי מי שביצע',
     completionsCount: (n: number) => (n === 1 ? 'משימה אחת הושלמה' : `${tasksWord(n, 'he')} הושלמו`),
     topTask: 'המשימה שהושלמה הכי הרבה',
@@ -312,7 +321,6 @@ export const he = {
     inactiveDays: (n: number) => `${days(n, 'he')} בלי ביצוע`,
 
     missedCyclesTitle: 'פספוסי מחזור',
-    missedCyclesTotal: (n: number) => `${cyclesWord(n, 'he')} פוספסו בסה"כ`,
   },
 
   space: {

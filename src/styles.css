@@ -642,6 +642,100 @@ button { font: inherit; cursor: pointer; }
   border-block-start: 2px solid var(--border);
 }
 
+/* Groups the Stats screen's cards by what question they answer, instead of
+   one flat stack where a good-news card and a some-attention-needed one look
+   identical. */
+.stats-section-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 20px 0 8px;
+}
+.stats-section-title:first-child { margin-top: 0; }
+
+/* The "needs attention" section's own card tint - the same late/warning
+   color already used for the "late" badge elsewhere, so a household that is
+   in good shape can tell at a glance that nothing here needs a second look. */
+.card-warning { background: var(--late-soft); border-color: var(--late-soft); }
+.card-warning h3 { color: var(--late-strong); }
+.card-warning .muted { color: var(--late); }
+
+/* The weekly-trend chart: one bar per trailing week, height proportional to
+   that week's completion count. A single hue (magnitude, not identity) with
+   the value labelled directly above each bar - a mobile screen has no hover
+   to reveal it later. Points are shown elsewhere already (leaderboard, the
+   all-time tile); repeating them here as a second bar would need a second
+   scale, so this chart stays to the one story it tells well. */
+.week-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  width: 100%;
+  height: 110px;
+  padding-top: 20px;
+  box-sizing: border-box;
+}
+.week-chart-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 4px;
+  min-width: 0;
+}
+.week-chart-value {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.week-chart-bar {
+  width: 100%;
+  max-width: 28px;
+  background: var(--accent);
+  border-radius: 4px 4px 0 0;
+  min-height: 3px;
+}
+.week-chart-label {
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* A missed-cycles row - the same track/fill meter language as the
+   leaderboard's contribution bar, just tinted as a warning and scaled to the
+   worst offender in the list rather than to a 100% share. */
+.missed-cycles-row {
+  display: grid;
+  grid-template-columns: 1fr 70px 68px;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-block-end: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.missed-cycles-row:last-child { border-block-end: 0; }
+.missed-cycles-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--late-soft);
+  overflow: hidden;
+}
+.missed-cycles-fill { height: 100%; border-radius: 3px; background: var(--late); }
+.missed-cycles-count {
+  text-align: end;
+  color: var(--late);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ------------------------------------------------------------ buttons --- */
 
 .btn {
