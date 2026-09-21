@@ -386,7 +386,7 @@ test.describe('stats screen', () => {
     await expect(laundryDates.first()).toBeVisible()
   })
 
-  test('shows the weekly trend as a simple table of the last 6 weeks', async ({ page }) => {
+  test('shows the weekly trend as a bar chart of the last 6 weeks', async ({ page }) => {
     const db = makeFakeDb({
       tasks: [statsTask({ id: 'task-a', title: 'לנקות את המטבח' })],
       taskCompletions: [
@@ -399,8 +399,37 @@ test.describe('stats screen', () => {
     await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
 
     const card = page.locator('.card', { hasText: 'מגמה שבועית' })
-    await expect(card.locator('.stats-breakdown-row', { hasText: 'השבוע' })).toContainText('1')
-    await expect(card.locator('.stats-breakdown-row', { hasText: 'לפני שבוע' })).toContainText('1')
+    const columns = card.locator('.week-chart-col')
+    await expect(columns).toHaveCount(6)
+    await expect(columns.last()).toContainText('השבוע') // most recent week is last, RTL reading order
+    await expect(columns.last().locator('.week-chart-value')).toHaveText('1')
+    await expect(columns.nth(4)).toContainText('לפני שבוע')
+    await expect(columns.nth(4).locator('.week-chart-value')).toHaveText('1')
+
+    // The weekly trend keeps its own fixed 6-week window regardless of the
+    // range toggle - switching to "this month" should not change it.
+    await page.getByRole('tab', { name: 'החודש' }).click()
+    await expect(columns).toHaveCount(6)
+    await expect(columns.last().locator('.week-chart-value')).toHaveText('1')
+  })
+
+  test('the range toggle narrows the leaderboard and totals to the current calendar month', async ({ page }) => {
+    const db = makeFakeDb({
+      tasks: [statsTask({ id: 'task-a', title: 'לנקות את המטבח' })],
+      taskCompletions: [
+        { id: 'e-this-month', task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 10, completed_on: isoDaysFromToday(0), created_at: new Date().toISOString(), completion_group: null },
+        { id: 'e-long-ago', task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 10, completed_on: '2020-01-01', created_at: '2020-01-01T08:00:00.000Z', completion_group: null },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
+
+    // "מאז ומתמיד" (all time) is the default: both completions count.
+    await expect(page.locator('.stat-tile', { hasText: 'מאז ומתמיד' }).locator('.points-value')).toHaveText('2')
+
+    await page.getByRole('tab', { name: 'החודש' }).click()
+    await expect(page.locator('.stat-tile', { hasText: 'החודש' }).locator('.points-value')).toHaveText('1')
   })
 
   test('the on-time tile reflects completions before vs after the task\'s own due date', async ({ page }) => {
@@ -634,5 +663,59 @@ test.describe('stats screen', () => {
     await expect(danaRow).toContainText('אף משימה לא בוצעה עדיין')
     // The active user did complete something recently - not listed here.
     await expect(card.locator('.history-row', { hasText: 'אני' })).toHaveCount(0)
+  })
+
+  test('groups the cards into sections, and only shows "needs attention" when something actually needs it', async ({ page }) => {
+    // A single on-time completion: nothing here should ever need attention.
+    const tidyDb = makeFakeDb({
+      tasks: [statsTask({ id: 'task-a', title: 'לשטוף כלים' })],
+      taskCompletions: [
+        {
+          id: 'e-1', task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 10,
+          completed_on: isoDaysFromToday(0), created_at: new Date().toISOString(), completion_group: null,
+          prev_due_date: isoDaysFromToday(0),
+        },
+      ],
+    })
+    await seed(page, tidyDb)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
+
+    await expect(page.getByText('פעילות', { exact: true })).toBeVisible()
+    await expect(page.getByText('מגמות', { exact: true })).toBeVisible()
+    await expect(page.getByText('דורש תשומת לב', { exact: true })).toHaveCount(0)
+    await expect(page.locator('.card-warning')).toHaveCount(0)
+  })
+
+  test('tints the "needs attention" cards with the warning style once something is flagged', async ({ page }) => {
+    const db = makeFakeDb({
+      tasks: [statsTask({ id: 'task-a', title: 'לנקות את הגינה', interval_days: 3 })],
+      taskCompletions: [
+        // Repeatedly late by more than a full cycle, so it lands in both
+        // "most neglected" (a nonzero wrapped remainder) and "missed cycles"
+        // (at least one full cycle skipped).
+        {
+          id: 'e-1', task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 10,
+          completed_on: isoDaysFromToday(0), created_at: new Date().toISOString(), completion_group: null,
+          prev_due_date: isoDaysFromToday(-5), // 5 days late on a 3-day cycle: 1 missed, 2 remainder
+        },
+        {
+          id: 'e-2', task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 10,
+          completed_on: isoDaysFromToday(-10), created_at: new Date(Date.now() - 10 * 86_400_000).toISOString(), completion_group: null,
+          prev_due_date: isoDaysFromToday(-17), // 7 days late: 2 missed, 1 remainder
+        },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
+
+    await expect(page.getByText('דורש תשומת לב', { exact: true })).toBeVisible()
+    const neglectedCard = page.locator('.card', { hasText: 'המשימה הכי מוזנחת' })
+    await expect(neglectedCard).toHaveClass(/card-warning/)
+    const missedCard = page.locator('.card', { hasText: 'פספוסי מחזור' })
+    await expect(missedCard).toHaveClass(/card-warning/)
+    // The activity-section cards stay neutral, not warning-tinted.
+    await expect(page.locator('.card', { hasText: 'לפי מי שביצע' })).not.toHaveClass(/card-warning/)
   })
 })

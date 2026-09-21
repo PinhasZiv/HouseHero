@@ -283,6 +283,15 @@ export const en: Strings = {
     title: 'Stats',
     lifetimeTitle: 'Lifetime points',
     spendableTitle: 'Available to spend',
+
+    rangeAria: 'Time range',
+    rangeMonth: 'This month',
+    rangeAllTime: 'All time',
+
+    sectionActivity: 'Activity',
+    sectionAttention: 'Needs attention',
+    sectionTrends: 'Trends',
+
     byPerson: 'By person',
     completionsCount: (n: number) => `${tasksWord(n, 'en')} completed`,
     topTask: 'Most completed task',

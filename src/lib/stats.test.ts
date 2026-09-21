@@ -4,6 +4,7 @@ import {
   WEEKLY_TREND_WEEKS,
   busiestWeekday,
   dedupeCompletionGroups,
+  filterByRange,
   inactiveMembers,
   missedCyclesFromHistory,
   missedCyclesFromOpenTasks,
@@ -72,6 +73,25 @@ describe('dedupeCompletionGroups', () => {
       completion({ task_id: 'a', user_id: 'u2', completion_group: 'g1' }),
     ]
     expect(dedupeCompletionGroups(rows)).toHaveLength(1)
+  })
+})
+
+describe('filterByRange', () => {
+  it('returns every row unchanged for "all"', () => {
+    const rows = [
+      completion({ task_id: 'a', user_id: 'u1', completed_on: '2026-01-05' }),
+      completion({ task_id: 'a', user_id: 'u1', completed_on: '2025-06-01' }),
+    ]
+    expect(filterByRange(rows, 'all', '2026-01-15')).toEqual(rows)
+  })
+
+  it('keeps only rows completed in the same calendar month for "month"', () => {
+    const inMonth = completion({ task_id: 'a', user_id: 'u1', completed_on: '2026-01-01' })
+    const lastDayOfMonth = completion({ task_id: 'a', user_id: 'u1', completed_on: '2026-01-31' })
+    const previousMonth = completion({ task_id: 'a', user_id: 'u1', completed_on: '2025-12-31' })
+    const nextMonth = completion({ task_id: 'a', user_id: 'u1', completed_on: '2026-02-01' })
+    const rows = [inMonth, lastDayOfMonth, previousMonth, nextMonth]
+    expect(filterByRange(rows, 'month', '2026-01-15')).toEqual([inMonth, lastDayOfMonth])
   })
 })
 

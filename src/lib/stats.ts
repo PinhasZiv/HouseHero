@@ -31,6 +31,21 @@ export function dedupeCompletionGroups<T extends { completion_group: string | nu
   })
 }
 
+export type StatsRange = 'month' | 'all'
+
+/**
+ * Narrows completions to the Stats screen's own range toggle - "this
+ * calendar month" or everything. A few widgets keep their own fixed window
+ * regardless of this toggle (the trailing-7-day tile, the 6-week trend, and
+ * "how long since someone was last active" all already define their own
+ * lookback), so this is applied selectively by the screen, not globally.
+ */
+export function filterByRange(completions: StatsCompletion[], range: StatsRange, today: string): StatsCompletion[] {
+  if (range === 'all') return completions
+  const month = today.slice(0, 7) // YYYY-MM
+  return completions.filter((row) => row.completed_on.slice(0, 7) === month)
+}
+
 export const WEEKLY_TREND_WEEKS = 6
 
 export interface WeekBucket {

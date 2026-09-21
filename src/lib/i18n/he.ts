@@ -285,6 +285,15 @@ export const he = {
     title: 'סטטיסטיקות',
     lifetimeTitle: 'נקודות שנצברו',
     spendableTitle: 'זמינות למימוש',
+
+    rangeAria: 'טווח התקופה',
+    rangeMonth: 'החודש',
+    rangeAllTime: 'הכל',
+
+    sectionActivity: 'פעילות',
+    sectionAttention: 'דורש תשומת לב',
+    sectionTrends: 'מגמות',
+
     byPerson: 'לפי מי שביצע',
     completionsCount: (n: number) => (n === 1 ? 'משימה אחת הושלמה' : `${tasksWord(n, 'he')} הושלמו`),
     topTask: 'המשימה שהושלמה הכי הרבה',

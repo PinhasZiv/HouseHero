@@ -7,12 +7,14 @@ import type { Language } from '../lib/i18n/types'
 import {
   busiestWeekday,
   dedupeCompletionGroups,
+  filterByRange,
   inactiveMembers,
   missedCyclesSummary,
   mostNeglectedTask,
   onTimeRate,
   weeklyTrend,
   type OnTimeRate,
+  type StatsRange,
 } from '../lib/stats'
 import { useApp } from '../state/AppState'
 import { useToast } from './Toast'
@@ -132,6 +134,10 @@ export function StatsScreen() {
   const [completions, setCompletions] = useState<StatsCompletion[] | null>(null)
   const [memberIds, setMemberIds] = useState<string[] | null>(null)
   const [selected, setSelected] = useState<{ userId: string; name: string } | null>(null)
+  // A handful of widgets keep their own fixed lookback (last 7 days, the
+  // 6-week trend, "when was this person last active") regardless of this -
+  // see filterByRange().
+  const [range, setRange] = useState<StatsRange>('all')
 
   useEffect(() => {
     if (!currentSpace) return
@@ -157,6 +163,14 @@ export function StatsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSpace?.id])
 
+  // The range toggle narrows most "how did we do" widgets to this calendar
+  // month - see filterByRange() for which ones keep their own fixed window
+  // instead (the trailing-7-day tile, the weekly trend, last-active dates).
+  const rangedCompletions = useMemo(
+    () => filterByRange(completions ?? [], range, today),
+    [completions, range, today],
+  )
+
   const stats = useMemo(() => {
     if (!completions) return null
 
@@ -164,24 +178,28 @@ export function StatsScreen() {
     const byTask = new Map<string, { title: string; count: number }>()
     let last7Days = 0
 
-    for (const row of completions) {
+    for (const row of rangedCompletions) {
       const person = byPerson.get(row.user_id) ?? { count: 0, points: 0 }
       person.count += 1
       person.points += row.points_awarded
       byPerson.set(row.user_id, person)
     }
 
+    // Always the full history, independent of the range toggle - a fixed
+    // reference point to compare the selected range against.
+    for (const row of dedupeCompletionGroups(completions)) {
+      if (daysBetween(row.completed_on, today) < 7) last7Days += 1
+    }
+
     // A completion credited to several people at once inserts one row per
     // person, all sharing completion_group - it happened once, so anything
     // counting physical events (not personal credit) counts that once too.
-    const events = dedupeCompletionGroups(completions)
+    const events = dedupeCompletionGroups(rangedCompletions)
     for (const row of events) {
       const taskKey = row.task_id
       const task = byTask.get(taskKey) ?? { title: row.task?.title ?? '?', count: 0 }
       task.count += 1
       byTask.set(taskKey, task)
-
-      if (daysBetween(row.completed_on, today) < 7) last7Days += 1
     }
 
     const leaderboard = [...byPerson.entries()].sort((a, b) => b[1].points - a[1].points)
@@ -191,29 +209,33 @@ export function StatsScreen() {
     const totalPoints = [...byPerson.values()].reduce((sum, entry) => sum + entry.points, 0)
 
     return { leaderboard, topTask, total: events.length, last7Days, totalPoints }
-  }, [completions, today])
+  }, [completions, rangedCompletions, today])
 
   // Each of these is independent of the others and of `stats` above - a
   // separate small computation over the same completions, rather than one
   // large block that would need re-reading as a whole to change any one of
-  // them.
+  // them. weeklyTrend and inactiveMembers keep the full history regardless of
+  // the range toggle - see the note by `range` above.
   const trend = useMemo(() => weeklyTrend(completions ?? [], today), [completions, today])
-  const onTime = useMemo(() => onTimeRate(completions ?? []), [completions])
-  const neglected = useMemo(() => mostNeglectedTask(completions ?? []), [completions])
-  const busiestDay = useMemo(() => busiestWeekday(completions ?? []), [completions])
+  // At least 1, so an all-zero trend still renders flat bars instead of
+  // dividing by zero.
+  const weekChartMax = useMemo(() => Math.max(1, ...trend.map((week) => week.count)), [trend])
+  const onTime = useMemo(() => onTimeRate(rangedCompletions), [rangedCompletions])
+  const neglected = useMemo(() => mostNeglectedTask(rangedCompletions), [rangedCompletions])
+  const busiestDay = useMemo(() => busiestWeekday(rangedCompletions), [rangedCompletions])
   const inactive = useMemo(
     () => inactiveMembers(memberIds ?? [], completions ?? [], today),
     [memberIds, completions, today],
   )
   const missedCycles = useMemo(
-    () => missedCyclesSummary(completions ?? [], tasks, today),
-    [completions, tasks, today],
+    () => missedCyclesSummary(rangedCompletions, tasks, today),
+    [rangedCompletions, tasks, today],
   )
 
   const selectedBreakdown = useMemo<TaskBreakdown[]>(() => {
-    if (!selected || !completions) return []
+    if (!selected) return []
     const byTask = new Map<string, TaskBreakdown>()
-    for (const row of completions) {
+    for (const row of rangedCompletions) {
       if (row.user_id !== selected.userId) continue
       const entry = byTask.get(row.task_id) ?? {
         taskId: row.task_id,
@@ -230,12 +252,12 @@ export function StatsScreen() {
     return [...byTask.values()]
       .map((entry) => ({ ...entry, timestamps: [...entry.timestamps].sort((a, b) => b.localeCompare(a)) }))
       .sort((a, b) => b.points - a.points)
-  }, [completions, selected])
+  }, [rangedCompletions, selected])
 
   const selectedOnTime = useMemo(() => {
-    if (!selected || !completions) return null
-    return onTimeRate(completions.filter((row) => row.user_id === selected.userId))
-  }, [completions, selected])
+    if (!selected) return null
+    return onTimeRate(rangedCompletions.filter((row) => row.user_id === selected.userId))
+  }, [rangedCompletions, selected])
 
   function personName(userId: string): string {
     if (userId === session?.user.id) return t.space.you
@@ -251,19 +273,45 @@ export function StatsScreen() {
         <h2>{t.stats.title}</h2>
       </header>
 
+      <div className="segmented" role="tablist" aria-label={t.stats.rangeAria}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={range === 'month'}
+          className={range === 'month' ? 'segment segment-active' : 'segment'}
+          onClick={() => setRange('month')}
+        >
+          {t.stats.rangeMonth}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={range === 'all'}
+          className={range === 'all' ? 'segment segment-active' : 'segment'}
+          onClick={() => setRange('all')}
+        >
+          {t.stats.rangeAllTime}
+        </button>
+      </div>
+
       {!stats ? (
         <p className="muted">{t.common.loading}</p>
-      ) : stats.total === 0 && missedCycles.total === 0 ? (
-        // A recurring task can rack up missed cycles while sitting untouched,
-        // with zero completions ever logged for it - that is itself the
-        // finding this screen exists to surface, not a reason to hide behind
-        // the empty state meant for a genuinely blank history.
+      ) : (completions?.length ?? 0) === 0 && missedCycles.total === 0 ? (
+        // Checked against the full, unranged history - a household with
+        // plenty of past activity but nothing yet this month should see that
+        // month's cards read empty, not the "not enough data yet" message
+        // meant for a genuinely blank space. A recurring task can also rack
+        // up missed cycles while sitting untouched, with zero completions
+        // ever logged for it - that is itself the finding this screen exists
+        // to surface, not a reason to hide behind the empty state either.
         <div className="empty-state">
           <ChartIcon size={40} />
           <p>{t.stats.noData}</p>
         </div>
       ) : (
         <>
+          <h2 className="stats-section-title">{t.stats.sectionActivity}</h2>
+
           <section className="card">
             <h3>{t.stats.byPerson}</h3>
             <ul className="leaderboard">
@@ -306,7 +354,7 @@ export function StatsScreen() {
           <section className="card stat-tiles">
             <div className="stat-tile">
               <span className="points-value">{stats.total}</span>
-              <span className="points-label">{t.stats.allTime}</span>
+              <span className="points-label">{range === 'all' ? t.stats.allTime : t.stats.rangeMonth}</span>
             </div>
             <div className="stat-tile">
               <span className="points-value">{stats.last7Days}</span>
@@ -320,24 +368,6 @@ export function StatsScreen() {
             )}
           </section>
 
-          <section className="card">
-            <h3>{t.stats.weeklyTrendTitle}</h3>
-            <div className="stats-breakdown">
-              <div className="stats-breakdown-row stats-breakdown-header">
-                <span></span>
-                <span>{t.stats.columnTimes}</span>
-                <span>{t.stats.columnPoints}</span>
-              </div>
-              {trend.map((week) => (
-                <div key={week.weeksAgo} className="stats-breakdown-row">
-                  <span>{t.stats.weeksAgoLabel(week.weeksAgo)}</span>
-                  <span>{week.count}</span>
-                  <span>{week.points}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-
           {stats.topTask && (
             <section className="card">
               <h3>{t.stats.topTask}</h3>
@@ -345,50 +375,82 @@ export function StatsScreen() {
             </section>
           )}
 
-          {neglected && (
-            <section className="card">
-              <h3>{t.stats.neglectedTaskTitle}</h3>
-              <p className="muted">{t.stats.neglectedTaskBody(neglected.title, neglected.avgDaysLate)}</p>
-            </section>
+          {(neglected || missedCycles.total > 0 || inactive.length > 0) && (
+            <>
+              <h2 className="stats-section-title">{t.stats.sectionAttention}</h2>
+
+              {neglected && (
+                <section className="card card-warning">
+                  <h3>{t.stats.neglectedTaskTitle}</h3>
+                  <p className="muted">{t.stats.neglectedTaskBody(neglected.title, neglected.avgDaysLate)}</p>
+                </section>
+              )}
+
+              {missedCycles.total > 0 && (
+                <section className="card card-warning">
+                  <h3>{t.stats.missedCyclesTitle}</h3>
+                  <p className="muted">{t.stats.missedCyclesTotal(missedCycles.total)}</p>
+                  <ul className="history-list">
+                    {missedCycles.byTask.map((entry) => {
+                      // byTask is sorted worst-first, so the first entry's
+                      // count is always the scale each bar is relative to.
+                      const width = Math.round((entry.missed / missedCycles.byTask[0].missed) * 100)
+                      return (
+                        <li key={entry.taskId} className="missed-cycles-row">
+                          <span>{entry.title}</span>
+                          <div className="missed-cycles-track" aria-hidden="true">
+                            <div className="missed-cycles-fill" style={{ width: `${width}%` }} />
+                          </div>
+                          <span className="missed-cycles-count">{cyclesWord(entry.missed, language)}</span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </section>
+              )}
+
+              {inactive.length > 0 && (
+                <section className="card card-warning">
+                  <h3>{t.stats.inactiveTitle}</h3>
+                  <ul className="history-list">
+                    {inactive.map((entry) => (
+                      <li key={entry.userId} className="history-row">
+                        <span>{personName(entry.userId)}</span>
+                        <span className="muted small">
+                          {entry.daysSinceLastCompletion == null
+                            ? t.stats.neverActive
+                            : t.stats.inactiveDays(entry.daysSinceLastCompletion)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+            </>
           )}
 
-          {missedCycles.total > 0 && (
-            <section className="card">
-              <h3>{t.stats.missedCyclesTitle}</h3>
-              <p className="muted">{t.stats.missedCyclesTotal(missedCycles.total)}</p>
-              <ul className="history-list">
-                {missedCycles.byTask.map((entry) => (
-                  <li key={entry.taskId} className="history-row">
-                    <span>{entry.title}</span>
-                    <span className="muted small">{cyclesWord(entry.missed, language)}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+          <h2 className="stats-section-title">{t.stats.sectionTrends}</h2>
+
+          <section className="card">
+            <h3>{t.stats.weeklyTrendTitle}</h3>
+            <div className="week-chart" role="img" aria-label={t.stats.weeklyTrendTitle}>
+              {trend.map((week) => {
+                const height = Math.round((week.count / weekChartMax) * 100)
+                return (
+                  <div key={week.weeksAgo} className="week-chart-col">
+                    <span className="week-chart-value">{week.count}</span>
+                    <div className="week-chart-bar" style={{ height: `${height}%` }} />
+                    <span className="week-chart-label">{t.stats.weeksAgoLabel(week.weeksAgo)}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
 
           {busiestDay && (
             <section className="card">
               <h3>{t.stats.busiestDayTitle}</h3>
               <p className="muted">{t.stats.busiestDayBody(weekdayName(busiestDay.weekday, language), busiestDay.count)}</p>
-            </section>
-          )}
-
-          {inactive.length > 0 && (
-            <section className="card">
-              <h3>{t.stats.inactiveTitle}</h3>
-              <ul className="history-list">
-                {inactive.map((entry) => (
-                  <li key={entry.userId} className="history-row">
-                    <span>{personName(entry.userId)}</span>
-                    <span className="muted small">
-                      {entry.daysSinceLastCompletion == null
-                        ? t.stats.neverActive
-                        : t.stats.inactiveDays(entry.daysSinceLastCompletion)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
             </section>
           )}
         </>
