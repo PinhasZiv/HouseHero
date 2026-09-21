@@ -5,11 +5,15 @@ import {
   busiestWeekday,
   dedupeCompletionGroups,
   inactiveMembers,
+  missedCyclesFromHistory,
+  missedCyclesFromOpenTasks,
+  missedCyclesSummary,
   mostNeglectedTask,
   onTimeRate,
   weeklyTrend,
 } from './stats'
 import type { StatsCompletion } from './api'
+import type { Task } from './types'
 
 function completion(overrides: Partial<StatsCompletion> & { task_id: string; user_id: string }): StatsCompletion {
   return {
@@ -19,6 +23,39 @@ function completion(overrides: Partial<StatsCompletion> & { task_id: string; use
     prev_due_date: '2026-01-15',
     task: { title: 'task', task_type: 'recurring', recurrence_mode: null, interval_days: null, weekly_days: null },
     completion_group: null,
+    ...overrides,
+  }
+}
+
+function openTask(overrides: Partial<Task> & { id: string; title: string }): Task {
+  return {
+    space_id: 'space-1',
+    description: null,
+    task_type: 'recurring',
+    recurrence_mode: 'interval',
+    interval_days: 7,
+    weekly_days: null,
+    end_condition: 'never',
+    end_after_count: null,
+    end_date: null,
+    occurrences_completed: 0,
+    points: 10,
+    reminder_hour: 9,
+    reminder_minute: 0,
+    due_date: '2026-01-01',
+    last_completed_date: null,
+    last_completed_at: null,
+    last_completed_by: null,
+    last_completed_actor: null,
+    is_done: false,
+    assigned_to: null,
+    created_by: 'u1',
+    created_at: '2026-01-01T00:00:00.000Z',
+    starts_at: null,
+    expires_at: null,
+    reminder_policy: null,
+    cancelled_at: null,
+    expired_at: null,
     ...overrides,
   }
 }
@@ -158,6 +195,107 @@ describe('mostNeglectedTask', () => {
       completion({ task_id: 'a', user_id: 'u1', prev_due_date: '2026-01-10', completed_on: '2026-01-12', task: cyclic }),
     ]
     expect(mostNeglectedTask(rows)).toMatchObject({ taskId: 'a', avgDaysLate: 0.5, count: 2 })
+  })
+})
+
+describe('missedCyclesFromHistory', () => {
+  const cyclic = { title: 'dishwasher', task_type: 'recurring' as const, recurrence_mode: 'interval' as const, interval_days: 2, weekly_days: null }
+
+  it('counts full cycles skipped before an eventual completion', () => {
+    const rows = [
+      // 5 days late on a 2-day cycle: 2 full cycles skipped.
+      completion({ task_id: 'a', user_id: 'u1', prev_due_date: '2026-01-01', completed_on: '2026-01-06', task: cyclic }),
+    ]
+    expect(missedCyclesFromHistory(rows)).toEqual([{ taskId: 'a', title: 'dishwasher', missed: 2 }])
+  })
+
+  it('sums across several completions of the same task', () => {
+    const rows = [
+      completion({ task_id: 'a', user_id: 'u1', prev_due_date: '2026-01-01', completed_on: '2026-01-06', task: cyclic }), // 2 missed
+      completion({ task_id: 'a', user_id: 'u1', prev_due_date: '2026-01-10', completed_on: '2026-01-13', task: cyclic }), // 1 missed
+    ]
+    expect(missedCyclesFromHistory(rows)).toEqual([{ taskId: 'a', title: 'dishwasher', missed: 3 }])
+  })
+
+  it('excludes a completion that skipped no full cycle', () => {
+    const rows = [
+      completion({ task_id: 'a', user_id: 'u1', prev_due_date: '2026-01-01', completed_on: '2026-01-02', task: cyclic }),
+    ]
+    expect(missedCyclesFromHistory(rows)).toEqual([])
+  })
+
+  it('excludes time-limited and one-time tasks', () => {
+    const rows = [
+      completion({
+        task_id: 'a', user_id: 'u1', prev_due_date: '2026-01-01', completed_on: '2026-01-10',
+        task: { title: 'window', task_type: 'time_limited', recurrence_mode: null, interval_days: null, weekly_days: null },
+      }),
+    ]
+    expect(missedCyclesFromHistory(rows)).toEqual([])
+  })
+
+  it('counts a shared completion once, not once per credited person', () => {
+    const rows = [
+      completion({ task_id: 'a', user_id: 'u1', prev_due_date: '2026-01-01', completed_on: '2026-01-06', task: cyclic, completion_group: 'g1' }),
+      completion({ task_id: 'a', user_id: 'u2', prev_due_date: '2026-01-01', completed_on: '2026-01-06', task: cyclic, completion_group: 'g1' }),
+    ]
+    expect(missedCyclesFromHistory(rows)).toEqual([{ taskId: 'a', title: 'dishwasher', missed: 2 }])
+  })
+})
+
+describe('missedCyclesFromOpenTasks', () => {
+  it('counts a currently-open recurring task already past a cycle boundary', () => {
+    const today = '2026-01-06' // 5 days after due_date on a 2-day cycle: 2 missed
+    const tasks = [openTask({ id: 'a', title: 'dishwasher', due_date: '2026-01-01', interval_days: 2 })]
+    expect(missedCyclesFromOpenTasks(tasks, today)).toEqual([{ taskId: 'a', title: 'dishwasher', missed: 2 }])
+  })
+
+  it('excludes a task not yet past one full cycle', () => {
+    const today = '2026-01-02'
+    const tasks = [openTask({ id: 'a', title: 'dishwasher', due_date: '2026-01-01', interval_days: 2 })]
+    expect(missedCyclesFromOpenTasks(tasks, today)).toEqual([])
+  })
+
+  it('excludes a task already marked done', () => {
+    const today = '2026-01-06'
+    const tasks = [openTask({ id: 'a', title: 'dishwasher', due_date: '2026-01-01', interval_days: 2, is_done: true })]
+    expect(missedCyclesFromOpenTasks(tasks, today)).toEqual([])
+  })
+
+  it('excludes one-time and time-limited tasks', () => {
+    const today = '2026-01-20'
+    const tasks = [
+      openTask({ id: 'a', title: 'one-off', due_date: '2026-01-01', task_type: 'one_time', recurrence_mode: null, interval_days: null }),
+      openTask({ id: 'b', title: 'window', due_date: '2026-01-01', task_type: 'time_limited', recurrence_mode: null, interval_days: null }),
+    ]
+    expect(missedCyclesFromOpenTasks(tasks, today)).toEqual([])
+  })
+})
+
+describe('missedCyclesSummary', () => {
+  it('combines history and currently-open tasks into one per-task total, worst first', () => {
+    const cyclic = { title: 'dishwasher', task_type: 'recurring' as const, recurrence_mode: 'interval' as const, interval_days: 2, weekly_days: null }
+    const completions = [
+      // Task "a": 2 missed cycles from a past completion.
+      completion({ task_id: 'a', user_id: 'u1', prev_due_date: '2026-01-01', completed_on: '2026-01-06', task: cyclic }),
+    ]
+    const today = '2026-01-15'
+    const tasks = [
+      // Task "a" is also currently open and 1 more cycle behind - same task, adds on.
+      openTask({ id: 'a', title: 'dishwasher', due_date: '2026-01-10', interval_days: 2 }), // 5 days late: 2 missed
+      // Task "b" is a different, worse offender, open only (no history yet).
+      openTask({ id: 'b', title: 'recycling', due_date: '2026-01-01', interval_days: 2 }), // 14 days late: 7 missed
+    ]
+    const summary = missedCyclesSummary(completions, tasks, today)
+    expect(summary.total).toBe(2 + 2 + 7)
+    expect(summary.byTask).toEqual([
+      { taskId: 'b', title: 'recycling', missed: 7 },
+      { taskId: 'a', title: 'dishwasher', missed: 4 },
+    ])
+  })
+
+  it('returns an empty summary when nothing has ever skipped a cycle', () => {
+    expect(missedCyclesSummary([], [], '2026-01-15')).toEqual({ total: 0, byTask: [] })
   })
 })
 

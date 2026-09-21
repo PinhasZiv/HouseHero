@@ -2,8 +2,9 @@
 // screen already fetches - each one a small, independently testable function
 // rather than logic buried inside the screen's own useMemo blocks.
 
-import { cycleLateness, dayOfWeek, daysBetween } from './taskDue'
+import { cycleLateness, dayOfWeek, daysBetween, missedCycles as cyclesMissedFor } from './taskDue'
 import type { StatsCompletion } from './api'
+import type { Task } from './types'
 
 /** How late a completion actually reads as, once wrapped to the task's own
  *  repeating schedule - see cycleLateness() for why a chronically-late
@@ -141,6 +142,72 @@ export function busiestWeekday(completions: StatsCompletion[]): BusiestWeekday |
   }
   const max = Math.max(...counts)
   return max > 0 ? { weekday: counts.indexOf(max), count: max } : null
+}
+
+export interface MissedCyclesEntry {
+  taskId: string
+  title: string
+  missed: number
+}
+
+export interface MissedCyclesSummary {
+  total: number
+  /** Worst offender first; empty when nothing has ever skipped a cycle. */
+  byTask: MissedCyclesEntry[]
+}
+
+/** How many of a recurring task's own cycles were skipped entirely before an
+ *  eventual completion - the "already done" half of the missed-cycles
+ *  picture, from history. */
+export function missedCyclesFromHistory(completions: StatsCompletion[]): MissedCyclesEntry[] {
+  const byTask = new Map<string, MissedCyclesEntry>()
+  for (const row of dedupeCompletionGroups(completions)) {
+    if (!row.task || row.task.task_type !== 'recurring') continue
+    const rawLate = daysBetween(row.prev_due_date, row.completed_on)
+    const missed = cyclesMissedFor(row.task, row.prev_due_date, rawLate)
+    if (missed <= 0) continue
+    const entry = byTask.get(row.task_id) ?? { taskId: row.task_id, title: row.task.title, missed: 0 }
+    entry.missed += missed
+    byTask.set(row.task_id, entry)
+  }
+  return [...byTask.values()]
+}
+
+/** Currently-open recurring tasks that have already skipped one or more full
+ *  cycles right now, even though nobody has completed them yet - the "still
+ *  slipping" half a completion history alone cannot show, since these have
+ *  no completion row at all. */
+export function missedCyclesFromOpenTasks(tasks: Task[], today: string): MissedCyclesEntry[] {
+  const entries: MissedCyclesEntry[] = []
+  for (const task of tasks) {
+    if (task.is_done || task.task_type !== 'recurring') continue
+    const rawLate = daysBetween(task.due_date, today)
+    const missed = cyclesMissedFor(task, task.due_date, rawLate)
+    if (missed > 0) entries.push({ taskId: task.id, title: task.title, missed })
+  }
+  return entries
+}
+
+/**
+ * How often recurring tasks are being skipped outright - combining a task
+ * that eventually got done late (from history) with one that is still open
+ * and already past a cycle boundary right now. Together they answer "are we
+ * skipping recurring tasks a lot", broken down by task so a repeat offender
+ * stands out rather than being buried in one household-wide number.
+ */
+export function missedCyclesSummary(
+  completions: StatsCompletion[],
+  tasks: Task[],
+  today: string,
+): MissedCyclesSummary {
+  const byTask = new Map<string, MissedCyclesEntry>()
+  for (const entry of [...missedCyclesFromHistory(completions), ...missedCyclesFromOpenTasks(tasks, today)]) {
+    const existing = byTask.get(entry.taskId) ?? { taskId: entry.taskId, title: entry.title, missed: 0 }
+    existing.missed += entry.missed
+    byTask.set(entry.taskId, existing)
+  }
+  const byTaskList = [...byTask.values()].sort((a, b) => b.missed - a.missed)
+  return { total: byTaskList.reduce((sum, entry) => sum + entry.missed, 0), byTask: byTaskList }
 }
 
 export interface InactiveMember {

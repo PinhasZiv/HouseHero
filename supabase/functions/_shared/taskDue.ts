@@ -144,6 +144,46 @@ export interface CyclicTask {
   weekly_days: number[] | null
 }
 
+interface CycleProgress {
+  /** How many full cycles have completely elapsed within the gap. */
+  cyclesMissed: number
+  /** What remains after those full cycles - cycleLateness()'s return value. */
+  remainderDays: number
+}
+
+/**
+ * Splits an overdue gap into full cycles elapsed plus what remains of the
+ * current one - the shared walk behind both cycleLateness() and
+ * missedCycles(), so the two always agree on where the grid points fall.
+ */
+function cycleProgress(task: CyclicTask, dueDate: string, rawDaysLate: number): CycleProgress {
+  if (task.recurrence_mode === 'interval' && task.interval_days) {
+    return {
+      cyclesMissed: Math.floor(rawDaysLate / task.interval_days),
+      remainderDays: rawDaysLate % task.interval_days,
+    }
+  }
+
+  if (task.recurrence_mode === 'weekly_days' && task.weekly_days?.length) {
+    // Walks the grid the task would have kept had it never been touched -
+    // one nextWeeklyDate() step at a time, since the gaps between chosen
+    // weekdays are not necessarily even - until the next step would
+    // overshoot `to`, leaving `gridPoint` as the most recent one not after it.
+    const to = addDays(dueDate, rawDaysLate)
+    let gridPoint = dueDate
+    let next = nextWeeklyDate(task.weekly_days, gridPoint)
+    let cyclesMissed = 0
+    while (daysBetween(next, to) >= 0) {
+      gridPoint = next
+      cyclesMissed++
+      next = nextWeeklyDate(task.weekly_days, gridPoint)
+    }
+    return { cyclesMissed, remainderDays: daysBetween(gridPoint, to) }
+  }
+
+  return { cyclesMissed: 0, remainderDays: rawDaysLate }
+}
+
 /**
  * Wraps an already-overdue gap to the most recently passed point on the
  * task's own repeating schedule, rather than the raw distance from the
@@ -160,27 +200,20 @@ export interface CyclicTask {
  */
 export function cycleLateness(task: CyclicTask, dueDate: string, rawDaysLate: number): number {
   if (rawDaysLate <= 0 || task.task_type !== 'recurring') return rawDaysLate
+  return cycleProgress(task, dueDate, rawDaysLate).remainderDays
+}
 
-  if (task.recurrence_mode === 'interval' && task.interval_days) {
-    return rawDaysLate % task.interval_days
-  }
-
-  if (task.recurrence_mode === 'weekly_days' && task.weekly_days?.length) {
-    // Walks the grid the task would have kept had it never been touched -
-    // one nextWeeklyDate() step at a time, since the gaps between chosen
-    // weekdays are not necessarily even - until the next step would
-    // overshoot `to`, leaving `gridPoint` as the most recent one not after it.
-    const to = addDays(dueDate, rawDaysLate)
-    let gridPoint = dueDate
-    let next = nextWeeklyDate(task.weekly_days, gridPoint)
-    while (daysBetween(next, to) >= 0) {
-      gridPoint = next
-      next = nextWeeklyDate(task.weekly_days, gridPoint)
-    }
-    return daysBetween(gridPoint, to)
-  }
-
-  return rawDaysLate
+/**
+ * The complement of cycleLateness(): how many of the task's own cycles were
+ * skipped entirely within an overdue gap, rather than what remains of the
+ * current one. A gap of 2.5 cycles is 2 missed cycles (cycleLateness()
+ * separately reports the half-cycle remainder) - together they answer both
+ * "how late is this right now" and "how many times did this slip by
+ * completely", which is what the Stats screen's missed-cycles count needs.
+ */
+export function missedCycles(task: CyclicTask, dueDate: string, rawDaysLate: number): number {
+  if (rawDaysLate <= 0 || task.task_type !== 'recurring') return 0
+  return cycleProgress(task, dueDate, rawDaysLate).cyclesMissed
 }
 
 export function classify(task: DueTask, today: string, now: Date = new Date()): DueInfo {
