@@ -401,16 +401,18 @@ test.describe('stats screen', () => {
     const card = page.locator('.card', { hasText: 'מגמה שבועית' })
     const columns = card.locator('.week-chart-col')
     await expect(columns).toHaveCount(6)
-    await expect(columns.last()).toContainText('השבוע') // most recent week is last, RTL reading order
-    await expect(columns.last().locator('.week-chart-value')).toHaveText('1')
-    await expect(columns.nth(4)).toContainText('לפני שבוע')
-    await expect(columns.nth(4).locator('.week-chart-value')).toHaveText('1')
+    // Rendered most-recent-first, so it sits at the scrollable chart's start
+    // edge and is visible without scrolling.
+    await expect(columns.first()).toContainText('השבוע')
+    await expect(columns.first().locator('.week-chart-value')).toHaveText('1')
+    await expect(columns.nth(1)).toContainText('לפני שבוע')
+    await expect(columns.nth(1).locator('.week-chart-value')).toHaveText('1')
 
     // The weekly trend keeps its own fixed 6-week window regardless of the
     // range toggle - switching to "this month" should not change it.
     await page.getByRole('tab', { name: 'החודש' }).click()
     await expect(columns).toHaveCount(6)
-    await expect(columns.last().locator('.week-chart-value')).toHaveText('1')
+    await expect(columns.first().locator('.week-chart-value')).toHaveText('1')
   })
 
   test('the range toggle narrows the leaderboard and totals to the current calendar month', async ({ page }) => {
