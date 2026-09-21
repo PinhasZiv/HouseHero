@@ -38,6 +38,12 @@ export function peopleWord(count: number, language: Language): string {
   return `${count} אנשים`
 }
 
+/** "מחזור אחד" / "5 מחזורים", or "1 cycle" / "5 cycles". */
+export function cyclesWord(count: number, language: Language): string {
+  if (language === 'en') return count === 1 ? '1 cycle' : `${count} cycles`
+  return count === 1 ? 'מחזור אחד' : `${count} מחזורים`
+}
+
 export function initials(name: string | null, email: string | null): string {
   const source = (name || email || '?').trim()
   const parts = source.split(/[\s@._-]+/).filter(Boolean)

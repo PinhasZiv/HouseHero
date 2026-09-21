@@ -513,6 +513,87 @@ test.describe('stats screen', () => {
     await expect(page.locator('.card', { hasText: 'המשימה הכי מוזנחת' })).toHaveCount(0)
   })
 
+  test('counts missed cycles from completion history, broken down by task', async ({ page }) => {
+    const db = makeFakeDb({
+      tasks: [
+        statsTask({ id: 'task-a', title: 'להוציא זבל', interval_days: 2 }),
+        statsTask({ id: 'task-b', title: 'לנקות שירותים', interval_days: 2 }),
+      ],
+      taskCompletions: [
+        // 5 days late on a 2-day cycle: 2 full cycles missed.
+        {
+          id: 'e-1', task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 10,
+          completed_on: isoDaysFromToday(0), created_at: new Date().toISOString(), completion_group: null,
+          prev_due_date: isoDaysFromToday(-5),
+        },
+        // 4 days late on a 2-day cycle: 2 more cycles missed for the same task.
+        {
+          id: 'e-2', task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 10,
+          completed_on: isoDaysFromToday(-10), created_at: new Date(Date.now() - 10 * 86_400_000).toISOString(), completion_group: null,
+          prev_due_date: isoDaysFromToday(-14),
+        },
+        // Never missed a full cycle - excluded from the breakdown entirely.
+        {
+          id: 'e-3', task_id: 'task-b', user_id: FAKE_USER_ID, points_awarded: 10,
+          completed_on: isoDaysFromToday(-1), created_at: new Date(Date.now() - 86_400_000).toISOString(), completion_group: null,
+          prev_due_date: isoDaysFromToday(-1),
+        },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
+
+    const card = page.locator('.card', { hasText: 'פספוסי מחזור' })
+    await expect(card).toContainText('4 מחזורים פוספסו בסה"כ')
+    await expect(card).toContainText('להוציא זבל')
+    await expect(card).not.toContainText('לנקות שירותים')
+  })
+
+  test('also counts a currently-open recurring task already past a cycle boundary, even though it was never completed', async ({ page }) => {
+    const db = makeFakeDb({
+      tasks: [
+        statsTask({
+          id: 'task-open',
+          title: 'להחליף מגבות',
+          interval_days: 2,
+          due_date: isoDaysFromToday(-7), // 7 days late on a 2-day cycle: 3 missed
+          is_done: false,
+          last_completed_date: null,
+          last_completed_at: null,
+          last_completed_by: null,
+          last_completed_actor: null,
+        }),
+      ],
+      taskCompletions: [],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
+
+    const card = page.locator('.card', { hasText: 'פספוסי מחזור' })
+    await expect(card).toContainText('3 מחזורים פוספסו בסה"כ')
+    await expect(card).toContainText('להחליף מגבות')
+  })
+
+  test('hides the missed-cycles card entirely when nothing has ever skipped a full cycle', async ({ page }) => {
+    const db = makeFakeDb({
+      tasks: [statsTask({ id: 'task-a', title: 'להוציא זבל', interval_days: 30 })],
+      taskCompletions: [
+        {
+          id: 'e-1', task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 10,
+          completed_on: isoDaysFromToday(0), created_at: new Date().toISOString(), completion_group: null,
+          prev_due_date: isoDaysFromToday(-3),
+        },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
+
+    await expect(page.locator('.card', { hasText: 'פספוסי מחזור' })).toHaveCount(0)
+  })
+
   test('shows the busiest day of the week across all history', async ({ page }) => {
     const busyDate1 = '2026-01-08'
     const busyDate2 = '2026-01-15' // exactly 7 days later - guaranteed the same weekday

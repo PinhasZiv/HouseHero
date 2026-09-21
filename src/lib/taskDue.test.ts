@@ -7,6 +7,7 @@ import {
   daysBetween,
   formatTimeIn,
   minutesOfDayIn,
+  missedCycles,
   nextWeeklyDate,
   notifiable,
   planCompletion,
@@ -168,6 +169,45 @@ describe('cycleLateness', () => {
     expect(cycleLateness(t, '2026-05-11', 3)).toBe(1) // 1 day past Wed 5/13
     expect(cycleLateness(t, '2026-05-11', 7)).toBe(0) // exactly Mon 5/18: due
     expect(cycleLateness(t, '2026-05-11', 11)).toBe(2) // 2 days past Wed 5/20
+  })
+})
+
+describe('missedCycles', () => {
+  function cyclic(overrides: Partial<CyclicTask> = {}): CyclicTask {
+    return {
+      task_type: 'recurring',
+      recurrence_mode: 'interval',
+      interval_days: 7,
+      weekly_days: null,
+      ...overrides,
+    }
+  }
+
+  it('is zero for a non-recurring task or a non-positive gap', () => {
+    expect(missedCycles(cyclic({ task_type: 'one_time' }), '2026-05-10', 30)).toBe(0)
+    expect(missedCycles(cyclic(), '2026-05-10', 0)).toBe(0)
+  })
+
+  it('counts full interval cycles elapsed, independent of the remainder', () => {
+    const t = cyclic({ interval_days: 4 })
+    expect(missedCycles(t, '2026-05-10', 3)).toBe(0) // under a cycle
+    expect(missedCycles(t, '2026-05-10', 4)).toBe(1) // exactly one cycle
+    expect(missedCycles(t, '2026-05-10', 11)).toBe(2) // 2.75 cycles: 2 full ones
+  })
+
+  it('falls through to zero when a recurring task is missing the fields its mode needs', () => {
+    expect(missedCycles(cyclic({ interval_days: null }), '2026-05-10', 9)).toBe(0)
+    expect(missedCycles(cyclic({ recurrence_mode: 'weekly_days', weekly_days: [] }), '2026-05-10', 9)).toBe(0)
+  })
+
+  it('counts weekly_days grid points crossed, agreeing with cycleLateness on where they fall', () => {
+    const t = cyclic({ recurrence_mode: 'weekly_days', interval_days: null, weekly_days: [1, 3] })
+    // Same grid as the cycleLateness test above: Wed 5/13 (+2), Mon 5/18 (+7),
+    // Wed 5/20 (+9), Mon 5/25 (+14), ...
+    expect(missedCycles(t, '2026-05-11', 2)).toBe(1) // exactly Wed 5/13: 1 cycle
+    expect(missedCycles(t, '2026-05-11', 3)).toBe(1) // still only Wed 5/13 crossed
+    expect(missedCycles(t, '2026-05-11', 7)).toBe(2) // Wed 5/13 and Mon 5/18
+    expect(missedCycles(t, '2026-05-11', 11)).toBe(3) // + Wed 5/20
   })
 })
 

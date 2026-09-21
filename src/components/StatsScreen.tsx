@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as api from '../lib/api'
 import { daysBetween } from '../lib/taskDue'
-import { formatDateTime, weekdayName } from '../lib/format'
+import { cyclesWord, formatDateTime, weekdayName } from '../lib/format'
 import { useI18n } from '../lib/i18n'
 import type { Language } from '../lib/i18n/types'
 import {
   busiestWeekday,
   dedupeCompletionGroups,
   inactiveMembers,
+  missedCyclesSummary,
   mostNeglectedTask,
   onTimeRate,
   weeklyTrend,
@@ -125,7 +126,7 @@ function PersonStatsSheet({
 
 /** Points, completion counts, and "who did what" for the current space. */
 export function StatsScreen() {
-  const { currentSpace, today, people, session } = useApp()
+  const { currentSpace, today, people, session, tasks } = useApp()
   const { t, language } = useI18n()
   const toast = useToast()
   const [completions, setCompletions] = useState<StatsCompletion[] | null>(null)
@@ -204,6 +205,10 @@ export function StatsScreen() {
     () => inactiveMembers(memberIds ?? [], completions ?? [], today),
     [memberIds, completions, today],
   )
+  const missedCycles = useMemo(
+    () => missedCyclesSummary(completions ?? [], tasks, today),
+    [completions, tasks, today],
+  )
 
   const selectedBreakdown = useMemo<TaskBreakdown[]>(() => {
     if (!selected || !completions) return []
@@ -248,7 +253,11 @@ export function StatsScreen() {
 
       {!stats ? (
         <p className="muted">{t.common.loading}</p>
-      ) : stats.total === 0 ? (
+      ) : stats.total === 0 && missedCycles.total === 0 ? (
+        // A recurring task can rack up missed cycles while sitting untouched,
+        // with zero completions ever logged for it - that is itself the
+        // finding this screen exists to surface, not a reason to hide behind
+        // the empty state meant for a genuinely blank history.
         <div className="empty-state">
           <ChartIcon size={40} />
           <p>{t.stats.noData}</p>
@@ -340,6 +349,21 @@ export function StatsScreen() {
             <section className="card">
               <h3>{t.stats.neglectedTaskTitle}</h3>
               <p className="muted">{t.stats.neglectedTaskBody(neglected.title, neglected.avgDaysLate)}</p>
+            </section>
+          )}
+
+          {missedCycles.total > 0 && (
+            <section className="card">
+              <h3>{t.stats.missedCyclesTitle}</h3>
+              <p className="muted">{t.stats.missedCyclesTotal(missedCycles.total)}</p>
+              <ul className="history-list">
+                {missedCycles.byTask.map((entry) => (
+                  <li key={entry.taskId} className="history-row">
+                    <span>{entry.title}</span>
+                    <span className="muted small">{cyclesWord(entry.missed, language)}</span>
+                  </li>
+                ))}
+              </ul>
             </section>
           )}
 
