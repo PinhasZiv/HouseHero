@@ -651,7 +651,7 @@ button { font: inherit; cursor: pointer; }
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  margin: 20px 0 -4px;
+  margin: 20px 0 8px;
 }
 .stats-section-title:first-child { margin-top: 0; }
 

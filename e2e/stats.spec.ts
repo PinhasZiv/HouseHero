@@ -574,8 +574,8 @@ test.describe('stats screen', () => {
     await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
 
     const card = page.locator('.card', { hasText: 'פספוסי מחזור' })
-    await expect(card).toContainText('4 מחזורים פוספסו בסה"כ')
     await expect(card).toContainText('להוציא זבל')
+    await expect(card.locator('.missed-cycles-row', { hasText: 'להוציא זבל' })).toContainText('4 מחזורים')
     await expect(card).not.toContainText('לנקות שירותים')
   })
 
@@ -601,8 +601,7 @@ test.describe('stats screen', () => {
     await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
 
     const card = page.locator('.card', { hasText: 'פספוסי מחזור' })
-    await expect(card).toContainText('3 מחזורים פוספסו בסה"כ')
-    await expect(card).toContainText('להחליף מגבות')
+    await expect(card.locator('.missed-cycles-row', { hasText: 'להחליף מגבות' })).toContainText('3 מחזורים')
   })
 
   test('hides the missed-cycles card entirely when nothing has ever skipped a full cycle', async ({ page }) => {

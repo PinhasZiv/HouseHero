@@ -5,7 +5,7 @@
 // half-translated interface is worse than an untranslated one, because you
 // only find the gaps by stumbling into them.
 
-import { cyclesWord, days, peopleWord, pointsWord, tasksWord } from '../format'
+import { days, peopleWord, pointsWord, tasksWord } from '../format'
 import type { Strings } from './he'
 
 export const en: Strings = {
@@ -319,7 +319,6 @@ export const en: Strings = {
     inactiveDays: (n: number) => `${days(n, 'en')} with nothing done`,
 
     missedCyclesTitle: 'Missed cycles',
-    missedCyclesTotal: (n: number) => `${cyclesWord(n, 'en')} missed in total`,
   },
 
   space: {

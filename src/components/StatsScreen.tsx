@@ -389,7 +389,6 @@ export function StatsScreen() {
               {missedCycles.total > 0 && (
                 <section className="card card-warning">
                   <h3>{t.stats.missedCyclesTitle}</h3>
-                  <p className="muted">{t.stats.missedCyclesTotal(missedCycles.total)}</p>
                   <ul className="history-list">
                     {missedCycles.byTask.map((entry) => {
                       // byTask is sorted worst-first, so the first entry's
