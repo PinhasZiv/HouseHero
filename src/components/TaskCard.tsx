@@ -6,12 +6,14 @@ import {
   describeWeeklyDays,
   formatDate,
   formatSnoozeUntil,
+  formatTime,
   personLabel,
   relativeDay,
   type PersonLabel,
 } from '../lib/format'
 import { useI18n, type Language } from '../lib/i18n'
 import type { Task } from '../lib/types'
+import { useApp } from '../state/AppState'
 import { CheckIcon, ClockIcon, CopyIcon, PencilIcon, SkipIcon, StarIcon, UndoIcon, XIcon } from './Icons'
 
 /** Who completed it: you, someone else by name, or nobody yet. */
@@ -85,6 +87,7 @@ export function TaskCard({
   onUndoSkip,
 }: TaskCardProps) {
   const { t, language } = useI18n()
+  const { reminderOverrides } = useApp()
   const [busy, setBusy] = useState(false)
   const [justCompleted, setJustCompleted] = useState(false)
   const info = classify(task, today)
@@ -180,6 +183,15 @@ export function TaskCard({
         : describeInterval(task.interval_days ?? 1, language)
       : null
 
+  // Tells apart copies of the same chore at different times of day (morning
+  // and evening drops). This viewer's own override wins, so it matches the
+  // time their notification actually arrives.
+  const override = reminderOverrides.get(task.id)
+  const reminderLabel =
+    task.task_type === 'recurring'
+      ? formatTime(override?.hour ?? task.reminder_hour, override?.minute ?? task.reminder_minute)
+      : null
+
   return (
     <article className={`task-card task-${info.status} ${justCompleted ? 'task-just-completed' : ''}`}>
       {/* A completed task always shows its checkmark, even when this viewer
@@ -220,6 +232,7 @@ export function TaskCard({
         <p className="task-meta">
           {spaceName && <span className="chip">{spaceName}</span>}
           {recurrenceLabel && <span>{recurrenceLabel}</span>}
+          {reminderLabel && <span className="task-meta-time">{reminderLabel}</span>}
           {assignedName && <span className="chip chip-assign">{assignedName}</span>}
           {snoozedUntil ? (
             <span>{t.task.snoozedUntil(formatSnoozeUntil(snoozedUntil, today, language))}</span>

@@ -91,7 +91,10 @@ test.describe('duplicating a task', () => {
     await page.getByLabel('שעת התזכורת של המשימה').fill('20:00')
     await page.locator('.sheet').getByRole('button', { name: 'הוספת משימה' }).click()
 
-    await expect(page.locator('.task-card', { hasText: 'טיפות אוזניים ערב' })).toBeVisible()
+    // Each card shows its own reminder time, so the two copies are told apart
+    // at a glance even when their titles get cut off.
+    await expect(page.locator('.task-card', { hasText: 'טיפות אוזניים ערב' }).locator('.task-meta-time')).toHaveText('20:00')
+    await expect(page.locator('.task-card', { hasText: 'טיפות אוזניים בוקר' }).locator('.task-meta-time')).toHaveText('08:00')
     expect(db.tasks).toHaveLength(2)
 
     const original = db.tasks.find((t) => t.id === 'task-morning')!
@@ -151,6 +154,25 @@ test.describe('duplicating a task', () => {
     expect(copy.task_type).toBe('one_time')
     expect(copy.is_done).toBe(false)
     expect(copy.due_date).toBe(appToday())
+  })
+
+  test('the card shows this viewer\'s personal reminder time when they set one, and no time on a one-time task', async ({
+    page,
+  }) => {
+    const db = makeFakeDb({
+      tasks: [
+        task({ id: 'task-daily', title: 'להאכיל את הכלבה', reminder_hour: 9, reminder_minute: 0 }),
+        task({ id: 'task-once', title: 'לקנות מזון', task_type: 'one_time', recurrence_mode: null, interval_days: null }),
+      ],
+      reminderOverrides: new Map([['task-daily', { hour: 7, minute: 30 }]]),
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'משימות' }).click()
+
+    await expect(page.locator('.task-card', { hasText: 'להאכיל את הכלבה' }).locator('.task-meta-time')).toHaveText('07:30')
+    await expect(page.locator('.task-card', { hasText: 'לקנות מזון' })).toBeVisible()
+    await expect(page.locator('.task-card', { hasText: 'לקנות מזון' }).locator('.task-meta-time')).toHaveCount(0)
   })
 
   test('the new-task form does not offer duplicating - only editing an existing task does', async ({ page }) => {

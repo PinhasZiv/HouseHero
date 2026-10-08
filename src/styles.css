@@ -439,6 +439,11 @@ button { font: inherit; cursor: pointer; }
   opacity: 0.55;
 }
 
+.task-meta-time {
+  font-variant-numeric: tabular-nums;
+  unicode-bidi: isolate;
+}
+
 .badge {
   font-size: 0.74rem;
   font-weight: 650;
