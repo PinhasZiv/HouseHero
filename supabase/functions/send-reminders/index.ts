@@ -17,6 +17,13 @@ import { composeReminder, composeTimeLimitedReminder, isLanguage, type Language 
 import { isTaskPaused, isUserPaused, type Pause } from '../_shared/pauses.ts'
 import { planSnoozeOutcomes, type ExpiredSnooze, type SnoozeTask } from '../_shared/snoozeResend.ts'
 import { dueReminderSlots, type ReminderPolicy } from '../_shared/timeLimitedReminders.ts'
+import {
+  composeWeeklySummary,
+  isSummaryTime,
+  summarizeSpaceWeek,
+  weekStart,
+  type SummaryCompletion,
+} from '../_shared/weeklySummary.ts'
 import { sendPush, type PushTarget } from '../_shared/webpush.ts'
 
 interface Profile {
@@ -447,6 +454,80 @@ Deno.serve(async (request) => {
             spaceId: task.space_id,
             taskId: task.id,
             taskCount: 1,
+          },
+          config.vapid,
+        )
+      }
+    }
+  }
+
+  // The weekly summary: Saturday 20:00 on each person's own clock, covering
+  // every space they belong to - except any they are away from (vacation
+  // mode), where there is nothing to tell them.
+  const spacesByUser = new Map<string, string[]>()
+  for (const [spaceId, members] of membersBySpace) {
+    for (const userId of members) spacesByUser.set(userId, [...(spacesByUser.get(userId) ?? []), spaceId])
+  }
+  const summaryFor: { userId: string; profile: Profile; localDate: string; spaceIds: string[] }[] = []
+  for (const [userId, spaceIds] of spacesByUser) {
+    const profile = profilesById.get(userId)
+    if (!profile || !subsByUser.get(userId)?.length) continue
+    const localDate = todayIn(profile.timezone, now)
+    if (!isSummaryTime(localDate, minutesOfDayIn(profile.timezone, now), WINDOW_MINUTES)) continue
+    const present = spaceIds.filter((spaceId) => !isUserPaused(pauses, spaceId, userId))
+    if (present.length) summaryFor.push({ userId, profile, localDate, spaceIds: present })
+  }
+
+  if (summaryFor.length) {
+    const from = summaryFor.map(({ localDate }) => weekStart(localDate)).sort()[0]
+    const completions = await admin
+      .from('task_completions')
+      .select('space_id, user_id, points_awarded, completed_on, completion_group')
+      .gte('completed_on', from)
+    if (completions.error) {
+      console.error('loading the weekly summary failed', completions.error)
+    } else {
+      const rows = (completions.data ?? []) as SummaryCompletion[]
+      for (const { userId, profile, localDate, spaceIds } of summaryFor) {
+        const language: Language = isLanguage(profile.language) ? profile.language : 'he'
+        const { title, body } = composeWeeklySummary(
+          spaceIds.map((spaceId) => {
+            const week = summarizeSpaceWeek(rows, spaceId, userId, localDate)
+            const top = week.topUserId ? profilesById.get(week.topUserId) : undefined
+            return {
+              spaceName: spaceIds.length > 1 ? (spaceNames.get(spaceId) ?? '?') : undefined,
+              total: week.total,
+              mine: week.mine,
+              myPoints: week.myPoints,
+              topName: week.topUserId ? (top?.display_name ?? null) : null,
+              topIsYou: week.topUserId === userId,
+            }
+          }),
+          language,
+        )
+
+        if (dryRun) {
+          report.push({ weeklySummary: { user: profile.display_name ?? userId, body } })
+          continue
+        }
+
+        // Same claim-by-insert mutex as notification_log.
+        const claim = await admin
+          .from('weekly_summary_log')
+          .insert({ user_id: userId, week_ending: localDate })
+          .select('user_id')
+        if (claim.error || !claim.data?.length) continue // already sent this week
+
+        sentCount += await pushToSubscriptions(
+          subsByUser.get(userId) ?? [],
+          {
+            title,
+            body,
+            lang: language,
+            dir: language === 'he' ? 'rtl' : 'ltr',
+            tag: `househero-weekly-${localDate}`,
+            spaceId: spaceIds[0],
+            tab: 'stats',
           },
           config.vapid,
         )
