@@ -30,6 +30,11 @@ export interface FakeTask {
   last_completed_at: string | null
   last_completed_by: string[] | null
   last_completed_actor: string | null
+  // Optional (unlike the real column, which is never absent): most fixtures
+  // predate skipping and have no reason to care, so they omit these rather
+  // than every one of them needing an unrelated null added.
+  last_skipped_date?: string | null
+  last_skipped_by?: string | null
   is_done: boolean
   assigned_to: string | null
   created_by: string
@@ -100,6 +105,18 @@ export interface FakeDb {
      *  defaults to completed_on itself (always "on time") when omitted. */
     prev_due_date?: string
   }[]
+  taskSkips: {
+    id: string
+    task_id: string
+    space_id: string
+    user_id: string
+    skipped_on: string
+    created_at: string
+    prev_due_date: string
+    prev_last_skipped_date: string | null
+    prev_last_skipped_by: string | null
+    prev_is_done: boolean
+  }[]
   rewards: FakeReward[]
   redemptions: FakeRedemption[]
   /** Other space members fetchPeople() should resolve names for. */
@@ -133,6 +150,7 @@ export function makeFakeDb(overrides?: Partial<FakeDb>): FakeDb {
     snoozes: new Map(),
     reminderOverrides: new Map(),
     taskCompletions: [],
+    taskSkips: [],
     rewards: [],
     redemptions: [],
     otherPeople: [],
@@ -247,6 +265,73 @@ function applyUndoLastCompletion(db: FakeDb, taskId: string) {
   return task
 }
 
+/** Applies skip_task()'s rules well enough for the cases the suite exercises - see 0008_task_skips.sql. */
+function applySkipTask(db: FakeDb, taskId: string, today: string) {
+  const task = db.tasks.find((t) => t.id === taskId)
+  if (!task || task.task_type !== 'recurring' || task.is_done) return null
+
+  let nextDue: string
+  if (task.recurrence_mode === 'weekly_days') {
+    const base = new Date(`${today}T00:00:00Z`)
+    nextDue = today
+    for (let i = 1; i <= 7; i++) {
+      const candidate = new Date(base)
+      candidate.setUTCDate(candidate.getUTCDate() + i)
+      if ((task.weekly_days ?? []).includes(candidate.getUTCDay())) {
+        nextDue = candidate.toISOString().slice(0, 10)
+        break
+      }
+    }
+  } else {
+    const candidate = new Date(`${today}T00:00:00Z`)
+    candidate.setUTCDate(candidate.getUTCDate() + (task.interval_days ?? 1))
+    nextDue = candidate.toISOString().slice(0, 10)
+  }
+
+  const finished =
+    (task.end_condition === 'after_count' && task.occurrences_completed >= (task.end_after_count ?? Infinity)) ||
+    (task.end_condition === 'on_date' && !!task.end_date && nextDue > task.end_date)
+
+  const event = {
+    id: `skip-${db.taskSkips.length + 1}`,
+    task_id: task.id,
+    space_id: task.space_id,
+    user_id: FAKE_USER_ID,
+    skipped_on: today,
+    created_at: new Date().toISOString(),
+    prev_due_date: task.due_date,
+    prev_last_skipped_date: task.last_skipped_date ?? null,
+    prev_last_skipped_by: task.last_skipped_by ?? null,
+    prev_is_done: task.is_done,
+  }
+  db.taskSkips.push(event)
+
+  task.due_date = finished ? task.due_date : nextDue
+  task.last_skipped_date = today
+  task.last_skipped_by = FAKE_USER_ID
+  task.is_done = finished
+
+  return event
+}
+
+/** Applies undo_last_skip()'s rules - restores the snapshot the most recent skip captured. */
+function applyUndoLastSkip(db: FakeDb, taskId: string) {
+  const task = db.tasks.find((t) => t.id === taskId)
+  if (!task) return null
+
+  const relevant = db.taskSkips.filter((s) => s.task_id === taskId)
+  if (relevant.length === 0) return null
+  const last = relevant.reduce((a, b) => (a.created_at > b.created_at ? a : b))
+
+  task.due_date = last.prev_due_date
+  task.last_skipped_date = last.prev_last_skipped_date
+  task.last_skipped_by = last.prev_last_skipped_by
+  task.is_done = last.prev_is_done
+
+  db.taskSkips.splice(db.taskSkips.indexOf(last), 1)
+  return task
+}
+
 export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void> {
   await page.route('**/rest/v1/**', async (route) => {
     const request = route.request()
@@ -271,6 +356,16 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
       }
       if (fn === 'undo_last_completion') {
         const task = applyUndoLastCompletion(db, body.p_task as string)
+        if (!task) return json(route, { message: 'nothing_to_undo' }, 404)
+        return json(route, wantsSingle ? task : [task])
+      }
+      if (fn === 'skip_task') {
+        const event = applySkipTask(db, body.p_task as string, body.p_today as string)
+        if (!event) return json(route, { message: 'not_recurring' }, 404)
+        return json(route, wantsSingle ? event : [event])
+      }
+      if (fn === 'undo_last_skip') {
+        const task = applyUndoLastSkip(db, body.p_task as string)
         if (!task) return json(route, { message: 'nothing_to_undo' }, 404)
         return json(route, wantsSingle ? task : [task])
       }
@@ -364,6 +459,8 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
         last_completed_at: null,
         last_completed_by: null,
         last_completed_actor: null,
+        last_skipped_date: null,
+        last_skipped_by: null,
         is_done: false,
         created_at: new Date().toISOString(),
         ...body,
@@ -460,6 +557,14 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
         return json(route, rows)
       }
       const rows = db.taskCompletions
+        .filter((row) => row.task_id === taskId)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      return json(route, rows)
+    }
+
+    if (table === 'task_skips' && method === 'GET') {
+      const taskId = eqValue(url, 'task_id')
+      const rows = db.taskSkips
         .filter((row) => row.task_id === taskId)
         .sort((a, b) => b.created_at.localeCompare(a.created_at))
       return json(route, rows)

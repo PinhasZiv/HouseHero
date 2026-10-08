@@ -106,6 +106,7 @@ export const he = {
     cancelAria: (name: string) => `ביטול ${name}`,
     duplicateAria: (name: string) => `שכפול ${name}`,
     skipAria: (name: string) => `דילוג על ${name} הפעם`,
+    undoSkipAria: (name: string) => `ביטול הדילוג על ${name}`,
     skippedLabel: 'דולגה הפעם',
     skipped: (name: string) => `דילגת על ${name} הפעם.`,
     skipUndone: (name: string) => `בוטל הדילוג על ${name}.`,

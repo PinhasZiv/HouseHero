@@ -49,6 +49,7 @@ function openTask(overrides: Partial<Task> & { id: string; title: string }): Tas
     last_completed_by: null,
     last_completed_actor: null,
     last_skipped_date: null,
+    last_skipped_by: null,
     is_done: false,
     assigned_to: null,
     created_by: 'u1',

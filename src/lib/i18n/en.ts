@@ -104,6 +104,7 @@ export const en: Strings = {
     cancelAria: (name: string) => `Cancel ${name}`,
     duplicateAria: (name: string) => `Duplicate ${name}`,
     skipAria: (name: string) => `Skip ${name} this time`,
+    undoSkipAria: (name: string) => `Undo skipping ${name}`,
     skippedLabel: 'Skipped this time',
     skipped: (name: string) => `Skipped ${name} this time.`,
     skipUndone: (name: string) => `Undid skipping ${name}.`,

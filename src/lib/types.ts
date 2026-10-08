@@ -64,6 +64,9 @@ export interface Task {
   /** The day this occurrence was last skipped ("not needed this time") -
    *  only meaningful for task_type 'recurring'. */
   last_skipped_date: string | null
+  /** Who skipped it - mirrors last_completed_actor, so the client can decide
+   *  whether to offer *this* viewer the undo-skip action without a round trip. */
+  last_skipped_by: string | null
   is_done: boolean
   assigned_to: string | null
   created_by: string

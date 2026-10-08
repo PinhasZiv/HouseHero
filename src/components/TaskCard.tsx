@@ -12,7 +12,7 @@ import {
 } from '../lib/format'
 import { useI18n, type Language } from '../lib/i18n'
 import type { Task } from '../lib/types'
-import { CheckIcon, ClockIcon, CopyIcon, PencilIcon, StarIcon, UndoIcon, XIcon } from './Icons'
+import { CheckIcon, ClockIcon, CopyIcon, PencilIcon, SkipIcon, StarIcon, UndoIcon, XIcon } from './Icons'
 
 /** Who completed it: you, someone else by name, or nobody yet. */
 export type CompletedBy = PersonLabel
@@ -46,6 +46,13 @@ interface TaskCardProps {
   /** Opens a new-task form pre-filled from this one - only offered once a
    *  time-limited task is over, to do it again. */
   onDuplicate?: () => void
+  /** Calls off just this occurrence of a recurring task - not late, not
+   *  done, just not needed this time. Only ever offered for an open
+   *  recurring task (see TodayScreen/TasksScreen's wiring). */
+  onSkip?: () => Promise<void>
+  /** The caller decides whether to offer this the same way onUndo does for
+   *  a completion - based on whether this viewer is the one who skipped it. */
+  onUndoSkip?: () => Promise<void>
 }
 
 /**
@@ -74,6 +81,8 @@ export function TaskCard({
   onCancelSnooze,
   onCancel,
   onDuplicate,
+  onSkip,
+  onUndoSkip,
 }: TaskCardProps) {
   const { t, language } = useI18n()
   const [busy, setBusy] = useState(false)
@@ -144,6 +153,26 @@ export function TaskCard({
     }
   }
 
+  async function skipTask() {
+    if (!onSkip || busy) return
+    setBusy(true)
+    try {
+      await onSkip()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function undoSkip() {
+    if (!onUndoSkip || busy) return
+    setBusy(true)
+    try {
+      await onUndoSkip()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const recurrenceLabel =
     task.task_type === 'recurring'
       ? task.recurrence_mode === 'weekly_days'
@@ -207,6 +236,11 @@ export function TaskCard({
                 <span>{t.task.nextIn(relativeDay(task.due_date, today, language))}</span>
               )}
             </>
+          ) : info.status === 'skipped_today' ? (
+            <>
+              <span>{t.task.skippedLabel}</span>
+              {!task.is_done && <span>{t.task.nextIn(relativeDay(task.due_date, today, language))}</span>}
+            </>
           ) : info.status === 'active' && task.expires_at ? (
             <span>{t.task.activeUntil(formatSnoozeUntil(task.expires_at, today, language))}</span>
           ) : info.status === 'scheduled' && task.starts_at ? (
@@ -242,6 +276,30 @@ export function TaskCard({
           onClick={cancelSnooze}
           disabled={busy}
           aria-label={t.task.cancelSnoozeAria(task.title)}
+        >
+          <UndoIcon size={18} />
+        </button>
+      )}
+
+      {onSkip && (
+        <button
+          type="button"
+          className="icon-button"
+          onClick={skipTask}
+          disabled={busy}
+          aria-label={t.task.skipAria(task.title)}
+        >
+          <SkipIcon size={18} />
+        </button>
+      )}
+
+      {onUndoSkip && (
+        <button
+          type="button"
+          className="icon-button"
+          onClick={undoSkip}
+          disabled={busy}
+          aria-label={t.task.undoSkipAria(task.title)}
         >
           <UndoIcon size={18} />
         </button>

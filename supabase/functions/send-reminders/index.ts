@@ -126,7 +126,7 @@ Deno.serve(async (request) => {
       .select(
         'id, space_id, title, task_type, recurrence_mode, interval_days, weekly_days, ' +
           'end_condition, end_after_count, end_date, occurrences_completed, due_date, ' +
-          'last_completed_date, is_done, reminder_hour, reminder_minute, assigned_to, ' +
+          'last_completed_date, last_skipped_date, is_done, reminder_hour, reminder_minute, assigned_to, ' +
           'starts_at, expires_at, reminder_policy, cancelled_at, expired_at',
       )
       .eq('is_done', false),
