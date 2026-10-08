@@ -5,6 +5,7 @@ import { isValidCompletionInstant } from '../lib/completionOptions'
 import { errorMessage } from '../lib/errors'
 import { firstName, toDatetimeLocalValue } from '../lib/format'
 import { useI18n } from '../lib/i18n'
+import { useDialog } from '../lib/useDialog'
 import type { Member, Task } from '../lib/types'
 import { ClockIcon } from './Icons'
 
@@ -32,6 +33,7 @@ type Mode = 'self' | 'everyone' | 'custom'
  */
 export function CompletionSheet({ task, selfId, onChoose, onClose }: CompletionSheetProps) {
   const { t, language } = useI18n()
+  const { titleId, dialogProps } = useDialog<HTMLDivElement>(onClose)
   const [members, setMembers] = useState<Member[] | null>(null)
   const [mode, setMode] = useState<Mode>('self')
   // Defaults to just the person opening this sheet - the common case for a
@@ -93,8 +95,8 @@ export function CompletionSheet({ task, selfId, onChoose, onClose }: CompletionS
 
   return (
     <div className="sheet-backdrop" onClick={onClose} role="presentation">
-      <div className="sheet" onClick={(event) => event.stopPropagation()}>
-        <h2>{t.completion.title}</h2>
+      <div className="sheet" {...dialogProps} onClick={(event) => event.stopPropagation()}>
+        <h2 id={titleId}>{t.completion.title}</h2>
         <p className="screen-subtitle">{task.title}</p>
 
         {hasOthers ? (

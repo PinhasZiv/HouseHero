@@ -3,6 +3,7 @@ import * as api from '../lib/api'
 import { daysBetween } from '../lib/taskDue'
 import { cyclesWord, formatDateTime, weekdayName } from '../lib/format'
 import { useI18n } from '../lib/i18n'
+import { useDialog } from '../lib/useDialog'
 import type { Language } from '../lib/i18n/types'
 import {
   busiestWeekday,
@@ -64,13 +65,14 @@ function PersonStatsSheet({
   onClose: () => void
 }) {
   const { t } = useI18n()
+  const { titleId, dialogProps } = useDialog<HTMLDivElement>(onClose)
   const totalCount = breakdown.reduce((sum, task) => sum + task.count, 0)
   const totalPoints = breakdown.reduce((sum, task) => sum + task.points, 0)
 
   return (
     <div className="sheet-backdrop" onClick={onClose} role="presentation">
-      <div className="sheet" onClick={(event) => event.stopPropagation()}>
-        <h2>{name}</h2>
+      <div className="sheet" {...dialogProps} onClick={(event) => event.stopPropagation()}>
+        <h2 id={titleId}>{name}</h2>
 
         {onTime?.percent != null && (
           <p className="muted small">

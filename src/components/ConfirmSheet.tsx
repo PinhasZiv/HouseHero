@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { errorMessage } from '../lib/errors'
 import { useI18n } from '../lib/i18n'
+import { useDialog } from '../lib/useDialog'
 
 interface ConfirmSheetProps {
   title: string
@@ -20,6 +21,9 @@ interface ConfirmSheetProps {
 export function ConfirmSheet({ title, message, confirmLabel, onConfirm, onCancel }: ConfirmSheetProps) {
   const { t } = useI18n()
   const [busy, setBusy] = useState(false)
+  const { titleId, dialogProps } = useDialog<HTMLDivElement>(() => {
+    if (!busy) onCancel()
+  })
   const [error, setError] = useState<string | null>(null)
 
   async function confirm() {
@@ -35,8 +39,8 @@ export function ConfirmSheet({ title, message, confirmLabel, onConfirm, onCancel
 
   return (
     <div className="sheet-backdrop" onClick={busy ? undefined : onCancel} role="presentation">
-      <div className="sheet" onClick={(event) => event.stopPropagation()}>
-        <h2>{title}</h2>
+      <div className="sheet" {...dialogProps} onClick={(event) => event.stopPropagation()}>
+        <h2 id={titleId}>{title}</h2>
         <p className="screen-subtitle">{message}</p>
 
         {error && <p className="error-text">{error}</p>}

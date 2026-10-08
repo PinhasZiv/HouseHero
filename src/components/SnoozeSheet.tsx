@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { errorMessage } from '../lib/errors'
 import { toDatetimeLocalValue } from '../lib/format'
 import { useI18n } from '../lib/i18n'
+import { useDialog } from '../lib/useDialog'
 import { SNOOZE_PRESETS, isValidSnoozeInstant, snoozeUntilInMinutes } from '../lib/snoozeOptions'
 import type { Task } from '../lib/types'
 import { ClockIcon } from './Icons'
@@ -22,6 +23,7 @@ function defaultCustomValue(): string {
 export function SnoozeSheet({ tasks, onConfirm, onClose }: SnoozeSheetProps) {
   const { t } = useI18n()
   const [busy, setBusy] = useState(false)
+  const { titleId, dialogProps } = useDialog<HTMLDivElement>(onClose)
   const [customOpen, setCustomOpen] = useState(false)
   const [customValue, setCustomValue] = useState(defaultCustomValue)
   const [error, setError] = useState<string | null>(null)
@@ -50,8 +52,8 @@ export function SnoozeSheet({ tasks, onConfirm, onClose }: SnoozeSheetProps) {
 
   return (
     <div className="sheet-backdrop" onClick={onClose} role="presentation">
-      <div className="sheet" onClick={(event) => event.stopPropagation()}>
-        <h2>{t.snooze.title(tasks.length)}</h2>
+      <div className="sheet" {...dialogProps} onClick={(event) => event.stopPropagation()}>
+        <h2 id={titleId}>{t.snooze.title(tasks.length)}</h2>
         <p className="screen-subtitle">{tasks.map((task) => task.title).join(', ')}</p>
 
         <div className="preset-row">
