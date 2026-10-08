@@ -79,6 +79,22 @@ export async function leaveSpace(spaceId: string): Promise<void> {
   }
 }
 
+/** Owner only - the old code stops working the moment this returns. */
+export async function regenerateInviteCode(spaceId: string): Promise<Space> {
+  const { data, error } = await supabase.rpc('regenerate_invite_code', { p_space: spaceId }).single()
+  if (error) throw error
+  return data as Space
+}
+
+/**
+ * Owner only, enforced by RLS. A trigger unassigns whatever was assigned to
+ * them in this space, so nothing keeps reminding someone who is gone.
+ */
+export async function removeMember(spaceId: string, userId: string): Promise<void> {
+  const { error } = await supabase.from('space_members').delete().eq('space_id', spaceId).eq('user_id', userId)
+  if (error) throw error
+}
+
 export async function renameSpace(spaceId: string, name: string): Promise<void> {
   const { error } = await supabase.from('spaces').update({ name }).eq('id', spaceId)
   if (error) throw error

@@ -128,6 +128,8 @@ export interface FakeDb {
    *  for ~7s per request, which only slows the test down - the app treats
    *  both failures the same way.) */
   failing?: boolean
+  /** The signed-in person's role in the space - owner unless a test says otherwise. */
+  selfRole?: 'owner' | 'member'
 }
 
 export function makeFakeDb(overrides?: Partial<FakeDb>): FakeDb {
@@ -402,6 +404,12 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
         redemption.decided_at = new Date().toISOString()
         return json(route, wantsSingle ? redemption : [redemption])
       }
+      if (fn === 'regenerate_invite_code') {
+        const space = db.spaces.find((s) => s.id === body.p_space)
+        if (!space) return json(route, { message: 'no_such_space' }, 404)
+        space.invite_code = `NEW${db.spaces.indexOf(space)}XY`.slice(0, 6)
+        return json(route, wantsSingle ? space : [space])
+      }
       if (fn === 'leave_space') {
         const spaceId = body.p_space as string
         db.spaces = db.spaces.filter((s) => s.id !== spaceId)
@@ -446,7 +454,7 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
         {
           space_id: FAKE_SPACE_ID,
           user_id: db.profile.id,
-          role: 'owner',
+          role: db.selfRole ?? 'owner',
           joined_at: new Date().toISOString(),
           profile: { id: db.profile.id, display_name: db.profile.display_name, avatar_url: db.profile.avatar_url, email: db.profile.email },
         },
@@ -459,6 +467,14 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
         })),
       ]
       return json(route, rows)
+    }
+
+    if (table === 'space_members' && method === 'DELETE') {
+      const userId = eqValue(url, 'user_id')
+      db.otherPeople = db.otherPeople.filter((person) => person.id !== userId)
+      // Mirrors the space_members_unassign_on_leave trigger.
+      for (const task of db.tasks) if (task.assigned_to === userId) task.assigned_to = null
+      return json(route, [])
     }
 
     if (table === 'tasks' && method === 'GET') return json(route, db.tasks)
