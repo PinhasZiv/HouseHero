@@ -11,6 +11,7 @@ import {
   nextWeeklyDate,
   notifiable,
   planCompletion,
+  planSkip,
   todayIn,
   type CyclicTask,
   type DueTask,
@@ -28,6 +29,7 @@ function task(overrides: Partial<DueTask> = {}): DueTask {
     occurrences_completed: 0,
     due_date: '2026-05-10',
     last_completed_date: null,
+    last_skipped_date: null,
     is_done: false,
     starts_at: null,
     expires_at: null,
@@ -286,6 +288,37 @@ describe('the same-day rule', () => {
   })
 })
 
+describe('skipping an occurrence', () => {
+  it('shows as skipped_today, not late or due, on the day it was skipped', () => {
+    const skipped = task({ due_date: '2026-05-17', last_skipped_date: '2026-05-10' })
+    const info = classify(skipped, '2026-05-10')
+    expect(info.status).toBe('skipped_today')
+    expect(info.notifiable).toBe(false)
+    expect(actionable([skipped], '2026-05-10')).toHaveLength(1)
+  })
+
+  it('drops it from the actionable list the next day, same as a completion', () => {
+    const skipped = task({ due_date: '2026-05-17', last_skipped_date: '2026-05-10' })
+    expect(classify(skipped, '2026-05-11').status).toBe('upcoming')
+    expect(actionable([skipped], '2026-05-11')).toHaveLength(0)
+  })
+
+  it('never notifies again the same day it was skipped', () => {
+    const skipped = task({ due_date: '2026-05-17', last_skipped_date: '2026-05-10' })
+    expect(notifiable([skipped], '2026-05-10')).toHaveLength(0)
+  })
+
+  it('still shows as skipped_today even if a skip finished the whole series', () => {
+    const skipped = task({ due_date: '2026-05-10', is_done: true, last_skipped_date: '2026-05-10' })
+    expect(classify(skipped, '2026-05-10').status).toBe('skipped_today')
+  })
+
+  it('reads as plain "done" once a day has passed, same as a finished completion', () => {
+    const skipped = task({ due_date: '2026-05-10', is_done: true, last_skipped_date: '2026-05-10' })
+    expect(classify(skipped, '2026-05-11').status).toBe('done')
+  })
+})
+
 describe('a finished task (is_done)', () => {
   it('is excluded from the actionable list, even overdue', () => {
     const done = task({ due_date: '2020-01-01', is_done: true })
@@ -415,5 +448,37 @@ describe('planCompletion', () => {
   it('never finishes a task set to recur forever', () => {
     const t = task({ end_condition: 'never', occurrences_completed: 500 })
     expect(planCompletion(t, '2026-05-10').finished).toBe(false)
+  })
+})
+
+describe('planSkip', () => {
+  it('advances the schedule the same way planCompletion does, from the skipped day', () => {
+    const t = task({ interval_days: 7, due_date: '2026-05-10' })
+    expect(planSkip(t, '2026-05-10')).toEqual({ nextDueDate: '2026-05-17', occurrencesCompleted: 0, finished: false })
+  })
+
+  it('schedules a weekly-days task onto the next matching weekday', () => {
+    const t = task({ recurrence_mode: 'weekly_days', interval_days: null, weekly_days: [1, 3], due_date: '2026-05-11' })
+    const outcome = planSkip(t, '2026-05-11') // a Monday
+    expect(outcome.nextDueDate).toBe('2026-05-13') // Wednesday
+  })
+
+  it('never increments occurrences_completed - a skip is not a completion', () => {
+    const t = task({ interval_days: 7, due_date: '2026-05-10', occurrences_completed: 2 })
+    expect(planSkip(t, '2026-05-10').occurrencesCompleted).toBe(2)
+  })
+
+  it('can still finish the series by its own end date, even though nothing was done', () => {
+    const t = task({ end_condition: 'on_date', end_date: '2026-05-15', interval_days: 7, due_date: '2026-05-10' })
+    const outcome = planSkip(t, '2026-05-10')
+    expect(outcome.finished).toBe(true) // next would be 2026-05-17, past the end date
+    expect(outcome.nextDueDate).toBeNull()
+  })
+
+  it('does not finish an "after N times" task just by skipping - occurrences never move', () => {
+    const t = task({ end_condition: 'after_count', end_after_count: 3, occurrences_completed: 2 })
+    const outcome = planSkip(t, '2026-05-10')
+    expect(outcome.finished).toBe(false)
+    expect(outcome.occurrencesCompleted).toBe(2)
   })
 })

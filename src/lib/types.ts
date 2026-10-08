@@ -61,6 +61,9 @@ export interface Task {
   /** Who actually tapped Done for the most recent completion - may differ
    *  from last_completed_by when that credited someone else instead. */
   last_completed_actor: string | null
+  /** The day this occurrence was last skipped ("not needed this time") -
+   *  only meaningful for task_type 'recurring'. */
+  last_skipped_date: string | null
   is_done: boolean
   assigned_to: string | null
   created_by: string
@@ -122,6 +125,16 @@ export interface TaskHistoryEntry {
   completed_on: string
   /** Non-null only for a "together" completion - every row of the same event shares this id, so the UI can collapse them into one entry. */
   completion_group: string | null
+  created_at: string
+}
+
+/** One skip of a recurring task's occurrence - no points, no credit to
+ *  anyone else, so it is its own small shape rather than a TaskHistoryEntry
+ *  with fields that would never apply. */
+export interface TaskSkipEntry {
+  id: string
+  user_id: string
+  skipped_on: string
   created_at: string
 }
 

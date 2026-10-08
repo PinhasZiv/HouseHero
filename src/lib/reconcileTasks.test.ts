@@ -23,6 +23,7 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     last_completed_at: null,
     last_completed_by: null,
     last_completed_actor: null,
+    last_skipped_date: null,
     is_done: false,
     assigned_to: null,
     created_by: 'user-1',

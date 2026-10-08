@@ -15,6 +15,7 @@ const DISHES: SnoozeTask = {
   occurrences_completed: 3,
   due_date: '2026-01-10',
   last_completed_date: null,
+  last_skipped_date: null,
   is_done: false,
   starts_at: null,
   expires_at: null,

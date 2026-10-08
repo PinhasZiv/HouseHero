@@ -137,6 +137,18 @@ export function XIcon({ size = 18, className }: IconProps) {
   )
 }
 
+/** A "skip to next" glyph - two forward chevrons and a bar, the same shape a
+ *  media player uses to skip a track, for skipping one occurrence of a
+ *  recurring task. */
+export function SkipIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 6v12l8.5-6z" fill="currentColor" stroke="none" />
+      <path d="M17 6v12" />
+    </svg>
+  )
+}
+
 export function CopyIcon({ size = 18, className }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

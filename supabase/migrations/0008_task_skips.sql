@@ -11,6 +11,9 @@
 -- exactly as if the occurrence had never existed to measure.
 
 alter table public.tasks add column if not exists last_skipped_date date;
+-- Who skipped it - mirrors last_completed_actor, so the client can decide
+-- whether to offer *this* viewer the Undo action without a round trip.
+alter table public.tasks add column if not exists last_skipped_by uuid references auth.users(id) on delete set null;
 
 -- Mirrors task_completions' own prev_* snapshot/undo shape, minus everything
 -- only completion needs (points, crediting several people, occurrences_completed
@@ -24,6 +27,7 @@ create table if not exists public.task_skips (
   skipped_on              date not null,
   prev_due_date           date not null,
   prev_last_skipped_date  date,
+  prev_last_skipped_by    uuid,
   prev_is_done            boolean not null,
   created_at              timestamptz not null default now()
 );
@@ -98,17 +102,18 @@ begin
 
   insert into public.task_skips (
     task_id, space_id, user_id, skipped_on, created_at,
-    prev_due_date, prev_last_skipped_date, prev_is_done
+    prev_due_date, prev_last_skipped_date, prev_last_skipped_by, prev_is_done
   )
   values (
     target.id, target.space_id, auth.uid(), p_today, p_skipped_at,
-    target.due_date, target.last_skipped_date, target.is_done
+    target.due_date, target.last_skipped_date, target.last_skipped_by, target.is_done
   )
   returning * into event;
 
   update public.tasks
   set due_date          = case when finished then target.due_date else next_due end,
       last_skipped_date = p_today,
+      last_skipped_by   = auth.uid(),
       is_done           = finished
   where id = target.id;
 
@@ -146,6 +151,7 @@ begin
   update public.tasks
   set due_date          = event.prev_due_date,
       last_skipped_date = event.prev_last_skipped_date,
+      last_skipped_by   = event.prev_last_skipped_by,
       is_done           = event.prev_is_done
   where id = event.task_id
   returning * into result;

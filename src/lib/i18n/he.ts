@@ -105,6 +105,10 @@ export const he = {
     cancelledLabel: 'בוטלה',
     cancelAria: (name: string) => `ביטול ${name}`,
     duplicateAria: (name: string) => `שכפול ${name}`,
+    skipAria: (name: string) => `דילוג על ${name} הפעם`,
+    skippedLabel: 'דולגה הפעם',
+    skipped: (name: string) => `דילגת על ${name} הפעם.`,
+    skipUndone: (name: string) => `בוטל הדילוג על ${name}.`,
   },
 
   completion: {
@@ -412,6 +416,7 @@ export const he = {
     lastOwner:
       'המרחב הזה מנוהל רק על ידך ויש בו עוד חברים. אפשר למחוק אותו לכולם, אבל לא לצאת ולהשאיר אותו בלי מנהל.',
     notYourCompletion: 'רק מי שביצע את המשימה יכול לבטל את זה.',
+    notYourSkip: 'רק מי שדילג על המשימה יכול לבטל את זה.',
   },
 
   setup: {

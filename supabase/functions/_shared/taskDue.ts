@@ -16,6 +16,7 @@ export type EndCondition = 'never' | 'after_count' | 'on_date'
 
 export type DueStatus =
   | 'completed_today' // done today; stays visible until tomorrow
+  | 'skipped_today' // this occurrence was skipped today - not late, not done, just not needed
   | 'done' // a one-time task, or a recurring task past its end condition - finished for good
   | 'late' // should have been done on an earlier day, and stays late (no cutoff) until completed or deleted
   | 'due' // due today
@@ -37,6 +38,10 @@ export interface DueTask {
   occurrences_completed: number
   due_date: string
   last_completed_date: string | null
+  /** Only meaningful for task_type 'recurring' - a one-time or time-limited
+   *  task has no "this occurrence isn't needed" concept of its own (delete
+   *  it, or cancel it, instead). */
+  last_skipped_date: string | null
   is_done: boolean
   /** Only meaningful for task_type 'time_limited'. */
   starts_at: string | null
@@ -226,6 +231,9 @@ export function classify(task: DueTask, today: string, now: Date = new Date()): 
     if (task.last_completed_date === today) {
       return { status: 'completed_today', daysLate: 0, notifiable: false }
     }
+    if (task.last_skipped_date === today) {
+      return { status: 'skipped_today', daysLate: 0, notifiable: false }
+    }
     return { status: 'done', daysLate: 0, notifiable: false }
   }
 
@@ -233,6 +241,12 @@ export function classify(task: DueTask, today: string, now: Date = new Date()): 
   // marked done, so a second person opening the app sees it was handled.
   if (task.last_completed_date === today) {
     return { status: 'completed_today', daysLate: 0, notifiable: false }
+  }
+  // Same idea for a skip: "not needed this time" is a settled answer for
+  // today, not a reason to keep nagging until the occurrence it actually
+  // skipped forward to.
+  if (task.last_skipped_date === today) {
+    return { status: 'skipped_today', daysLate: 0, notifiable: false }
   }
 
   const rawLate = daysBetween(task.due_date, today)
@@ -287,6 +301,7 @@ const STATUS_ORDER: Record<DueStatus, number> = {
   late: 0,
   due: 1,
   completed_today: 2,
+  skipped_today: 2,
   upcoming: 3,
   scheduled: 3,
   done: 4,
@@ -353,4 +368,28 @@ export function planCompletion(task: DueTask, completedOn: string): CompletionOu
   }
 
   return { nextDueDate: candidate, occurrencesCompleted, finished: false }
+}
+
+/**
+ * Works out what happens when one occurrence of a recurring task is skipped
+ * instead of completed - the schedule still advances exactly like
+ * planCompletion(), but occurrences_completed does not move, since nothing
+ * was actually done: a skip can never by itself satisfy an "after N times"
+ * end condition. Only ever called for a recurring task - a one-time or
+ * time-limited task has no occurrence to skip forward from.
+ */
+export function planSkip(task: DueTask, skippedOn: string): CompletionOutcome {
+  const candidate =
+    task.recurrence_mode === 'weekly_days'
+      ? nextWeeklyDate(task.weekly_days ?? [], skippedOn)
+      : addDays(skippedOn, task.interval_days ?? 1)
+
+  if (task.end_condition === 'after_count' && task.occurrences_completed >= (task.end_after_count ?? Infinity)) {
+    return { nextDueDate: null, occurrencesCompleted: task.occurrences_completed, finished: true }
+  }
+  if (task.end_condition === 'on_date' && task.end_date && candidate > task.end_date) {
+    return { nextDueDate: null, occurrencesCompleted: task.occurrences_completed, finished: true }
+  }
+
+  return { nextDueDate: candidate, occurrencesCompleted: task.occurrences_completed, finished: false }
 }
