@@ -127,6 +127,9 @@ button { font: inherit; cursor: pointer; }
 .fade-in { animation: fade-in 220ms ease-out; }
 .pop-in { animation: pop-in 320ms cubic-bezier(0.2, 0.9, 0.3, 1.2); }
 .task-just-completed { animation: card-pop 320ms ease-out; }
+/* The card a notification was about - a ring rather than an animation, so it
+   cannot fight the cards' own pop-in, and fades as the class comes off. */
+.task-card.task-highlight { box-shadow: 0 0 0 3px var(--accent); }
 .points-pop .points-value { animation: points-pop 700ms ease-out; }
 
 /* A little life while a list settles in - each card pops in slightly after
@@ -365,7 +368,7 @@ button { font: inherit; cursor: pointer; }
   margin-bottom: 10px;
   box-shadow: var(--shadow);
   overflow: hidden;
-  transition: transform 160ms ease-out;
+  transition: transform 160ms ease-out, box-shadow 500ms ease-out;
 }
 
 .task-late { border-inline-start: 4px solid var(--late); }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { toDatetimeLocalValue } from './format'
-import { SNOOZE_PRESETS, isValidSnoozeInstant, snoozeUntilInMinutes } from './snoozeOptions'
+import { SNOOZE_PRESETS, fixedTimeSnoozes, isValidSnoozeInstant, snoozeUntilInMinutes } from './snoozeOptions'
 
 describe('snoozeUntilInMinutes', () => {
   it('adds the given number of minutes to now', () => {
@@ -40,5 +40,35 @@ describe('isValidSnoozeInstant', () => {
 describe('SNOOZE_PRESETS', () => {
   it('is exactly the three durations the picker offers, in order', () => {
     expect(SNOOZE_PRESETS.map((preset) => preset.minutes)).toEqual([30, 60, 180])
+  })
+})
+
+describe('fixedTimeSnoozes', () => {
+  it('offers this evening and tomorrow morning during the day', () => {
+    const now = new Date(2026, 0, 10, 14, 0)
+    const options = fixedTimeSnoozes(now)
+    expect(options.map((o) => o.labelKey)).toEqual(['tonight', 'morning'])
+    expect(new Date(options[0].until)).toEqual(new Date(2026, 0, 10, 20, 0))
+    expect(new Date(options[1].until)).toEqual(new Date(2026, 0, 11, 8, 0))
+  })
+
+  it('drops "this evening" once it is less than half an hour away, or past', () => {
+    expect(fixedTimeSnoozes(new Date(2026, 0, 10, 19, 31)).map((o) => o.labelKey)).toEqual(['morning'])
+    expect(fixedTimeSnoozes(new Date(2026, 0, 10, 22, 0)).map((o) => o.labelKey)).toEqual(['morning'])
+  })
+
+  it('"morning" after midnight means the coming 08:00, the same calendar day', () => {
+    const options = fixedTimeSnoozes(new Date(2026, 0, 10, 0, 30))
+    expect(new Date(options[options.length - 1].until)).toEqual(new Date(2026, 0, 10, 8, 0))
+  })
+
+  it('"morning" within half an hour of 08:00 rolls over to the next day', () => {
+    const options = fixedTimeSnoozes(new Date(2026, 0, 10, 7, 45))
+    expect(new Date(options[options.length - 1].until)).toEqual(new Date(2026, 0, 11, 8, 0))
+  })
+
+  it('crosses a month boundary', () => {
+    const options = fixedTimeSnoozes(new Date(2026, 0, 31, 21, 0))
+    expect(new Date(options[0].until)).toEqual(new Date(2026, 1, 1, 8, 0))
   })
 })

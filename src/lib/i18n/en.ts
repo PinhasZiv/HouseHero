@@ -161,6 +161,8 @@ export const en: Strings = {
       thirtyMinutes: '30 minutes',
       oneHour: '1 hour',
       threeHours: '3 hours',
+      tonight: 'Tonight at 20:00',
+      morning: 'Morning at 08:00',
     },
     custom: 'Custom time',
     setCustom: 'Set',

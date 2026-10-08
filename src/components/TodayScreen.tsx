@@ -10,7 +10,12 @@ import { TaskCard, completedByLabel } from './TaskCard'
 import { TaskHistory } from './TaskHistory'
 import { SnoozeSheet } from './SnoozeSheet'
 import { useI18n } from '../lib/i18n'
-import type { Task } from '../lib/types'
+import * as api from '../lib/api'
+import { readParam, stripParam } from '../lib/urlParams'
+import type { Member, Task } from '../lib/types'
+import { useAddTask } from '../state/useAddTask'
+import { PlusIcon } from './Icons'
+import { TaskForm } from './TaskForm'
 
 /** How often to re-check whether a snooze has run out while the screen is open. */
 const SNOOZE_TICK_MS = 30_000
@@ -25,16 +30,8 @@ function readShowOthers(): boolean {
   }
 }
 
-/** Consumes the one-shot `?snooze=1` a notification's Snooze action opens the
- * app with, so a later reload does not reopen the sheet. */
-function consumeSnoozeFlag(): boolean {
-  const params = new URLSearchParams(window.location.search)
-  if (params.get('snooze') !== '1') return false
-  params.delete('snooze')
-  const rest = params.toString()
-  window.history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : ''))
-  return true
-}
+/** How long the card a notification was about stays called out. */
+const HIGHLIGHT_MS = 2500
 
 /**
  * The screen a notification opens: what needs doing today, across every space
@@ -45,7 +42,7 @@ function consumeSnoozeFlag(): boolean {
  * contradict the notification that led here.
  */
 export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
-  const { tasks, spaces, people, today, session, snoozes, profile } = useApp()
+  const { tasks, spaces, people, today, session, snoozes, profile, currentSpace } = useApp()
   const { t, language } = useI18n()
   const { complete, undo } = useCompletion()
   const { snooze, cancelSnooze } = useSnooze()
@@ -55,6 +52,14 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
 
   const [sheetTargets, setSheetTargets] = useState<Task[] | null>(null)
   const [viewingHistory, setViewingHistory] = useState<Task | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [members, setMembers] = useState<Member[]>([])
+  const addTask = useAddTask()
+  // A notification about a single task carries its id - that card gets
+  // scrolled to and briefly called out, instead of leaving the person to
+  // hunt for it in the list.
+  const [highlightId, setHighlightId] = useState(() => readParam('task'))
+  useEffect(() => stripParam('task'), [])
   const [completing, setCompleting] = useState<{
     task: Task
     resolve: (result: boolean | void) => void
@@ -153,7 +158,8 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
   // no single task to point at (the notification can cover several), so it
   // opens the picker on everything actually due right now.
   useEffect(() => {
-    if (!consumeSnoozeFlag()) return
+    if (readParam('snooze') !== '1') return
+    stripParam('snooze')
     const targets = [...groups.late, ...groups.due]
     if (targets.length > 0) setSheetTargets(targets)
     // Deliberately mount-only: re-running whenever groups change would
@@ -183,6 +189,26 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
     const person = people.get(task.assigned_to)
     return t.task.assignedTo(person?.display_name || person?.email || t.task.someoneElse)
   }
+
+  // Quick add, without a detour through the Tasks tab - it goes into the
+  // space currently selected there, the same one that tab would use.
+  function openAdd() {
+    setAdding(true)
+    if (!currentSpace) return
+    api
+      .fetchMembers(currentSpace.id)
+      .then(setMembers)
+      .catch(() => {})
+  }
+
+  useEffect(() => {
+    if (!highlightId) return
+    const card = document.querySelector(`[data-task-id="${CSS.escape(highlightId)}"]`)
+    if (!card) return // not rendered yet - runs again once the tasks load
+    card.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    const timer = window.setTimeout(() => setHighlightId(null), HIGHLIGHT_MS)
+    return () => window.clearTimeout(timer)
+  }, [highlightId, tasks])
 
   const remaining = groups.active.length + groups.late.length + groups.due.length
 
@@ -224,6 +250,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
           {groups.active.map((task) => (
             <TaskCard
               key={task.id}
+              highlighted={task.id === highlightId}
               task={task}
               today={today}
               spaceName={showSpaceNames ? spaceNames.get(task.space_id) : undefined}
@@ -241,6 +268,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
           {groups.startingToday.map((task) => (
             <TaskCard
               key={task.id}
+              highlighted={task.id === highlightId}
               task={task}
               today={today}
               spaceName={showSpaceNames ? spaceNames.get(task.space_id) : undefined}
@@ -258,6 +286,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
           {groups.late.map((task) => (
             <TaskCard
               key={task.id}
+              highlighted={task.id === highlightId}
               task={task}
               today={today}
               spaceName={showSpaceNames ? spaceNames.get(task.space_id) : undefined}
@@ -277,6 +306,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
           {groups.due.map((task) => (
             <TaskCard
               key={task.id}
+              highlighted={task.id === highlightId}
               task={task}
               today={today}
               spaceName={showSpaceNames ? spaceNames.get(task.space_id) : undefined}
@@ -296,6 +326,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
           {groups.snoozed.map(({ task, until }) => (
             <TaskCard
               key={task.id}
+              highlighted={task.id === highlightId}
               task={task}
               today={today}
               spaceName={showSpaceNames ? spaceNames.get(task.space_id) : undefined}
@@ -324,6 +355,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
             return (
               <TaskCard
                 key={task.id}
+                highlighted={task.id === highlightId}
                 task={task}
                 today={today}
                 spaceName={showSpaceNames ? spaceNames.get(task.space_id) : undefined}
@@ -350,6 +382,23 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
       )}
 
       {viewingHistory && <TaskHistory task={viewingHistory} onClose={() => setViewingHistory(null)} />}
+
+      {currentSpace && (
+        <button type="button" className="fab" onClick={openAdd} aria-label={t.tasks.addAria}>
+          <PlusIcon size={24} />
+        </button>
+      )}
+      {adding && (
+        <TaskForm
+          today={today}
+          members={members}
+          onCancel={() => setAdding(false)}
+          onSave={async (draft) => {
+            await addTask(draft)
+            setAdding(false)
+          }}
+        />
+      )}
 
       {completing && selfId && (
         <CompletionSheet

@@ -3,7 +3,7 @@ import { errorMessage } from '../lib/errors'
 import { toDatetimeLocalValue } from '../lib/format'
 import { useI18n } from '../lib/i18n'
 import { useDialog } from '../lib/useDialog'
-import { SNOOZE_PRESETS, isValidSnoozeInstant, snoozeUntilInMinutes } from '../lib/snoozeOptions'
+import { SNOOZE_PRESETS, fixedTimeSnoozes, isValidSnoozeInstant, snoozeUntilInMinutes } from '../lib/snoozeOptions'
 import type { Task } from '../lib/types'
 import { ClockIcon } from './Icons'
 
@@ -66,6 +66,17 @@ export function SnoozeSheet({ tasks, onConfirm, onClose }: SnoozeSheetProps) {
               onClick={() => void confirm(snoozeUntilInMinutes(preset.minutes))}
             >
               {t.snooze.presets[preset.labelKey]}
+            </button>
+          ))}
+          {fixedTimeSnoozes().map((option) => (
+            <button
+              key={option.labelKey}
+              type="button"
+              className="preset"
+              disabled={busy}
+              onClick={() => void confirm(option.until)}
+            >
+              {t.snooze.presets[option.labelKey]}
             </button>
           ))}
         </div>
