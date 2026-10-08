@@ -15,6 +15,16 @@ import type { Task } from '../lib/types'
 /** How often to re-check whether a snooze has run out while the screen is open. */
 const SNOOZE_TICK_MS = 30_000
 
+const SHOW_OTHERS_KEY = 'househero.today.showOthers'
+
+function readShowOthers(): boolean {
+  try {
+    return localStorage.getItem(SHOW_OTHERS_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 /** Consumes the one-shot `?snooze=1` a notification's Snooze action opens the
  * app with, so a later reload does not reopen the sheet. */
 function consumeSnoozeFlag(): boolean {
@@ -71,6 +81,17 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
     return () => window.clearInterval(interval)
   }, [])
 
+  const [showOthers, setShowOthers] = useState(readShowOthers)
+  function toggleShowOthers() {
+    const next = !showOthers
+    setShowOthers(next)
+    try {
+      localStorage.setItem(SHOW_OTHERS_KEY, next ? '1' : '0')
+    } catch {
+      // Storage blocked; the choice just will not persist.
+    }
+  }
+
   const groups = useMemo(() => {
     const active: Task[] = []
     const late: Task[] = []
@@ -78,24 +99,41 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
     const done: Task[] = []
     const startingToday: Task[] = []
     const snoozed: { task: Task; until: string }[] = []
+    let hiddenOthers = 0
 
     for (const task of tasks) {
       const { status } = classify(task, today)
       const until = snoozes.get(task.id)
       const stillSnoozed = (status === 'late' || status === 'due') && until && new Date(until) > new Date()
 
+      const onToday =
+        status === 'active' ||
+        (status === 'scheduled' && !!task.starts_at && todayIn(timezone, new Date(task.starts_at)) === today) ||
+        status === 'late' ||
+        status === 'due' ||
+        status === 'completed_today' ||
+        status === 'skipped_today'
+      if (!onToday) continue
+
+      // Someone else's assigned task: they get its reminder, not this
+      // viewer - so by default it stays off this list too, matching the
+      // notification that brought them here.
+      if (!showOthers && task.assigned_to && task.assigned_to !== selfId) {
+        hiddenOthers++
+        continue
+      }
+
       if (status === 'active') active.push(task)
-      else if (status === 'scheduled') {
-        // A window opening in a few days does not belong on "today" - only
-        // one whose window starts before this day is out.
-        if (task.starts_at && todayIn(timezone, new Date(task.starts_at)) === today) startingToday.push(task)
-      } else if (stillSnoozed) snoozed.push({ task, until: until as string })
+      // A window opening in a few days does not belong on "today" - only one
+      // whose window starts before this day is out (checked in onToday).
+      else if (status === 'scheduled') startingToday.push(task)
+      else if (stillSnoozed) snoozed.push({ task, until: until as string })
       else if (status === 'late') late.push(task)
       else if (status === 'due') due.push(task)
       // A skip settles the day the same way a completion does - off today's
       // active list, shown in the same "done" section with its own label
       // rather than a count that would overstate what actually got done.
-      else if (status === 'completed_today' || status === 'skipped_today') done.push(task)
+      else done.push(task)
     }
 
     // Oldest due date (and, within a date, earliest reminder time) first -
@@ -106,9 +144,10 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
     done.sort(compareByCompletion)
     startingToday.sort((a, b) => (a.starts_at ?? '').localeCompare(b.starts_at ?? ''))
     snoozed.sort((a, b) => a.until.localeCompare(b.until))
-    return { active, late, due, done, startingToday, snoozed }
+    const skippedCount = done.filter((task) => classify(task, today).status === 'skipped_today').length
+    return { active, late, due, done, startingToday, snoozed, hiddenOthers, skippedCount }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, today, snoozes, tick, timezone])
+  }, [tasks, today, snoozes, tick, timezone, showOthers, selfId])
 
   // The Snooze action on a notification opens here with ?snooze=1: there is
   // no single task to point at (the notification can cover several), so it
@@ -172,6 +211,11 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
                 ? t.today.allDone
                 : t.today.nothingDue}
         </p>
+        {(groups.hiddenOthers > 0 || showOthers) && (
+          <button type="button" className="link-button" onClick={toggleShowOthers}>
+            {showOthers ? t.today.hideOthers : t.today.othersHidden(groups.hiddenOthers)}
+          </button>
+        )}
       </header>
 
       {groups.active.length > 0 && (
@@ -272,7 +316,8 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
               Collapsed by default: what still needs doing matters more than
               what is already behind you. */}
           <summary className="group-title completed-summary">
-            {t.today.groupDone} ({groups.done.length})
+            {t.today.groupDone} ({groups.done.length - groups.skippedCount})
+            {groups.skippedCount > 0 && ` · ${t.today.skippedCount(groups.skippedCount)}`}
           </summary>
           {groups.done.map((task) => {
             const skippedToday = task.last_skipped_date === today && task.last_completed_date !== today

@@ -240,6 +240,17 @@ button { font: inherit; cursor: pointer; }
 .screen { padding: 16px 16px 8px; }
 
 .screen-header { margin-bottom: 18px; }
+
+.link-button {
+  margin-top: 6px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.86rem;
+  cursor: pointer;
+}
 .screen-header-secondary { margin-top: 8px; }
 
 .screen-subtitle {

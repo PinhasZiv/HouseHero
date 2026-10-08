@@ -68,6 +68,10 @@ export const he = {
     groupDue: 'להיום',
     groupSnoozed: 'מושהה',
     groupDone: 'בוצעו היום',
+    skippedCount: (n: number) => (n === 1 ? 'דולגה אחת' : `דולגו ${n}`),
+    othersHidden: (n: number) =>
+      `${n === 1 ? 'משימה אחת' : `${n} משימות`} של אחרים ${n === 1 ? 'מוסתרת' : 'מוסתרות'} · הצגה`,
+    hideOthers: 'הסתרת המשימות של אחרים',
     someSnoozed: (n: number) => `${tasksWord(n, 'he')} מושהות`,
     emptyTitle: 'עוד אין משימות',
     emptyBody: 'מוסיפים את הראשונה, ו-HouseHero יתחיל להזכיר לכולם במרחב.',
