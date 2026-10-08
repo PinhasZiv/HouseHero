@@ -385,6 +385,10 @@ export function TasksScreen() {
           onCancel={() => setEditing(null)}
           onSave={saveTask}
           onDelete={removeTaskAction}
+          onDuplicate={() => {
+            setDuplicating(editing)
+            setEditing(null)
+          }}
         />
       )}
       {duplicating && (

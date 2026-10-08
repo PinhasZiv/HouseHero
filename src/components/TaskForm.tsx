@@ -31,14 +31,16 @@ export interface TaskDraft {
 interface TaskFormProps {
   today: string
   existing?: Task
-  /** Pre-fills every field from an expired/cancelled task, the same as
-   *  editing would - but onSave still creates a new task, since the old
-   *  window has passed and there is nothing left to update. */
+  /** Pre-fills every field from another task, the same as editing would -
+   *  but onSave creates a new task and leaves the source untouched. */
   duplicateFrom?: Task
   members: Member[]
   onCancel: () => void
   onSave: (draft: TaskDraft) => Promise<void>
   onDelete?: () => Promise<void>
+  /** Only offered while editing - reopens the form as a new task pre-filled
+   *  from the saved version of this one (any unsaved edits are dropped). */
+  onDuplicate?: () => void
 }
 
 const INTERVAL_PRESETS = [1, 7, 14, 30]
@@ -62,7 +64,16 @@ function toLocalInput(iso: string | null): string {
   return iso ? toDatetimeLocalValue(new Date(iso)) : ''
 }
 
-export function TaskForm({ today, existing, duplicateFrom, members, onCancel, onSave, onDelete }: TaskFormProps) {
+export function TaskForm({
+  today,
+  existing,
+  duplicateFrom,
+  members,
+  onCancel,
+  onSave,
+  onDelete,
+  onDuplicate,
+}: TaskFormProps) {
   const { t, language } = useI18n()
   const source = existing ?? duplicateFrom
 
@@ -81,8 +92,11 @@ export function TaskForm({ today, existing, duplicateFrom, members, onCancel, on
   const [reminderHour, setReminderHour] = useState(source?.reminder_hour ?? 9)
   const [reminderMinute, setReminderMinute] = useState(source?.reminder_minute ?? 0)
   // New task defaults to "due today", which is almost always what is meant
-  // when adding one in the moment.
-  const [dueDate, setDueDate] = useState(source?.due_date ?? today)
+  // when adding one in the moment. A copy of an overdue or finished task
+  // would otherwise be born already late.
+  const [dueDate, setDueDate] = useState(
+    duplicateFrom && duplicateFrom.due_date < today ? today : (source?.due_date ?? today),
+  )
   const [assignedTo, setAssignedTo] = useState(source?.assigned_to ?? '')
   const [startsAt, setStartsAt] = useState(() => toLocalInput(source?.starts_at ?? null) || defaultWindowStart())
   const [expiresAt, setExpiresAt] = useState(() => toLocalInput(source?.expires_at ?? null) || defaultWindowEnd())
@@ -642,6 +656,12 @@ export function TaskForm({ today, existing, duplicateFrom, members, onCancel, on
             {busy ? t.common.saving : existing ? t.common.save : t.taskForm.add}
           </button>
         </div>
+
+        {onDuplicate && (
+          <button type="button" className="btn btn-ghost" onClick={onDuplicate} disabled={busy}>
+            {t.taskForm.duplicate}
+          </button>
+        )}
 
         {onDelete && (
           <button type="button" className="btn btn-danger-text" onClick={() => setConfirmingDelete(true)}>
