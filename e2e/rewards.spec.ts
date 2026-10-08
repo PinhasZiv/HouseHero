@@ -55,15 +55,18 @@ test.describe('rewards', () => {
     await expect(movie.locator('.badge-points')).toHaveText('30 נקודות')
 
     // Far more expensive than the available balance: still listed, not
-    // hidden - redeeming is always offered, the server is what actually
-    // enforces the balance at approval time.
+    // hidden - but it says how far off it is instead of offering a request
+    // the server would refuse.
     const trip = page.locator('.task-card', { hasText: 'טיול לסוף שבוע' })
     await expect(trip).toContainText('500')
-    await expect(trip.getByRole('button', { name: 'מימוש' })).toBeEnabled()
+    await expect(trip.getByRole('button', { name: 'מימוש' })).toHaveCount(0)
+    await expect(trip.getByRole('button', { name: 'חסרות 455' })).toBeDisabled()
+    await expect(movie.getByRole('button', { name: 'מימוש' })).toBeEnabled()
   })
 
   test('requesting a redemption sends it for the other person to approve', async ({ page }) => {
     const db = makeFakeDb({
+      profile: { ...makeFakeDb().profile, lifetime_points: 20, spendable_points: 20 },
       rewards: [
         {
           id: 'reward-coffee',
@@ -86,6 +89,8 @@ test.describe('rewards', () => {
     await expect(page.getByRole('heading', { name: 'ממתין לאישור' })).toBeVisible()
     expect(db.redemptions).toHaveLength(1)
     expect(db.redemptions[0]).toMatchObject({ status: 'pending', reward_title: 'קפה בבית קפה', cost: 15 })
+    // Everyone else in the space is told there is something to approve.
+    await expect.poll(() => db.redemptionNotifications).toEqual([{ redemptionId: db.redemptions[0].id }])
   })
 
   test('cancelling your own pending request removes it from the approval queue', async ({ page }) => {
@@ -165,4 +170,52 @@ test.describe('rewards', () => {
     await expect(page.getByText('התגמול נמחק.')).toBeVisible()
     expect(db.rewards).toHaveLength(0)
   })
+
+  test('points promised to your own pending requests are held back from new ones', async ({ page }) => {
+    const db = makeFakeDb({
+      profile: { ...makeFakeDb().profile, lifetime_points: 100, spendable_points: 100 },
+      rewards: [
+        { id: 'r-dinner', space_id: FAKE_SPACE_ID, title: 'ארוחה בחוץ', description: null, cost: 60, created_by: FAKE_USER_ID, created_at: new Date().toISOString() },
+        { id: 'r-movie', space_id: FAKE_SPACE_ID, title: 'ערב סרטים', description: null, cost: 50, created_by: FAKE_USER_ID, created_at: new Date().toISOString() },
+      ],
+      redemptions: [
+        { id: 'red-1', space_id: FAKE_SPACE_ID, reward_id: 'r-dinner', reward_title: 'ארוחה בחוץ', cost: 60, requested_by: FAKE_USER_ID, approved_by: null, status: 'pending', requested_at: new Date().toISOString(), decided_at: null },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'תגמולים' }).click()
+
+    await expect(page.locator('.reserved-note')).toHaveText('60 נקודות שמורות לבקשות שממתינות לאישור.')
+    // 100 spendable, 60 already held: the 50-point movie is 10 short.
+    const movie = page.locator('section.task-group .task-card', { hasText: 'ערב סרטים' })
+    await expect(movie.getByRole('button', { name: 'חסרות 10' })).toBeDisabled()
+  })
+
+  test('approving someone else\'s request notifies them, and it moves to the history', async ({ page }) => {
+    const db = makeFakeDb({
+      otherPeople: [{ ...DANA_WITH_POINTS }],
+      redemptions: [
+        { id: 'red-dana', space_id: FAKE_SPACE_ID, reward_id: null, reward_title: 'בוקר בלי השכמה', cost: 40, requested_by: DANA_WITH_POINTS.id, approved_by: null, status: 'pending', requested_at: new Date().toISOString(), decided_at: null },
+        { id: 'red-old', space_id: FAKE_SPACE_ID, reward_id: null, reward_title: 'גלידה', cost: 10, requested_by: FAKE_USER_ID, approved_by: DANA_WITH_POINTS.id, status: 'rejected', requested_at: new Date(Date.now() - 86_400_000).toISOString(), decided_at: new Date(Date.now() - 86_400_000).toISOString() },
+      ],
+    })
+    await seed(page, db)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'תגמולים' }).click()
+
+    await page.getByRole('button', { name: 'אישור המימוש של בוקר בלי השכמה' }).click()
+
+    await expect(page.getByText('אושר המימוש של בוקר בלי השכמה.')).toBeVisible()
+    await expect.poll(() => db.redemptionNotifications).toEqual([{ redemptionId: 'red-dana' }])
+    expect(db.otherPeople[0].spendable_points).toBe(60)
+
+    const history = page.locator('.redemption-history')
+    await expect(history.locator('summary')).toHaveText('היסטוריית מימושים (2)')
+    await history.locator('summary').click()
+    await expect(history.locator('.history-row', { hasText: 'בוקר בלי השכמה' })).toContainText('אושר')
+    await expect(history.locator('.history-row', { hasText: 'גלידה' })).toContainText('נדחה')
+  })
 })
+
+const DANA_WITH_POINTS = { id: '33333333-3333-4333-8333-333333333333', display_name: 'דנה כהן', avatar_url: null, email: 'dana@example.com', lifetime_points: 100, spendable_points: 100 }

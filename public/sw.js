@@ -75,6 +75,17 @@ self.addEventListener('fetch', (event) => {
   }
 })
 
+/** Where tapping the notification lands: its space, and - when it is about
+ *  one task, or belongs on a specific tab (a reward request) - that too. */
+function notificationUrl(payload) {
+  const params = new URLSearchParams()
+  if (payload.spaceId) params.set('space', payload.spaceId)
+  if (payload.taskId) params.set('task', payload.taskId)
+  if (payload.tab) params.set('tab', payload.tab)
+  const query = params.toString()
+  return query ? `${SCOPE_PATH}?${query}` : SCOPE_PATH
+}
+
 self.addEventListener('push', (event) => {
   let payload = {}
   try {
@@ -104,9 +115,7 @@ self.addEventListener('push', (event) => {
     data: {
       spaceId: payload.spaceId || null,
       taskId: payload.taskId || null,
-      url: payload.spaceId
-        ? `${SCOPE_PATH}?space=${payload.spaceId}${payload.taskId ? `&task=${payload.taskId}` : ''}`
-        : SCOPE_PATH,
+      url: notificationUrl(payload),
     },
     // A test notification has no real due tasks behind it, so the Snooze
     // action - which opens the app straight to a duration picker for

@@ -3,7 +3,12 @@ import { en } from './i18n/en'
 import { he } from './i18n/he'
 import { directionOf, isLanguage, LANGUAGES } from './i18n/types'
 import { days, pointsWord, tasksWord } from './format'
-import { composeReminder, composeTimeLimitedReminder } from '../../supabase/functions/_shared/messages.ts'
+import {
+  composeRedemptionDecision,
+  composeRedemptionRequest,
+  composeReminder,
+  composeTimeLimitedReminder,
+} from '../../supabase/functions/_shared/messages.ts'
 
 // The type system already forces the two dictionaries to have the same shape.
 // These tests cover what it cannot: that no entry was left in the wrong
@@ -175,5 +180,27 @@ describe('the time-limited task reminder', () => {
       title: 'לקנות חלב',
       body: 'עדיין פתוחה · בתוקף עד 20:00',
     })
+  })
+})
+
+describe('reward request notifications', () => {
+  it('names who asked, what, and the cost, in each language', () => {
+    expect(composeRedemptionRequest('ערב סרטים', 30, 'דנה', 'he')).toEqual({
+      title: 'בקשה לתגמול מחכה לאישור',
+      body: 'דנה ביקש/ה את "ערב סרטים" (30 נק\').',
+    })
+    expect(composeRedemptionRequest('Movie night', 30, 'Dana', 'en').body).toBe('Dana asked for "Movie night" (30 points).')
+  })
+
+  it('falls back to a neutral word when the requester has no name on file', () => {
+    expect(composeRedemptionRequest('גלידה', 10, null, 'he').body).toContain('מישהו ביקש/ה')
+    expect(composeRedemptionRequest('Ice cream', 10, null, 'en').body).toContain('Someone asked')
+  })
+
+  it('tells an approval apart from a rejection', () => {
+    expect(composeRedemptionDecision('גלידה', true, 'דנה', 'he').title).toBe('התגמול אושר!')
+    expect(composeRedemptionDecision('גלידה', false, 'דנה', 'he').title).toBe('הבקשה לתגמול נדחתה')
+    expect(composeRedemptionDecision('Ice cream', true, 'Dana', 'en').body).toBe('Dana approved "Ice cream". Enjoy!')
+    expect(composeRedemptionDecision('Ice cream', false, 'Dana', 'en').body).toBe('Dana declined "Ice cream".')
   })
 })

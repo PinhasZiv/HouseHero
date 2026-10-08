@@ -287,6 +287,15 @@ export const en: Strings = {
     errorCost: 'The cost must be at least 1 point.',
     added: (title: string) => `${title} added.`,
     deleted: 'Reward deleted.',
+    missingPoints: (n: number) => `${n} short`,
+    reservedNote: (n: number) => `${pointsWord(n, 'en')} held for requests awaiting approval.`,
+    historyTitle: (n: number) => `Redemption history (${n})`,
+    historyRow: (who: string, title: string) => `${who}: ${title}`,
+    status: {
+      approved: 'Approved',
+      rejected: 'Declined',
+      cancelled: 'Cancelled',
+    },
   },
 
   stats: {
