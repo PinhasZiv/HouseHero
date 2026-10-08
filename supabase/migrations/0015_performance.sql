@@ -80,3 +80,4 @@ create index if not exists task_snoozes_user_idx on public.task_snoozes(user_id)
 create index if not exists tasks_created_by_idx on public.tasks(created_by);
 create index if not exists tasks_last_completed_actor_idx on public.tasks(last_completed_actor);
 create index if not exists tasks_last_skipped_by_idx on public.tasks(last_skipped_by);
+create index if not exists pauses_created_by_idx on public.pauses(created_by);
