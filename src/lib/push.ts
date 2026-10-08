@@ -66,7 +66,7 @@ export async function currentPushState(): Promise<PushState> {
  * can reach this device. Safe to call again - the endpoint is the primary key,
  * so re-subscribing updates rather than duplicates.
  */
-export async function enablePush(userId: string): Promise<PushState> {
+export async function enablePush(): Promise<PushState> {
   if (!pushSupported()) return 'unsupported'
   if (!VAPID_PUBLIC_KEY) return 'unconfigured'
 
@@ -88,17 +88,15 @@ export async function enablePush(userId: string): Promise<PushState> {
     }))
 
   const json = subscription.toJSON()
-  const { error } = await supabase.from('push_subscriptions').upsert(
-    {
-      user_id: userId,
-      endpoint: subscription.endpoint,
-      p256dh: json.keys?.p256dh ?? '',
-      auth: json.keys?.auth ?? '',
-      user_agent: navigator.userAgent.slice(0, 300),
-      failure_count: 0,
-    },
-    { onConflict: 'endpoint' },
-  )
+  // An RPC rather than a plain upsert: if this device's endpoint is still on
+  // record for someone who signed out here, RLS would refuse to hand the row
+  // over and the person now signed in would silently get no reminders.
+  const { error } = await supabase.rpc('claim_push_subscription', {
+    p_endpoint: subscription.endpoint,
+    p_p256dh: json.keys?.p256dh ?? '',
+    p_auth: json.keys?.auth ?? '',
+    p_user_agent: navigator.userAgent,
+  })
   if (error) throw error
 
   return 'subscribed'
@@ -131,11 +129,11 @@ export function shouldAutoRestorePush(permission: NotificationPermission, state:
  * just a subscription that quietly never came back until someone noticed and
  * pressed "turn on reminders" again by hand.
  */
-export async function restorePushIfGranted(userId: string): Promise<void> {
+export async function restorePushIfGranted(): Promise<void> {
   if (!pushSupported() || !VAPID_PUBLIC_KEY) return
   if (!shouldAutoRestorePush(Notification.permission, await currentPushState())) return
   try {
-    await withRetry(() => enablePush(userId), COLD_START_RETRY_DELAYS_MS)
+    await withRetry(() => enablePush(), COLD_START_RETRY_DELAYS_MS)
   } catch (error) {
     console.error('could not silently restore the push subscription', error)
   }
@@ -148,6 +146,23 @@ export async function disablePush(): Promise<void> {
 
   await supabase.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint)
   await subscription.unsubscribe()
+}
+
+/**
+ * Signing out has to take this device's push subscription with it - otherwise
+ * the server keeps sending that person's reminders to a phone they are no
+ * longer signed in on. Best-effort: a failure here (offline, push blocked)
+ * must never stop the sign-out itself.
+ */
+export async function signOut(): Promise<void> {
+  if (pushSupported()) {
+    try {
+      await disablePush()
+    } catch (error) {
+      console.error('could not remove the push subscription on sign-out', error)
+    }
+  }
+  await supabase.auth.signOut()
 }
 
 /**

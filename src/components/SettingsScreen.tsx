@@ -6,10 +6,10 @@ import {
   enablePush,
   isInstalled,
   sendTestNotification,
+  signOut,
   type PushState,
 } from '../lib/push'
 import { LANGUAGE_NAMES, LANGUAGES, useI18n, type Language } from '../lib/i18n'
-import { supabase } from '../lib/supabase'
 import { useApp } from '../state/AppState'
 import { useToast } from './Toast'
 
@@ -43,7 +43,7 @@ export function SettingsScreen() {
     setBusy(true)
     try {
       if (enabled) {
-        const next = await enablePush(session!.user.id)
+        const next = await enablePush()
         setPushState(next)
         if (next === 'subscribed') toast.show(t.settings.enabled)
         if (next === 'denied') toast.show(t.settings.blockedToast, { tone: 'error' })
@@ -144,9 +144,7 @@ export function SettingsScreen() {
         <button
           type="button"
           className="btn btn-ghost"
-          onClick={async () => {
-            await supabase.auth.signOut()
-          }}
+          onClick={() => void signOut()}
         >
           {t.settings.signOut}
         </button>
