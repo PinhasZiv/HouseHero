@@ -17,7 +17,9 @@ export function SpaceScreen() {
   const [renaming, setRenaming] = useState(false)
   const [draftName, setDraftName] = useState('')
   const [showJoin, setShowJoin] = useState(false)
-  const [confirming, setConfirming] = useState<'leave' | 'remove' | null>(null)
+  const [confirming, setConfirming] = useState<'leave' | 'remove' | 'newCode' | null>(null)
+  const [removingMember, setRemovingMember] = useState<Member | null>(null)
+  const [membersVersion, setMembersVersion] = useState(0)
 
   useEffect(() => {
     if (!currentSpace) return
@@ -31,7 +33,7 @@ export function SpaceScreen() {
     return () => {
       cancelled = true
     }
-  }, [currentSpace, toast])
+  }, [currentSpace, toast, membersVersion])
 
   if (!currentSpace) return null
 
@@ -85,6 +87,25 @@ export function SpaceScreen() {
     toast.show(t.space.removed)
   }
 
+  async function newInviteCode() {
+    const updated = await api.regenerateInviteCode(currentSpace!.id)
+    await reload()
+    toast.show(t.space.newCodeDone(updated.invite_code))
+  }
+
+  function memberName(member: Member): string {
+    return member.profile?.display_name || member.profile?.email || t.space.memberFallback
+  }
+
+  async function removeMember(member: Member) {
+    await api.removeMember(currentSpace!.id, member.user_id)
+    setMembersVersion((n) => n + 1)
+    // Anything that was assigned to them is everyone's now - see the
+    // trigger in 0011_space_management.sql.
+    await reload()
+    toast.show(t.space.memberRemoved(memberName(member)))
+  }
+
   return (
     <>
       <section className="card">
@@ -131,6 +152,11 @@ export function SpaceScreen() {
         <button type="button" className="btn btn-primary" onClick={share}>
           {t.space.share}
         </button>
+        {isOwner && (
+          <button type="button" className="btn btn-ghost btn-small" onClick={() => setConfirming('newCode')}>
+            {t.space.newCode}
+          </button>
+        )}
       </section>
 
       <section className="card">
@@ -146,10 +172,20 @@ export function SpaceScreen() {
                 </span>
               )}
               <span className="member-name">
-                {member.profile?.display_name || member.profile?.email || t.space.memberFallback}
+                {memberName(member)}
                 {member.user_id === session?.user.id && <span className="chip">{t.space.you}</span>}
               </span>
               {member.role === 'owner' && <span className="chip">{t.space.owner}</span>}
+              {isOwner && member.user_id !== session?.user.id && member.role !== 'owner' && (
+                <button
+                  type="button"
+                  className="btn btn-danger-text btn-small"
+                  onClick={() => setRemovingMember(member)}
+                  aria-label={t.space.removeMemberAria(memberName(member))}
+                >
+                  {t.space.removeMember}
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -198,6 +234,32 @@ export function SpaceScreen() {
             setConfirming(null)
           }}
           onCancel={() => setConfirming(null)}
+        />
+      )}
+
+      {confirming === 'newCode' && (
+        <ConfirmSheet
+          title={t.space.newCode}
+          message={t.space.confirmNewCode}
+          confirmLabel={t.space.newCode}
+          onConfirm={async () => {
+            await newInviteCode()
+            setConfirming(null)
+          }}
+          onCancel={() => setConfirming(null)}
+        />
+      )}
+
+      {removingMember && (
+        <ConfirmSheet
+          title={t.space.removeMemberTitle}
+          message={t.space.confirmRemoveMember(memberName(removingMember))}
+          confirmLabel={t.space.removeMember}
+          onConfirm={async () => {
+            await removeMember(removingMember)
+            setRemovingMember(null)
+          }}
+          onCancel={() => setRemovingMember(null)}
         />
       )}
 
