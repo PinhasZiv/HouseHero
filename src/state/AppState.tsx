@@ -43,7 +43,11 @@ interface AppContextValue {
   setCurrentSpaceId: (id: string) => void
   currentSpace: Space | null
   loading: boolean
+  /** The initial load failed - there is nothing to show at all. */
   error: string | null
+  /** A refresh after the initial load failed: what is on screen still
+   *  stands, it just may not be current. */
+  stale: boolean
   reload: () => Promise<void>
   setProfile: (profile: Profile) => void
   /** Applies a task change locally so the UI does not wait for a round trip. */
@@ -94,6 +98,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentSpaceId, setCurrentSpaceIdState] = useState<string | null>(readStoredSpace)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [stale, setStale] = useState(false)
+  const loadedOnceRef = useRef(false)
   const [today, setToday] = useState(() => todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone))
 
   // Task ids the realtime channel has patched in since the current reload()
@@ -166,8 +172,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const stillValid = current && nextSpaces.some((space) => space.id === current)
         return stillValid ? current : (nextSpaces[0]?.id ?? null)
       })
+      loadedOnceRef.current = true
+      setStale(false)
     } catch (cause) {
-      setError(errorMessage(cause))
+      // Reopening the app with no signal used to replace a perfectly good,
+      // already-loaded list with a full-screen error. Only the very first load
+      // has nothing to fall back on.
+      if (loadedOnceRef.current) setStale(true)
+      else setError(errorMessage(cause))
     } finally {
       setLoading(false)
     }
@@ -190,6 +202,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!authReady) return
     if (!userId) {
+      loadedOnceRef.current = false
+      setStale(false)
       setLoading(false)
       setProfile(null)
       setSpaces([])
@@ -270,6 +284,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [userId, reload])
 
+  // Whatever went stale while offline catches up the moment the connection
+  // is back, without waiting for the next visibility change.
+  useEffect(() => {
+    if (!userId || !stale) return
+    const onOnline = () => void reload()
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
+  }, [userId, stale, reload])
+
+  // Reminders are timed against the stored timezone, so it follows the
+  // device on every load - this used to happen only once the Settings
+  // section was opened, which someone abroad might never do.
+  const storedTimezone = profile?.timezone
+  useEffect(() => {
+    if (!userId || !storedTimezone) return
+    const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    if (storedTimezone === deviceTimezone) return
+    api
+      .updateProfile(userId, { timezone: deviceTimezone })
+      .then(setProfile)
+      .catch((cause) => console.error('could not sync the timezone', cause))
+  }, [userId, storedTimezone])
+
   // A device can wipe the push subscription along with the sign-in session
   // while leaving the OS notification permission granted. If so, this
   // silently re-subscribes - no prompt, since permission is already decided -
@@ -327,6 +364,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       currentSpace: spaces.find((space) => space.id === currentSpaceId) ?? null,
       loading: loading || !authReady,
       error,
+      stale,
       reload,
       setProfile,
       patchTask,
@@ -338,7 +376,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }),
     [
       session, profile, spaces, tasks, people, today, currentSpaceId,
-      setCurrentSpaceId, loading, authReady, error, reload, patchTask, removeTask,
+      setCurrentSpaceId, loading, authReady, error, stale, reload, patchTask, removeTask,
       snoozes, patchSnooze, reminderOverrides, patchReminderOverride,
     ],
   )
