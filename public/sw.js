@@ -95,6 +95,10 @@ self.addEventListener('push', (event) => {
   }
 
   const title = payload.title || 'יש משימה שמחכה'
+  // A notification that points at a tab (a reward request, the weekly
+  // summary) is news, not a due task: nothing to snooze, nothing to keep
+  // pinned to the tray.
+  const informational = Boolean(payload.test || payload.tab)
   const labels = ACTION_LABELS[payload.lang] || ACTION_LABELS.he
   const options = {
     body: payload.body || '',
@@ -110,7 +114,7 @@ self.addEventListener('push', (event) => {
     badge: `${SCOPE_PATH}icons/badge-96.png`,
     // A task reminder should survive a glance at the phone; it stays until
     // it is dealt with.
-    requireInteraction: !payload.test,
+    requireInteraction: !informational,
     vibrate: [120, 60, 120],
     data: {
       spaceId: payload.spaceId || null,
@@ -120,7 +124,7 @@ self.addEventListener('push', (event) => {
     // A test notification has no real due tasks behind it, so the Snooze
     // action - which opens the app straight to a duration picker for
     // whatever is currently due - would just land on an empty picker.
-    actions: payload.test
+    actions: informational
       ? [{ action: 'open', title: labels.open }]
       : [
           { action: 'open', title: labels.open },
