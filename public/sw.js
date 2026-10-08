@@ -10,6 +10,8 @@
  * offline mode that would show stale task state.
  */
 
+// Stamped with a hash of the build at build time (scripts/swVersion.ts), so
+// each deploy gets a fresh cache and 'activate' below drops the old one.
 const CACHE = 'househero-v1'
 const SCOPE_PATH = new URL(self.registration.scope).pathname
 
