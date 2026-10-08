@@ -144,7 +144,10 @@ Deno.serve(async (request) => {
     admin.from('pauses').select('id, space_id, user_id, started_on, ended_on').is('ended_on', null),
   ])
 
-  const failed = [profiles, subscriptions, memberships, tasks, spaces, snoozes, reminderOverrides, pausesResult].find(
+  // Deployed before 0013_pauses.sql was run: nobody is on vacation yet, and
+  // that must not cost everyone their reminders.
+  const pausesMissing = pausesResult.error?.code === 'PGRST205' || pausesResult.error?.code === '42P01'
+  const failed = [profiles, subscriptions, memberships, tasks, spaces, snoozes, reminderOverrides, ...(pausesMissing ? [] : [pausesResult])].find(
     (r) => r.error,
   )
   if (failed?.error) {
@@ -202,7 +205,7 @@ Deno.serve(async (request) => {
 
   // Vacation mode (0013_pauses.sql): nothing about a frozen task, and
   // nothing at all from a space to someone who is away from it.
-  const pauses = (pausesResult.data ?? []) as Pause[]
+  const pauses = (pausesMissing ? [] : (pausesResult.data ?? [])) as Pause[]
   const silenced = (task: Task, userId: string): boolean =>
     isTaskPaused(pauses, task) || isUserPaused(pauses, task.space_id, userId)
 
