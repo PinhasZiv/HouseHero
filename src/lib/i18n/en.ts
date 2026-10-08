@@ -103,6 +103,11 @@ export const en: Strings = {
     cancelledLabel: 'cancelled',
     cancelAria: (name: string) => `Cancel ${name}`,
     duplicateAria: (name: string) => `Duplicate ${name}`,
+    skipAria: (name: string) => `Skip ${name} this time`,
+    undoSkipAria: (name: string) => `Undo skipping ${name}`,
+    skippedLabel: 'Skipped this time',
+    skipped: (name: string) => `Skipped ${name} this time.`,
+    skipUndone: (name: string) => `Undid skipping ${name}.`,
   },
 
   completion: {
@@ -413,6 +418,7 @@ export const en: Strings = {
     lastOwner:
       'You are the only owner of this space and there are other members in it. You can delete it for everyone, but not leave it without an owner.',
     notYourCompletion: 'Only the person who completed it can undo this.',
+    notYourSkip: 'Only the person who skipped it can undo this.',
   },
 
   setup: {

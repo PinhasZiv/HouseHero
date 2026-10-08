@@ -4,7 +4,7 @@ import { describeInterval, describeWeeklyDays, formatDate, formatSnoozeUntil, fo
 import { googleCalendarUrl } from '../lib/googleCalendar'
 import { useI18n } from '../lib/i18n'
 import { useApp } from '../state/AppState'
-import type { Task, TaskHistoryEntry } from '../lib/types'
+import type { Task, TaskHistoryEntry, TaskSkipEntry } from '../lib/types'
 import { CalendarIcon, PencilIcon } from './Icons'
 import { ReminderOverrideSheet } from './ReminderOverrideSheet'
 import { useToast } from './Toast'
@@ -31,6 +31,7 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
   const toast = useToast()
   const selfId = session?.user.id ?? null
   const [entries, setEntries] = useState<TaskHistoryEntry[] | null>(null)
+  const [skipEntries, setSkipEntries] = useState<TaskSkipEntry[] | null>(null)
   const [editingReminder, setEditingReminder] = useState(false)
   const myOverride = reminderOverrides.get(task.id) ?? null
 
@@ -46,14 +47,18 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
 
   useEffect(() => {
     let cancelled = false
-    api
-      .fetchHistory(task.id)
-      .then((rows) => {
-        if (!cancelled) setEntries(rows)
+    Promise.all([api.fetchHistory(task.id), api.fetchSkipHistory(task.id)])
+      .then(([rows, skipRows]) => {
+        if (cancelled) return
+        setEntries(rows)
+        setSkipEntries(skipRows)
       })
       .catch((cause) => {
         toast.showError(cause)
-        if (!cancelled) setEntries([])
+        if (!cancelled) {
+          setEntries([])
+          setSkipEntries([])
+        }
       })
     return () => {
       cancelled = true
@@ -81,7 +86,7 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
   // completion_group - collapse those into a single entry rather than
   // listing the same moment once per person.
   const seenGroups = new Set<string>()
-  const displayEntries = (entries ?? [])
+  const completionRows = (entries ?? [])
     .filter((entry) => {
       if (!entry.completion_group) return true
       if (seenGroups.has(entry.completion_group)) return false
@@ -100,8 +105,21 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
               who?.kind === 'other' ? t.task.completedBy(who.name ?? t.task.someoneElse) : t.task.completedByYou
             return t.history.entry(whoText, entry.points_awarded)
           })()
-      return { key: entry.id, date: entry.completed_on, label }
+      return { key: entry.id, date: entry.completed_on, createdAt: entry.created_at, label, muted: false }
     })
+
+  // Skips never carry points or crediting, so they get their own muted row -
+  // the history reads as "handled, one way or another" rather than implying
+  // every entry here was an actual completion.
+  const skipRows = (skipEntries ?? []).map((entry) => ({
+    key: entry.id,
+    date: entry.skipped_on,
+    createdAt: entry.created_at,
+    label: t.task.skippedLabel,
+    muted: true,
+  }))
+
+  const displayEntries = [...completionRows, ...skipRows].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 
   async function saveReminderOverride(hour: number, minute: number) {
     if (!selfId) return
@@ -198,14 +216,14 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
 
         <h3 className="group-title">{t.history.sectionTitle}</h3>
 
-        {entries === null ? (
+        {entries === null || skipEntries === null ? (
           <p className="muted">{t.common.loading}</p>
-        ) : entries.length === 0 ? (
+        ) : displayEntries.length === 0 ? (
           <p className="muted">{t.history.empty}</p>
         ) : (
           <ul className="history-list">
             {displayEntries.map((entry) => (
-              <li key={entry.key} className="history-row">
+              <li key={entry.key} className={`history-row ${entry.muted ? 'history-row-muted' : ''}`}>
                 <span className="history-date">{formatDate(entry.date, language)}</span>
                 <span className="history-who">{entry.label}</span>
               </li>

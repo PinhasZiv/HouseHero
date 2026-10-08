@@ -4,6 +4,7 @@ import { classify, compareByCompletion, compareBySchedule, todayIn } from '../li
 import { useApp } from '../state/AppState'
 import { useSnooze } from '../state/useSnooze'
 import { useCompletion } from '../state/useCompletion'
+import { useSkip } from '../state/useSkip'
 import { CompletionSheet } from './CompletionSheet'
 import { TaskCard, completedByLabel } from './TaskCard'
 import { TaskHistory } from './TaskHistory'
@@ -38,6 +39,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
   const { t, language } = useI18n()
   const { complete, undo } = useCompletion()
   const { snooze, cancelSnooze } = useSnooze()
+  const { skip, undo: undoSkip } = useSkip()
   const selfId = session?.user.id ?? null
   const timezone = profile?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
 
@@ -90,7 +92,10 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
       } else if (stillSnoozed) snoozed.push({ task, until: until as string })
       else if (status === 'late') late.push(task)
       else if (status === 'due') due.push(task)
-      else if (status === 'completed_today') done.push(task)
+      // A skip settles the day the same way a completion does - off today's
+      // active list, shown in the same "done" section with its own label
+      // rather than a count that would overstate what actually got done.
+      else if (status === 'completed_today' || status === 'skipped_today') done.push(task)
     }
 
     // Oldest due date (and, within a date, earliest reminder time) first -
@@ -125,6 +130,12 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
   // completed together, everyone was credited, so everyone can undo it.
   function canUndo(task: Task): boolean {
     return (selfId !== null && (task.last_completed_by ?? []).includes(selfId)) || task.last_completed_actor === selfId
+  }
+
+  /** Only whoever actually skipped it can undo that - there is no group
+   *  credit to share the way a completion has. */
+  function canUndoSkip(task: Task): boolean {
+    return selfId !== null && task.last_skipped_by === selfId
   }
 
   function assignedName(task: Task): string | null {
@@ -209,6 +220,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
               assignedName={assignedName(task)}
               onComplete={() => requestComplete(task)}
               onSnooze={() => setSheetTargets([task])}
+              onSkip={task.task_type === 'recurring' ? async () => { await skip(task) } : undefined}
               onOpen={() => setViewingHistory(task)}
             />
           ))}
@@ -227,6 +239,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
               assignedName={assignedName(task)}
               onComplete={() => requestComplete(task)}
               onSnooze={() => setSheetTargets([task])}
+              onSkip={task.task_type === 'recurring' ? async () => { await skip(task) } : undefined}
               onOpen={() => setViewingHistory(task)}
             />
           ))}
@@ -261,17 +274,22 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
           <summary className="group-title completed-summary">
             {t.today.groupDone} ({groups.done.length})
           </summary>
-          {groups.done.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              today={today}
-              spaceName={showSpaceNames ? spaceNames.get(task.space_id) : undefined}
-              completedBy={completedByLabel(task, people, selfId, language)}
-              onUndo={canUndo(task) ? () => undo(task) : undefined}
-              onOpen={() => setViewingHistory(task)}
-            />
-          ))}
+          {groups.done.map((task) => {
+            const skippedToday = task.last_skipped_date === today && task.last_completed_date !== today
+            return (
+              <TaskCard
+                key={task.id}
+                task={task}
+                today={today}
+                spaceName={showSpaceNames ? spaceNames.get(task.space_id) : undefined}
+                completedBy={completedByLabel(task, people, selfId, language)}
+                onComplete={skippedToday ? () => requestComplete(task) : undefined}
+                onUndo={!skippedToday && canUndo(task) ? () => undo(task) : undefined}
+                onUndoSkip={skippedToday && canUndoSkip(task) ? () => undoSkip(task) : undefined}
+                onOpen={() => setViewingHistory(task)}
+              />
+            )
+          })}
         </details>
       )}
 

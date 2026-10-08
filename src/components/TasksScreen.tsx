@@ -4,6 +4,7 @@ import type { CompletionChoice } from '../lib/api'
 import { classify, compareByCompletion, compareBySchedule } from '../lib/taskDue'
 import { useApp } from '../state/AppState'
 import { useCompletion } from '../state/useCompletion'
+import { useSkip } from '../state/useSkip'
 import { CompletionSheet } from './CompletionSheet'
 import { TaskCard, completedByLabel } from './TaskCard'
 import { TaskForm, type TaskDraft } from './TaskForm'
@@ -43,6 +44,7 @@ export function TasksScreen() {
   const { tasks, currentSpace, today, session, people, reload, patchTask, removeTask } = useApp()
   const { t, language } = useI18n()
   const { complete, undo } = useCompletion()
+  const { skip, undo: undoSkip } = useSkip()
   const toast = useToast()
   const [members, setMembers] = useState<Member[]>([])
   const [adding, setAdding] = useState(false)
@@ -98,7 +100,9 @@ export function TasksScreen() {
   function priorityTier(task: Task): number {
     const status = classify(task, today).status
     if (status === 'active') return 0
-    if (status === 'upcoming' || status === 'scheduled') return 2
+    // A skipped occurrence's due_date already moved to its real next date -
+    // it ranks the same as any other not-due-yet task, not with late/due.
+    if (status === 'upcoming' || status === 'scheduled' || status === 'skipped_today') return 2
     return 1
   }
 
@@ -214,7 +218,15 @@ export function TasksScreen() {
     return (selfId !== null && (task.last_completed_by ?? []).includes(selfId)) || task.last_completed_actor === selfId
   }
 
+  /** Only whoever actually skipped it can undo that - there is no group
+   *  credit to share the way a completion has. */
+  function canUndoSkip(task: Task): boolean {
+    const selfId = session?.user.id ?? null
+    return selfId !== null && task.last_skipped_by === selfId
+  }
+
   function renderCard(task: Task) {
+    const status = classify(task, today).status
     return (
       <TaskCard
         key={task.id}
@@ -230,6 +242,12 @@ export function TasksScreen() {
         onDuplicate={
           task.task_type === 'time_limited' && task.is_done ? () => setDuplicating(task) : undefined
         }
+        onSkip={
+          task.task_type === 'recurring' && (status === 'late' || status === 'due')
+            ? async () => { await skip(task) }
+            : undefined
+        }
+        onUndoSkip={status === 'skipped_today' && canUndoSkip(task) ? () => undoSkip(task) : undefined}
         onOpen={() => setViewingHistory(task)}
         onEdit={() => setEditing(task)}
       />

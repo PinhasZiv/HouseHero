@@ -972,6 +972,10 @@ button { font: inherit; cursor: pointer; }
 
 .history-row:last-child { border-block-end: 0; }
 .history-who { color: var(--text-muted); }
+/* A skipped occurrence reads as a lesser event than an actual completion -
+   no points, nobody credited - so its row sits back visually rather than
+   looking like one more entry in the same achievement list. */
+.history-row-muted .history-date { color: var(--text-muted); }
 
 /* ----------------------------------------------------------- fields --- */
 

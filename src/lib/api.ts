@@ -11,6 +11,7 @@ import type {
   Task,
   TaskCompletion,
   TaskHistoryEntry,
+  TaskSkipEntry,
 } from './types'
 import type { EndCondition, RecurrenceMode, TaskType } from './taskDue'
 
@@ -292,6 +293,26 @@ export async function undoTaskCompletion(taskId: string): Promise<Task> {
   return data as Task
 }
 
+/**
+ * Skips one occurrence of a recurring task - "not needed this time". Awards
+ * no points, credits nobody, and advances the schedule exactly like
+ * completing it would - see skip_task() for why.
+ */
+export async function skipTask(taskId: string, today: string): Promise<TaskSkipEntry> {
+  const { data, error } = await supabase.rpc('skip_task', { p_task: taskId, p_today: today }).single()
+  if (error) throw error
+  return data as TaskSkipEntry
+}
+
+/** Reverses a task's most recent skip and returns the restored task row. */
+export async function undoTaskSkip(taskId: string): Promise<Task> {
+  const { data, error } = await supabase.rpc('undo_last_skip', { p_task: taskId }).single()
+  if (error) {
+    throw new Error(error.message.includes('not_your_skip') ? t().errors.notYourSkip : error.message)
+  }
+  return data as Task
+}
+
 /** Every task this person has personally snoozed. */
 export async function fetchSnoozes(userId: string): Promise<{ task_id: string; snoozed_until: string }[]> {
   const { data, error } = await supabase
@@ -373,6 +394,20 @@ export async function fetchHistory(taskId: string, limit = 20): Promise<TaskHist
     .limit(limit)
   if (error) throw error
   return (data ?? []) as TaskHistoryEntry[]
+}
+
+/** Recent skips for a task, newest first - a small, separate history from
+ *  completions, since a skip carries none of what those do (points, who
+ *  else was credited). */
+export async function fetchSkipHistory(taskId: string, limit = 20): Promise<TaskSkipEntry[]> {
+  const { data, error } = await supabase
+    .from('task_skips')
+    .select('id, user_id, skipped_on, created_at')
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return (data ?? []) as TaskSkipEntry[]
 }
 
 export async function fetchRewards(spaceId: string): Promise<Reward[]> {
