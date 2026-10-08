@@ -14,6 +14,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4'
 import { classify, formatTimeIn, minutesOfDayIn, todayIn, type DueTask } from '../_shared/taskDue.ts'
 import { loadConfig } from '../_shared/config.ts'
 import { composeReminder, composeTimeLimitedReminder, isLanguage, type Language } from '../_shared/messages.ts'
+import { isTaskPaused, isUserPaused, type Pause } from '../_shared/pauses.ts'
 import { planSnoozeOutcomes, type ExpiredSnooze, type SnoozeTask } from '../_shared/snoozeResend.ts'
 import { dueReminderSlots, type ReminderPolicy } from '../_shared/timeLimitedReminders.ts'
 import { sendPush, type PushTarget } from '../_shared/webpush.ts'
@@ -117,7 +118,7 @@ Deno.serve(async (request) => {
   const now = new Date()
   const nowIso = now.toISOString()
 
-  const [profiles, subscriptions, memberships, tasks, spaces, snoozes, reminderOverrides] = await Promise.all([
+  const [profiles, subscriptions, memberships, tasks, spaces, snoozes, reminderOverrides, pausesResult] = await Promise.all([
     admin.from('profiles').select('id, display_name, timezone, language'),
     admin.from('push_subscriptions').select('id, user_id, endpoint, p256dh, auth, failure_count'),
     admin.from('space_members').select('space_id, user_id'),
@@ -133,9 +134,10 @@ Deno.serve(async (request) => {
     admin.from('spaces').select('id, name'),
     admin.from('task_snoozes').select('task_id, user_id, snoozed_until'),
     admin.from('task_reminder_overrides').select('task_id, user_id, reminder_hour, reminder_minute'),
+    admin.from('pauses').select('id, space_id, user_id, started_on, ended_on').is('ended_on', null),
   ])
 
-  const failed = [profiles, subscriptions, memberships, tasks, spaces, snoozes, reminderOverrides].find(
+  const failed = [profiles, subscriptions, memberships, tasks, spaces, snoozes, reminderOverrides, pausesResult].find(
     (r) => r.error,
   )
   if (failed?.error) {
@@ -191,10 +193,17 @@ Deno.serve(async (request) => {
     return task.assigned_to && members.includes(task.assigned_to) ? [task.assigned_to] : members
   }
 
+  // Vacation mode (0013_pauses.sql): nothing about a frozen task, and
+  // nothing at all from a space to someone who is away from it.
+  const pauses = (pausesResult.data ?? []) as Pause[]
+  const silenced = (task: Task, userId: string): boolean =>
+    isTaskPaused(pauses, task) || isUserPaused(pauses, task.space_id, userId)
+
   const tasksForUser = new Map<string, Task[]>()
   for (const task of tasksById.values()) {
     const targets = recipientsFor(task)
     for (const userId of targets) {
+      if (silenced(task, userId)) continue
       const list = tasksForUser.get(userId) ?? []
       list.push(task)
       tasksForUser.set(userId, list)
@@ -340,6 +349,8 @@ Deno.serve(async (request) => {
       const task = tasksById.get(outcome.taskId)
       // Snoozed, then left (or was removed from) the space before it ran out.
       if (task && !(membersBySpace.get(task.space_id) ?? []).includes(outcome.userId)) continue
+      // Ran out while they (or the task) are away - dropped, not saved up.
+      if (task && silenced(task, outcome.userId)) continue
       sentCount += await pushToSubscriptions(
         subs,
         {
@@ -382,6 +393,7 @@ Deno.serve(async (request) => {
 
     const targets = recipientsFor(task)
     for (const userId of targets) {
+      if (silenced(task, userId)) continue
       const profile = profilesById.get(userId)
       const subs = subsByUser.get(userId)
       if (!profile || !subs?.length) continue

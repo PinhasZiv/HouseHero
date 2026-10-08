@@ -16,6 +16,7 @@ import { reconcileReloadedTasks } from '../lib/reconcileTasks'
 import { COLD_START_RETRY_DELAYS_MS, withRetry } from '../lib/retry'
 import { supabase } from '../lib/supabase'
 import { todayIn } from '../lib/taskDue'
+import { isTaskPaused, type Pause } from '../lib/pauses'
 import * as api from '../lib/api'
 import type { Profile, Space, Task } from '../lib/types'
 
@@ -68,6 +69,12 @@ interface AppContextValue {
   reminderOverrides: Map<string, ReminderOverride>
   /** Applies an override (or clears it, with `override: null`) locally. */
   patchReminderOverride: (taskId: string, override: ReminderOverride | null) => void
+  /** Vacation mode: every pause in the user's spaces, switched on or off. */
+  pauses: Pause[]
+  /** Applies a started or ended pause locally. */
+  patchPause: (pause: Pause) => void
+  /** Whether a task is frozen right now - see isTaskPaused(). */
+  isPaused: (task: Pick<Task, 'space_id' | 'assigned_to'>) => boolean
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
@@ -95,6 +102,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [people, setPeople] = useState<Map<string, Person>>(new Map())
   const [snoozes, setSnoozes] = useState<Map<string, string>>(new Map())
   const [reminderOverrides, setReminderOverrides] = useState<Map<string, ReminderOverride>>(new Map())
+  const [pauses, setPauses] = useState<Pause[]>([])
   const [currentSpaceId, setCurrentSpaceIdState] = useState<string | null>(readStoredSpace)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -148,6 +156,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         api.fetchPeople(),
         api.fetchSnoozes(userId),
         api.fetchReminderOverrides(userId),
+        api.fetchPauses(),
       ])
     try {
       // A cold start (opening the PWA after it sat backgrounded, or from
@@ -158,7 +167,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // on its own, which is all "press try again" ever did, so this retries
       // silently rather than making it a manual step.
       const result = await withRetry(fetchEverything, COLD_START_RETRY_DELAYS_MS)
-      const [nextProfile, nextSpaces, nextTasks, nextPeople, nextSnoozes, nextReminderOverrides] = result
+      const [nextProfile, nextSpaces, nextTasks, nextPeople, nextSnoozes, nextReminderOverrides, nextPauses] = result
       setProfile(nextProfile)
       adoptLanguage(nextProfile)
       setSpaces(nextSpaces)
@@ -168,6 +177,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setReminderOverrides(
         new Map(nextReminderOverrides.map((row) => [row.task_id, { hour: row.reminder_hour, minute: row.reminder_minute }])),
       )
+      setPauses(nextPauses)
       setCurrentSpaceIdState((current) => {
         const stillValid = current && nextSpaces.some((space) => space.id === current)
         return stillValid ? current : (nextSpaces[0]?.id ?? null)
@@ -211,6 +221,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setPeople(new Map())
       setSnoozes(new Map())
       setReminderOverrides(new Map())
+      setPauses([])
       return
     }
     setLoading(true)
@@ -263,6 +274,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return next
         })
         if (incoming.id === userId) setProfile((current) => (current ? { ...current, ...incoming } : current))
+      })
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [userId])
+
+  // Someone else going on (or coming back from) vacation changes what is
+  // late on this screen too.
+  useEffect(() => {
+    if (!userId) return
+    const channel = supabase
+      .channel('pauses-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pauses' }, (payload) => {
+        if (payload.eventType === 'DELETE') return
+        const incoming = payload.new as Pause
+        setPauses((current) => [incoming, ...current.filter((pause) => pause.id !== incoming.id)])
       })
       .subscribe()
     return () => {
@@ -351,6 +379,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const patchPause = useCallback((pause: Pause) => {
+    setPauses((current) => [pause, ...current.filter((item) => item.id !== pause.id)])
+  }, [])
+
+  const isPaused = useCallback(
+    (task: Pick<Task, 'space_id' | 'assigned_to'>) => isTaskPaused(pauses, task),
+    [pauses],
+  )
+
   const value = useMemo<AppContextValue>(
     () => ({
       session,
@@ -373,11 +410,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       patchSnooze,
       reminderOverrides,
       patchReminderOverride,
+      pauses,
+      patchPause,
+      isPaused,
     }),
     [
       session, profile, spaces, tasks, people, today, currentSpaceId,
       setCurrentSpaceId, loading, authReady, error, stale, reload, patchTask, removeTask,
-      snoozes, patchSnooze, reminderOverrides, patchReminderOverride,
+      snoozes, patchSnooze, reminderOverrides, patchReminderOverride, pauses, patchPause, isPaused,
     ],
   )
 

@@ -14,6 +14,7 @@ import type {
   TaskSkipEntry,
 } from './types'
 import type { EndCondition, RecurrenceMode, TaskType } from './taskDue'
+import type { Pause } from './pauses'
 
 // Thin wrappers over the queries the screens need. Errors are thrown rather
 // than returned so callers can use one try/catch per user action, and RLS does
@@ -84,6 +85,35 @@ export async function regenerateInviteCode(spaceId: string): Promise<Space> {
   const { data, error } = await supabase.rpc('regenerate_invite_code', { p_space: spaceId }).single()
   if (error) throw error
   return data as Space
+}
+
+/** Every pause in the caller's spaces, on and off - the ended ones still
+ *  matter to Stats (someone back from a trip was not idle while away). */
+export async function fetchPauses(): Promise<Pause[]> {
+  const { data, error } = await supabase
+    .from('pauses')
+    .select('id, space_id, user_id, started_on, ended_on')
+    .order('started_on', { ascending: false })
+  // The app can be deployed before 0013_pauses.sql is run by hand; a missing
+  // table means "nobody is on vacation", not "nothing loads".
+  if (error && (error.code === 'PGRST205' || error.code === '42P01')) return []
+  if (error) throw error
+  return (data ?? []) as Pause[]
+}
+
+/** Switches vacation mode on - for the caller alone, or (owner only) for the
+ *  whole space. */
+export async function startPause(spaceId: string, wholeSpace: boolean): Promise<Pause> {
+  const { data, error } = await supabase.rpc('start_pause', { p_space: spaceId, p_whole_space: wholeSpace }).single()
+  if (error) throw new Error(error.message.includes('already_paused') ? t().vacation.alreadyPaused : error.message)
+  return data as Pause
+}
+
+/** Switches it off again; the server restarts the frozen tasks from today. */
+export async function endPause(pauseId: string): Promise<Pause> {
+  const { data, error } = await supabase.rpc('end_pause', { p_pause: pauseId }).single()
+  if (error) throw error
+  return data as Pause
 }
 
 /**

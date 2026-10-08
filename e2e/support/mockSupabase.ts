@@ -132,6 +132,26 @@ export interface FakeDb {
   failing?: boolean
   /** The signed-in person's role in the space - owner unless a test says otherwise. */
   selfRole?: 'owner' | 'member'
+  /** Vacation mode - see 0013_pauses.sql. */
+  pauses: FakePause[]
+}
+
+export interface FakePause {
+  id: string
+  space_id: string
+  user_id: string | null
+  started_on: string
+  ended_on: string | null
+}
+
+/** "Today" for the fake profile, which always lives in Asia/Jerusalem. */
+function mockToday(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date())
+}
+
+function addDaysIso(isoDate: string, days: number): string {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
 }
 
 export function makeFakeDb(overrides?: Partial<FakeDb>): FakeDb {
@@ -165,6 +185,7 @@ export function makeFakeDb(overrides?: Partial<FakeDb>): FakeDb {
     otherPeople: [],
     assignmentNotifications: [],
     redemptionNotifications: [],
+    pauses: [],
     ...overrides,
   }
 }
@@ -442,6 +463,52 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
         space.invite_code = `NEW${db.spaces.indexOf(space)}XY`.slice(0, 6)
         return json(route, wantsSingle ? space : [space])
       }
+      if (fn === 'start_pause') {
+        const spaceId = body.p_space as string
+        const whole = Boolean(body.p_whole_space)
+        if (whole && (db.selfRole ?? 'owner') !== 'owner') return json(route, { message: 'not_owner' }, 403)
+        const userId = whole ? null : FAKE_USER_ID
+        if (db.pauses.some((p) => p.space_id === spaceId && p.user_id === userId && p.ended_on === null)) {
+          return json(route, { message: 'already_paused' }, 400)
+        }
+        const pause: FakePause = {
+          id: `pause-${db.pauses.length + 1}`,
+          space_id: spaceId,
+          user_id: userId,
+          started_on: mockToday(),
+          ended_on: null,
+        }
+        db.pauses.push(pause)
+        return json(route, wantsSingle ? pause : [pause])
+      }
+      if (fn === 'end_pause') {
+        const pause = db.pauses.find((p) => p.id === body.p_pause)
+        if (!pause) return json(route, { message: 'no_such_pause' }, 404)
+        if (pause.user_id === null && (db.selfRole ?? 'owner') !== 'owner') return json(route, { message: 'not_owner' }, 403)
+        if (pause.user_id !== null && pause.user_id !== FAKE_USER_ID) return json(route, { message: 'not_your_pause' }, 403)
+        const today = mockToday()
+        if (pause.ended_on === null) {
+          for (const task of db.tasks) {
+            if (task.space_id !== pause.space_id || task.is_done || task.task_type === 'time_limited') continue
+            if (task.due_date >= today) continue
+            if (pause.user_id !== null && task.assigned_to !== pause.user_id) continue
+            let next = today
+            if (task.recurrence_mode === 'weekly_days' && task.weekly_days?.length) {
+              for (let offset = 0; offset < 7; offset++) {
+                const candidate = addDaysIso(today, offset)
+                const [y, m, d] = candidate.split('-').map(Number)
+                if (task.weekly_days.includes(new Date(Date.UTC(y, m - 1, d)).getUTCDay())) {
+                  next = candidate
+                  break
+                }
+              }
+            }
+            task.due_date = next
+          }
+          pause.ended_on = today
+        }
+        return json(route, wantsSingle ? pause : [pause])
+      }
       if (fn === 'leave_space') {
         const spaceId = body.p_space as string
         db.spaces = db.spaces.filter((s) => s.id !== spaceId)
@@ -642,6 +709,8 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
     if (table === 'reward_redemptions' && method === 'GET') return json(route, db.redemptions)
 
     if (table === 'push_subscriptions') return json(route, [])
+
+    if (table === 'pauses' && method === 'GET') return json(route, db.pauses)
 
     return json(route, { message: `unmocked request: ${method} ${url.pathname}${url.search}` }, 404)
   })

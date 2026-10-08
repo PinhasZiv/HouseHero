@@ -292,6 +292,12 @@ describe('missedCyclesFromOpenTasks', () => {
     ]
     expect(missedCyclesFromOpenTasks(tasks, today)).toEqual([])
   })
+
+  it('excludes a task frozen for a vacation', () => {
+    const today = '2026-01-06'
+    const tasks = [openTask({ id: 'a', title: 'dishwasher', due_date: '2026-01-01', interval_days: 2 })]
+    expect(missedCyclesFromOpenTasks(tasks, today, (task) => task.id === 'a')).toEqual([])
+  })
 })
 
 describe('missedCyclesSummary', () => {
@@ -361,5 +367,36 @@ describe('inactiveMembers', () => {
     const rows = [completion({ task_id: 'a', user_id: 'u1', completed_on: '2026-01-01' })]
     const result = inactiveMembers(['u1', 'u2'], rows, today)
     expect(result.map((entry) => entry.userId)).toEqual(['u2', 'u1'])
+  })
+})
+
+describe('inactiveMembers with vacations', () => {
+  const today = '2026-01-15'
+  const old = [completion({ task_id: 'a', user_id: 'u1', completed_on: '2026-01-01' })]
+
+  it('leaves out someone away right now', () => {
+    const pauses = [{ id: 'p', space_id: 'space-1', user_id: 'u1', started_on: '2026-01-02', ended_on: null }]
+    expect(inactiveMembers(['u1'], old, today, { pauses, spaceId: 'space-1' })).toEqual([])
+  })
+
+  it('leaves out everyone while the whole space is away', () => {
+    const pauses = [{ id: 'p', space_id: 'space-1', user_id: null, started_on: '2026-01-02', ended_on: null }]
+    expect(inactiveMembers(['u1', 'u2'], old, today, { pauses, spaceId: 'space-1' })).toEqual([])
+  })
+
+  it('counts the silence from the day of return, not from before leaving', () => {
+    const pauses = [{ id: 'p', space_id: 'space-1', user_id: 'u1', started_on: '2026-01-02', ended_on: '2026-01-14' }]
+    expect(inactiveMembers(['u1'], old, today, { pauses, spaceId: 'space-1' })).toEqual([])
+    const longAgo = [{ ...pauses[0], ended_on: '2026-01-10' }]
+    expect(inactiveMembers(['u1'], old, today, { pauses: longAgo, spaceId: 'space-1' })).toEqual([
+      { userId: 'u1', daysSinceLastCompletion: 5 },
+    ])
+  })
+
+  it('ignores a vacation in another space', () => {
+    const pauses = [{ id: 'p', space_id: 'space-2', user_id: 'u1', started_on: '2026-01-02', ended_on: null }]
+    expect(inactiveMembers(['u1'], old, today, { pauses, spaceId: 'space-1' })).toEqual([
+      { userId: 'u1', daysSinceLastCompletion: 14 },
+    ])
   })
 })

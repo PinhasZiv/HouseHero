@@ -25,6 +25,7 @@ export type DueStatus =
   | 'active' // a time-limited task, inside its window right now
   | 'expired' // a time-limited task whose window closed without being completed
   | 'cancelled' // a time-limited task the person called off themselves
+  | 'paused' // would be due/late/active, but whoever it is waiting on is away - see withPause()
 
 export interface DueTask {
   task_type: TaskType
@@ -295,6 +296,19 @@ function classifyTimeLimited(task: DueTask, today: string, now: Date): DueInfo {
   return { status: 'active', daysLate: 0, notifiable: true }
 }
 
+/**
+ * Vacation mode on top of classify(): a task that would be nagging (due,
+ * late, or an open time-limited window) reads as paused instead, and is
+ * neither late nor notifiable. Settled states (done today, skipped, not yet
+ * due) pass through - they say nothing about anyone being late. Whether the
+ * task is paused at all comes from isTaskPaused() in pauses.ts.
+ */
+export function withPause(info: DueInfo, paused: boolean): DueInfo {
+  if (!paused) return info
+  if (info.status !== 'due' && info.status !== 'late' && info.status !== 'active') return info
+  return { status: 'paused', daysLate: 0, notifiable: false }
+}
+
 /** Rank for list ordering: overdue tasks first, finished ones last. */
 const STATUS_ORDER: Record<DueStatus, number> = {
   active: -1,
@@ -307,6 +321,7 @@ const STATUS_ORDER: Record<DueStatus, number> = {
   done: 4,
   expired: 4,
   cancelled: 4,
+  paused: 3,
 }
 
 /** Tasks that belong on the "due today" list, worst-overdue first. */

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as api from '../lib/api'
 import type { CompletionChoice } from '../lib/api'
-import { classify, compareByCompletion, compareBySchedule } from '../lib/taskDue'
+import { classify, compareByCompletion, compareBySchedule, withPause } from '../lib/taskDue'
 import { useApp } from '../state/AppState'
 import { useCompletion } from '../state/useCompletion'
 import { useSkip } from '../state/useSkip'
@@ -19,7 +19,7 @@ type OwnerFilter = 'all' | 'mine' | 'everyone' | 'others'
 
 /** Every task in the selected space, whether or not it needs anything today. */
 export function TasksScreen() {
-  const { tasks, currentSpace, today, session, people, patchTask, removeTask } = useApp()
+  const { tasks, currentSpace, today, session, people, patchTask, removeTask, isPaused } = useApp()
   const { t, language } = useI18n()
   const { complete, undo } = useCompletion()
   const { skip, undo: undoSkip } = useSkip()
@@ -77,11 +77,12 @@ export function TasksScreen() {
   // open - it is relevant for a bounded stretch of time, not just "sometime
   // today" - then late/due, then whatever is not due yet.
   function priorityTier(task: Task): number {
-    const status = classify(task, today).status
+    const status = withPause(classify(task, today), isPaused(task)).status
     if (status === 'active') return 0
     // A skipped occurrence's due_date already moved to its real next date -
     // it ranks the same as any other not-due-yet task, not with late/due.
-    if (status === 'upcoming' || status === 'scheduled' || status === 'skipped_today') return 2
+    // A task frozen for a vacation waits with them too.
+    if (status === 'upcoming' || status === 'scheduled' || status === 'skipped_today' || status === 'paused') return 2
     return 1
   }
 
@@ -111,7 +112,7 @@ export function TasksScreen() {
     completed.sort(compareByCompletion)
     return { openTasks: open, completedTasks: completed }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, currentSpace, today, tick])
+  }, [tasks, currentSpace, today, tick, isPaused])
 
   const spaceTasks = useMemo(() => [...openTasks, ...completedTasks], [openTasks, completedTasks])
 
@@ -199,7 +200,7 @@ export function TasksScreen() {
   }
 
   function renderCard(task: Task) {
-    const status = classify(task, today).status
+    const status = withPause(classify(task, today), isPaused(task)).status
     return (
       <TaskCard
         key={task.id}

@@ -25,6 +25,8 @@
   --due: #a3690c;
   --due-soft: #fdf1dc;
   --done: #6a6785;
+  --away: #1d7486;
+  --away-soft: #e0f1f4;
   --gold: #b8860b;
   --gold-soft: #faf1dd;
   --radius: 14px;
@@ -49,6 +51,8 @@
     --due: #e8c06a;
     --due-soft: #33280f;
     --done: #a6a1c6;
+    --away: #7fcfdd;
+    --away-soft: #10303a;
     --gold: #e8c06a;
     --gold-soft: #33280f;
     --shadow: none;
@@ -353,8 +357,11 @@ button { font: inherit; cursor: pointer; }
   margin-inline-end: 6px;
   transition: transform 0.15s ease;
 }
-.completed-group[open] .completed-summary::before { transform: rotate(90deg); }
-.completed-group .task-card { margin-top: 8px; }
+.completed-group[open] .completed-summary::before,
+.paused-group[open] .completed-summary::before { transform: rotate(90deg); }
+.completed-group .task-card,
+.paused-group .task-card { margin-top: 8px; }
+.paused-group .completed-summary { color: var(--away); }
 
 .task-card {
   display: flex;
@@ -373,6 +380,7 @@ button { font: inherit; cursor: pointer; }
 
 .task-late { border-inline-start: 4px solid var(--late); }
 .task-due { border-inline-start: 4px solid var(--accent); }
+.task-paused { border-inline-start: 4px solid var(--away); }
 /* More than a due-today task: a time-limited window is relevant right now
    and closes for good soon, so the whole card is tinted, not just the
    leading stripe. */
@@ -482,6 +490,7 @@ button { font: inherit; cursor: pointer; }
 .badge-late { background: var(--late-soft); color: var(--late); }
 .badge-due { background: var(--accent-soft); color: var(--accent-strong); }
 .badge-active { background: var(--accent); color: #fff; }
+.badge-paused { background: var(--away-soft); color: var(--away); }
 .badge-points {
   background: var(--gold-soft);
   color: var(--gold);
@@ -1265,3 +1274,21 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   padding: 4px 2px;
   font-size: 0.86rem;
 }
+
+/* Vacation mode: a calm note rather than a warning - nothing is wrong, the
+   house is just empty for a while. */
+.vacation-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-radius: var(--radius);
+  background: var(--away-soft);
+  color: var(--away);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.vacation-banner .btn { color: var(--away); flex-shrink: 0; }
+.vacation-state { color: var(--away); font-weight: 650; margin: 0; }

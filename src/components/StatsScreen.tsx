@@ -130,7 +130,7 @@ function PersonStatsSheet({
 
 /** Points, completion counts, and "who did what" for the current space. */
 export function StatsScreen() {
-  const { currentSpace, today, people, session, tasks } = useApp()
+  const { currentSpace, today, people, session, tasks, pauses, isPaused } = useApp()
   const { t, language } = useI18n()
   const toast = useToast()
   const [completions, setCompletions] = useState<StatsCompletion[] | null>(null)
@@ -226,12 +226,18 @@ export function StatsScreen() {
   const neglected = useMemo(() => mostNeglectedTask(rangedCompletions), [rangedCompletions])
   const busiestDay = useMemo(() => busiestWeekday(rangedCompletions), [rangedCompletions])
   const inactive = useMemo(
-    () => inactiveMembers(memberIds ?? [], completions ?? [], today),
-    [memberIds, completions, today],
+    () =>
+      inactiveMembers(
+        memberIds ?? [],
+        completions ?? [],
+        today,
+        currentSpace ? { pauses, spaceId: currentSpace.id } : undefined,
+      ),
+    [memberIds, completions, today, pauses, currentSpace],
   )
   const missedCycles = useMemo(
-    () => missedCyclesSummary(rangedCompletions, tasks, today),
-    [rangedCompletions, tasks, today],
+    () => missedCyclesSummary(rangedCompletions, tasks, today, isPaused),
+    [rangedCompletions, tasks, today, isPaused],
   )
 
   const selectedBreakdown = useMemo<TaskBreakdown[]>(() => {
