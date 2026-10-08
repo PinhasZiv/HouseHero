@@ -4,6 +4,8 @@
 -- 1. RLS: `auth.uid()` written bare is re-evaluated for every row a policy
 -- looks at; wrapped in a sub-select it is evaluated once per query. Same
 -- rules, word for word otherwise. ALTER POLICY rewrites them in place.
+-- (task_completions_insert and task_skips_insert are not here: 0009 removed
+-- them - those rows are written only by SECURITY DEFINER functions.)
 
 alter policy notification_log_select on public.notification_log
   using (user_id = (select auth.uid()));
@@ -24,9 +26,6 @@ alter policy rewards_insert on public.rewards
 alter policy space_members_delete on public.space_members
   using (user_id = (select auth.uid()) or public.is_owner(space_id));
 
-alter policy task_completions_insert on public.task_completions
-  with check (public.is_member(space_id) and actor_id = (select auth.uid()));
-
 alter policy task_reminder_overrides_select on public.task_reminder_overrides
   using (user_id = (select auth.uid()));
 alter policy task_reminder_overrides_insert on public.task_reminder_overrides
@@ -42,9 +41,6 @@ alter policy task_reminder_overrides_update on public.task_reminder_overrides
   );
 alter policy task_reminder_overrides_delete on public.task_reminder_overrides
   using (user_id = (select auth.uid()));
-
-alter policy task_skips_insert on public.task_skips
-  with check (public.is_member(space_id) and user_id = (select auth.uid()));
 
 alter policy task_snoozes_select on public.task_snoozes using (user_id = (select auth.uid()));
 alter policy task_snoozes_insert on public.task_snoozes
