@@ -4,6 +4,7 @@ import { burstConfetti, failAt } from '../lib/celebrate'
 import { errorMessage } from '../lib/errors'
 import { formatDate } from '../lib/format'
 import { useI18n } from '../lib/i18n'
+import { useDialog } from '../lib/useDialog'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../state/AppState'
 import { useToast } from './Toast'
@@ -34,6 +35,7 @@ function RewardForm({
   const [description, setDescription] = useState(existing?.description ?? '')
   const [cost, setCost] = useState(existing?.cost ?? 50)
   const [busy, setBusy] = useState(false)
+  const { titleId, dialogProps } = useDialog<HTMLFormElement>(onCancel)
   const [error, setError] = useState<string | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
@@ -54,8 +56,8 @@ function RewardForm({
   return (
     <>
       <div className="sheet-backdrop" onClick={onCancel} role="presentation">
-        <form className="sheet" onClick={(event) => event.stopPropagation()} onSubmit={save}>
-          <h2>{existing ? t.rewards.titleEdit : t.rewards.titleNew}</h2>
+        <form className="sheet" {...dialogProps} onClick={(event) => event.stopPropagation()} onSubmit={save}>
+          <h2 id={titleId}>{existing ? t.rewards.titleEdit : t.rewards.titleNew}</h2>
 
           <label className="field">
             <span>{t.rewards.name}</span>

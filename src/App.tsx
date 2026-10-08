@@ -11,6 +11,7 @@ import { StatsScreen } from './components/StatsScreen'
 import { MoreScreen } from './components/MoreScreen'
 import { SpaceSetup } from './components/SpaceScreen'
 import { applyLanguageToDocument, useI18n } from './lib/i18n'
+import { useBackClose } from './lib/useDialog'
 import { ChartIcon, DotsIcon, GiftIcon, HouseMark, ListIcon, TodayIcon } from './components/Icons'
 
 type Tab = 'today' | 'tasks' | 'rewards' | 'stats' | 'more'
@@ -63,6 +64,8 @@ function Shell() {
   const { session, loading, error, stale, reload, spaces, currentSpace, setCurrentSpaceId } = useApp()
   const { t } = useI18n()
   const [tab, setTab] = useState<Tab>(consumeTabFlag)
+  // Back from any other tab returns to Today; only from Today does it leave.
+  useBackClose(() => setTab('today'), tab !== 'today')
 
   if (loading) {
     return (

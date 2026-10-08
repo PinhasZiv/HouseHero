@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { errorMessage } from '../lib/errors'
 import { formatTime } from '../lib/format'
 import { useI18n } from '../lib/i18n'
+import { useDialog } from '../lib/useDialog'
 
 interface ReminderOverrideSheetProps {
   taskTitle: string
@@ -35,6 +36,9 @@ export function ReminderOverrideSheet({
   const { t } = useI18n()
   const [value, setValue] = useState(formatTime(initialHour, initialMinute))
   const [busy, setBusy] = useState(false)
+  const { titleId, dialogProps } = useDialog<HTMLFormElement>(() => {
+    if (!busy) onClose()
+  })
   const [error, setError] = useState<string | null>(null)
 
   async function save(event: React.FormEvent) {
@@ -66,8 +70,8 @@ export function ReminderOverrideSheet({
 
   return (
     <div className="sheet-backdrop" onClick={busy ? undefined : onClose} role="presentation">
-      <form className="sheet" onClick={(event) => event.stopPropagation()} onSubmit={save}>
-        <h2>{t.reminderOverride.title}</h2>
+      <form className="sheet" {...dialogProps} onClick={(event) => event.stopPropagation()} onSubmit={save}>
+        <h2 id={titleId}>{t.reminderOverride.title}</h2>
         <p className="screen-subtitle">{taskTitle}</p>
         <p className="muted small">{t.reminderOverride.body}</p>
 

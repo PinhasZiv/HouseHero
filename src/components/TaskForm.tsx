@@ -3,6 +3,7 @@ import { addDays } from '../lib/taskDue'
 import { errorMessage } from '../lib/errors'
 import { formatDate, toDatetimeLocalValue, weekdayShort } from '../lib/format'
 import { useI18n } from '../lib/i18n'
+import { useDialog } from '../lib/useDialog'
 import type { EndCondition, RecurrenceMode, TaskType } from '../lib/taskDue'
 import type { Member, ReminderPolicy, ReminderPolicyMode, Task } from '../lib/types'
 import { ConfirmSheet } from './ConfirmSheet'
@@ -120,6 +121,7 @@ export function TaskForm({
     source?.reminder_policy?.finalReminderMinutesBeforeExpiry ?? 15,
   )
   const [busy, setBusy] = useState(false)
+  const { titleId, dialogProps } = useDialog<HTMLFormElement>(onCancel)
   const [error, setError] = useState<string | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
@@ -230,11 +232,11 @@ export function TaskForm({
     <div className="sheet-backdrop" onClick={onCancel} role="presentation">
       <form
         className="sheet"
+        {...dialogProps}
         onClick={(event) => event.stopPropagation()}
         onSubmit={save}
-        aria-label={existing ? t.taskForm.titleEdit : t.taskForm.titleNew}
       >
-        <h2>{existing ? t.taskForm.titleEdit : t.taskForm.titleNew}</h2>
+        <h2 id={titleId}>{existing ? t.taskForm.titleEdit : t.taskForm.titleNew}</h2>
 
         <label className="field">
           <span>{t.taskForm.name}</span>

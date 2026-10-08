@@ -3,6 +3,7 @@ import * as api from '../lib/api'
 import { describeInterval, describeWeeklyDays, formatDate, formatSnoozeUntil, formatTime, personLabel } from '../lib/format'
 import { googleCalendarUrl } from '../lib/googleCalendar'
 import { useI18n } from '../lib/i18n'
+import { useDialog } from '../lib/useDialog'
 import { useApp } from '../state/AppState'
 import type { Task, TaskHistoryEntry, TaskSkipEntry } from '../lib/types'
 import { CalendarIcon, PencilIcon } from './Icons'
@@ -28,6 +29,7 @@ interface TaskHistoryProps {
 export function TaskHistory({ task, onClose }: TaskHistoryProps) {
   const { people, session, today, reminderOverrides, patchReminderOverride } = useApp()
   const { t, language } = useI18n()
+  const { titleId, dialogProps } = useDialog<HTMLDivElement>(onClose)
   const toast = useToast()
   const selfId = session?.user.id ?? null
   const [entries, setEntries] = useState<TaskHistoryEntry[] | null>(null)
@@ -140,8 +142,8 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
   return (
     <>
     <div className="sheet-backdrop" onClick={onClose} role="presentation">
-      <div className="sheet" onClick={(event) => event.stopPropagation()}>
-        <h2>{task.title}</h2>
+      <div className="sheet" {...dialogProps} onClick={(event) => event.stopPropagation()}>
+        <h2 id={titleId}>{task.title}</h2>
 
         {task.description && <p className="task-detail-description">{task.description}</p>}
 

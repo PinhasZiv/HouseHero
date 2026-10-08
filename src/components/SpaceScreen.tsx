@@ -5,6 +5,7 @@ import { initials } from '../lib/format'
 import { useApp } from '../state/AppState'
 import { useToast } from './Toast'
 import { useI18n } from '../lib/i18n'
+import { useDialog } from '../lib/useDialog'
 import type { Member } from '../lib/types'
 import { ConfirmSheet } from './ConfirmSheet'
 
@@ -297,6 +298,9 @@ export function SpaceSetup({
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
+  // The very first space has nothing to go back to - only the later
+  // create/join sheet can be dismissed.
+  const { titleId, dialogProps } = useDialog<HTMLFormElement>(onDone, { closable: allowCancel })
   const [error, setError] = useState<string | null>(null)
 
   async function submit(event: React.FormEvent) {
@@ -320,8 +324,8 @@ export function SpaceSetup({
 
   return (
     <div className="sheet-backdrop" onClick={allowCancel ? onDone : undefined} role="presentation">
-      <form className="sheet" onClick={(event) => event.stopPropagation()} onSubmit={submit}>
-        <h2>{mode === 'create' ? t.spaceSetup.titleCreate : t.spaceSetup.titleJoin}</h2>
+      <form className="sheet" {...dialogProps} onClick={(event) => event.stopPropagation()} onSubmit={submit}>
+        <h2 id={titleId}>{mode === 'create' ? t.spaceSetup.titleCreate : t.spaceSetup.titleJoin}</h2>
 
         <div className="segmented">
           <button

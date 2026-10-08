@@ -131,9 +131,15 @@ test.describe('rewards', () => {
     await expect(pending.getByRole('button', { name: 'אישור' })).toHaveCount(0)
     await pending.getByRole('button', { name: 'ביטול', exact: false }).click()
 
-    await expect(page.getByText('בוטלה', { exact: false })).toBeVisible()
+    // Scoped to the toast: a bare getByText('בוטלה') also matched the whole
+    // app once the history rendered - its last "בוטל" chip runs straight into
+    // the "היום" tab, and that concatenation contains "בוטלה" too.
+    await expect(page.locator('.toast')).toContainText('בוטלה')
     await expect(page.getByRole('heading', { name: 'ממתין לאישור' })).toHaveCount(0)
     expect(db.redemptions[0].status).toBe('cancelled')
+    // And it is now in the history, marked as cancelled.
+    await page.locator('.redemption-history summary').click()
+    await expect(page.locator('.redemption-history .history-row', { hasText: 'קפה בבית קפה' })).toContainText('בוטל')
   })
 
   test('deleting a reward goes through a confirm sheet, not a browser dialog', async ({ page }) => {
