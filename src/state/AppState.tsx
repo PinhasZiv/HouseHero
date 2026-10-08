@@ -313,7 +313,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // the moment a session comes back.
   useEffect(() => {
     if (!userId) return
-    void restorePushIfGranted(userId)
+    void restorePushIfGranted()
   }, [userId])
 
   const setCurrentSpaceId = useCallback((id: string) => {
