@@ -183,10 +183,17 @@ Deno.serve(async (request) => {
   )
 
   // Every user who should be considered for a task: the assignee alone if the
-  // task has one, otherwise every member of its space.
+  // task has one, otherwise every member of its space. An assignee who has
+  // since left the space falls back to everyone - leaving unassigns them
+  // (0011_space_management.sql), so this only guards against older rows.
+  const recipientsFor = (task: Task): string[] => {
+    const members = membersBySpace.get(task.space_id) ?? []
+    return task.assigned_to && members.includes(task.assigned_to) ? [task.assigned_to] : members
+  }
+
   const tasksForUser = new Map<string, Task[]>()
   for (const task of tasksById.values()) {
-    const targets = task.assigned_to ? [task.assigned_to] : (membersBySpace.get(task.space_id) ?? [])
+    const targets = recipientsFor(task)
     for (const userId of targets) {
       const list = tasksForUser.get(userId) ?? []
       list.push(task)
@@ -331,6 +338,8 @@ Deno.serve(async (request) => {
       if (!subs?.length) continue
 
       const task = tasksById.get(outcome.taskId)
+      // Snoozed, then left (or was removed from) the space before it ran out.
+      if (task && !(membersBySpace.get(task.space_id) ?? []).includes(outcome.userId)) continue
       sentCount += await pushToSubscriptions(
         subs,
         {
@@ -371,7 +380,7 @@ Deno.serve(async (request) => {
   for (const task of timeLimitedTasks) {
     if (justExpiredIds.includes(task.id)) continue
 
-    const targets = task.assigned_to ? [task.assigned_to] : (membersBySpace.get(task.space_id) ?? [])
+    const targets = recipientsFor(task)
     for (const userId of targets) {
       const profile = profilesById.get(userId)
       const subs = subsByUser.get(userId)

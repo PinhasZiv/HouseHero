@@ -359,6 +359,15 @@ export const en: Strings = {
       `Delete "${name}" for everyone? All its tasks and history are removed.`,
     removed: 'Space deleted.',
     switchAria: 'Current space',
+    newCode: 'Create a new code',
+    confirmNewCode: 'The current code will stop working; everyone already in the space stays. Create a new code?',
+    newCodeDone: (code: string) => `New code: ${code}`,
+    removeMember: 'Remove',
+    removeMemberAria: (name: string) => `Remove ${name} from the space`,
+    removeMemberTitle: 'Remove from space',
+    confirmRemoveMember: (name: string) =>
+      `Remove ${name} from the space? Tasks assigned to them become everyone's.`,
+    memberRemoved: (name: string) => `${name} was removed from the space.`,
   },
 
   spaceSetup: {

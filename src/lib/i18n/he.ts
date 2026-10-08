@@ -362,6 +362,15 @@ export const he = {
       `למחוק את "${name}" לכולם? כל המשימות וההיסטוריה שבו יימחקו.`,
     removed: 'המרחב נמחק.',
     switchAria: 'המרחב הנוכחי',
+    newCode: 'יצירת קוד חדש',
+    confirmNewCode: 'הקוד הנוכחי יפסיק לעבוד, ומי שכבר במרחב יישאר בו. ליצור קוד חדש?',
+    newCodeDone: (code: string) => `הקוד החדש: ${code}`,
+    removeMember: 'הסרה',
+    removeMemberAria: (name: string) => `הסרת ${name} מהמרחב`,
+    removeMemberTitle: 'הסרה מהמרחב',
+    confirmRemoveMember: (name: string) =>
+      `להסיר את ${name} מהמרחב? המשימות שמשויכות אליו/ה יעברו להיות של כולם.`,
+    memberRemoved: (name: string) => `${name} הוסר/ה מהמרחב.`,
   },
 
   spaceSetup: {
