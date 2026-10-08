@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { isConfigured } from './lib/supabase'
 import { registerServiceWorker } from './lib/push'
 import { AppProvider, useApp } from './state/AppState'
@@ -7,7 +7,6 @@ import { SignIn } from './components/SignIn'
 import { TodayScreen } from './components/TodayScreen'
 import { TasksScreen } from './components/TasksScreen'
 import { RewardsScreen } from './components/RewardsScreen'
-import { StatsScreen } from './components/StatsScreen'
 import { MoreScreen } from './components/MoreScreen'
 import { SpaceSetup } from './components/SpaceScreen'
 import { applyLanguageToDocument, useI18n } from './lib/i18n'
@@ -16,6 +15,13 @@ import { readParam, stripParam } from './lib/urlParams'
 import { ChartIcon, DotsIcon, GiftIcon, HouseMark, ListIcon, TodayIcon } from './components/Icons'
 
 type Tab = 'today' | 'tasks' | 'rewards' | 'stats' | 'more'
+
+// Stats is the heaviest screen and the one opened least, so it is not part
+// of the first download. It is fetched in the background right after start
+// (see Shell), so it is there - and in the service worker's cache - well
+// before anyone taps it, even offline.
+const loadStats = () => import('./components/StatsScreen')
+const StatsScreen = lazy(() => loadStats().then((module) => ({ default: module.StatsScreen })))
 
 // The icons are fixed, the labels are not, so only the labels are looked up
 // per render.
@@ -63,6 +69,10 @@ function Shell() {
   useEffect(() => stripParam('tab'), [])
   // Back from any other tab returns to Today; only from Today does it leave.
   useBackClose(() => setTab('today'), tab !== 'today')
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadStats().catch(() => {}), 2000)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   if (loading) {
     return (
@@ -136,7 +146,11 @@ function Shell() {
         {tab === 'today' && <TodayScreen onManageTasks={() => setTab('tasks')} />}
         {tab === 'tasks' && <TasksScreen />}
         {tab === 'rewards' && <RewardsScreen />}
-        {tab === 'stats' && <StatsScreen />}
+        {tab === 'stats' && (
+          <Suspense fallback={<p className="muted screen">{t.common.loading}</p>}>
+            <StatsScreen />
+          </Suspense>
+        )}
         {tab === 'more' && <MoreScreen />}
       </main>
 
