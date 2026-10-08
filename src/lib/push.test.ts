@@ -5,7 +5,8 @@ import { FunctionsHttpError } from '@supabase/supabase-js'
 import { FunctionsClient } from '@supabase/functions-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setLanguage } from './i18n'
-import { sendTestNotification, shouldAutoRestorePush } from './push'
+import { sendTestNotification, shouldAutoRestorePush, signOut } from './push'
+import { supabase } from './supabase'
 
 // send-test returns a non-2xx status for every failure case (not
 // authenticated, no subscriptions, the server-side setup missing), and
@@ -126,5 +127,69 @@ describe('shouldAutoRestorePush', () => {
   it('never silently restores without an already-granted permission', () => {
     expect(shouldAutoRestorePush('default', 'prompt')).toBe(false)
     expect(shouldAutoRestorePush('denied', 'denied')).toBe(false)
+  })
+})
+
+// Signing out used to leave this device's push subscription on record for
+// the person who just left, so their reminders kept arriving on a phone they
+// were no longer signed in on.
+describe('signOut', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  function stubPushDevice(subscription: { endpoint: string; unsubscribe: () => Promise<boolean> } | Error) {
+    vi.stubGlobal('window', { PushManager: class {}, Notification: class {} })
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        getRegistration: async () => {
+          if (subscription instanceof Error) throw subscription
+          return { pushManager: { getSubscription: async () => subscription } }
+        },
+      },
+    })
+  }
+
+  it('removes this device\'s subscription before signing out', async () => {
+    const calls: string[] = []
+    const unsubscribe = vi.fn(async () => {
+      calls.push('unsubscribe')
+      return true
+    })
+    stubPushDevice({ endpoint: 'https://push.example/abc', unsubscribe })
+    const eq = vi.fn(async () => {
+      calls.push('delete row')
+      return { error: null }
+    })
+    vi.spyOn(supabase, 'from').mockReturnValue({ delete: () => ({ eq }) } as never)
+    vi.spyOn(supabase.auth, 'signOut').mockImplementation(async () => {
+      calls.push('sign out')
+      return { error: null }
+    })
+
+    await signOut()
+
+    expect(eq).toHaveBeenCalledWith('endpoint', 'https://push.example/abc')
+    expect(calls).toEqual(['delete row', 'unsubscribe', 'sign out'])
+  })
+
+  it('still signs out when removing the subscription fails', async () => {
+    stubPushDevice(new Error('offline'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const authSignOut = vi.spyOn(supabase.auth, 'signOut').mockResolvedValue({ error: null })
+
+    await signOut()
+
+    expect(authSignOut).toHaveBeenCalledOnce()
+  })
+
+  it('signs out normally on a browser without push support', async () => {
+    vi.stubGlobal('navigator', {})
+    const authSignOut = vi.spyOn(supabase.auth, 'signOut').mockResolvedValue({ error: null })
+
+    await signOut()
+
+    expect(authSignOut).toHaveBeenCalledOnce()
   })
 })
