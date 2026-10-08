@@ -5,6 +5,7 @@ import { classify, compareByCompletion, compareBySchedule } from '../lib/taskDue
 import { useApp } from '../state/AppState'
 import { useCompletion } from '../state/useCompletion'
 import { useSkip } from '../state/useSkip'
+import { draftToNewTask, useAddTask } from '../state/useAddTask'
 import { CompletionSheet } from './CompletionSheet'
 import { TaskCard, completedByLabel } from './TaskCard'
 import { TaskForm, type TaskDraft } from './TaskForm'
@@ -14,38 +15,16 @@ import { useToast } from './Toast'
 import { useI18n } from '../lib/i18n'
 import type { Member, Task } from '../lib/types'
 
-function draftToNewTask(draft: TaskDraft, spaceId: string) {
-  return {
-    spaceId,
-    title: draft.title,
-    description: draft.description,
-    taskType: draft.taskType,
-    recurrenceMode: draft.recurrenceMode ?? undefined,
-    intervalDays: draft.intervalDays,
-    weeklyDays: draft.weeklyDays,
-    endCondition: draft.endCondition,
-    endAfterCount: draft.endAfterCount,
-    endDate: draft.endDate,
-    points: draft.points,
-    reminderHour: draft.reminderHour,
-    reminderMinute: draft.reminderMinute,
-    dueDate: draft.dueDate,
-    assignedTo: draft.assignedTo || null,
-    startsAt: draft.startsAt,
-    expiresAt: draft.expiresAt,
-    reminderPolicy: draft.reminderPolicy,
-  }
-}
-
 type OwnerFilter = 'all' | 'mine' | 'everyone' | 'others'
 
 /** Every task in the selected space, whether or not it needs anything today. */
 export function TasksScreen() {
-  const { tasks, currentSpace, today, session, people, reload, patchTask, removeTask } = useApp()
+  const { tasks, currentSpace, today, session, people, patchTask, removeTask } = useApp()
   const { t, language } = useI18n()
   const { complete, undo } = useCompletion()
   const { skip, undo: undoSkip } = useSkip()
   const toast = useToast()
+  const createTask = useAddTask()
   const [members, setMembers] = useState<Member[]>([])
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Task | null>(null)
@@ -152,14 +131,8 @@ export function TasksScreen() {
   if (!currentSpace) return null
 
   async function addTask(draft: TaskDraft) {
-    if (!session) return
-    const created = await api.createTask(draftToNewTask(draft, currentSpace!.id), session.user.id)
+    await createTask(draft)
     setAdding(false)
-    await reload()
-    toast.show(t.tasks.added(draft.title.trim()))
-    if (created.assigned_to && created.assigned_to !== session.user.id) {
-      void api.notifyAssignment(created.id)
-    }
   }
 
   async function saveTask(draft: TaskDraft) {

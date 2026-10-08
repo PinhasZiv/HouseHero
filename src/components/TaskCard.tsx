@@ -55,6 +55,8 @@ interface TaskCardProps {
   /** The caller decides whether to offer this the same way onUndo does for
    *  a completion - based on whether this viewer is the one who skipped it. */
   onUndoSkip?: () => Promise<void>
+  /** Briefly called out - the card a notification was about. */
+  highlighted?: boolean
 }
 
 /**
@@ -85,6 +87,7 @@ export function TaskCard({
   onDuplicate,
   onSkip,
   onUndoSkip,
+  highlighted = false,
 }: TaskCardProps) {
   const { t, language } = useI18n()
   const { reminderOverrides } = useApp()
@@ -193,7 +196,10 @@ export function TaskCard({
       : null
 
   return (
-    <article className={`task-card task-${info.status} ${justCompleted ? 'task-just-completed' : ''}`}>
+    <article
+      className={`task-card task-${info.status} ${justCompleted ? 'task-just-completed' : ''} ${highlighted ? 'task-highlight' : ''}`}
+      data-task-id={task.id}
+    >
       {/* A completed task always shows its checkmark, even when this viewer
           has no way to act on it (didn't do it and isn't the one who tapped
           Done) - the same checked-but-disabled state already used for an

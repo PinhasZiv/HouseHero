@@ -164,6 +164,8 @@ export const he = {
       thirtyMinutes: 'חצי שעה',
       oneHour: 'שעה',
       threeHours: '3 שעות',
+      tonight: 'הערב ב-20:00',
+      morning: 'בבוקר ב-08:00',
     },
     custom: 'זמן מותאם אישית',
     setCustom: 'קביעה',
