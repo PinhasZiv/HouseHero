@@ -48,7 +48,7 @@ export default function App() {
 }
 
 function Shell() {
-  const { session, loading, error, spaces, currentSpace, setCurrentSpaceId } = useApp()
+  const { session, loading, error, stale, reload, spaces, currentSpace, setCurrentSpaceId } = useApp()
   const { t } = useI18n()
   const [tab, setTab] = useState<Tab>('today')
 
@@ -110,6 +110,15 @@ function Shell() {
           </select>
         )}
       </header>
+
+      {stale && (
+        <div className="stale-banner" role="status">
+          <span>{t.common.staleBanner}</span>
+          <button type="button" className="btn btn-ghost btn-small" onClick={() => void reload()}>
+            {t.common.tryAgain}
+          </button>
+        </div>
+      )}
 
       <main className="app-body">
         {tab === 'today' && <TodayScreen onManageTasks={() => setTab('tasks')} />}

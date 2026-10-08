@@ -224,6 +224,19 @@ button { font: inherit; cursor: pointer; }
   padding-bottom: 88px;
 }
 
+/* Not an error: the list below is still real, just possibly out of date -
+   amber like "due", not red like "late". */
+.stale-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 16px;
+  background: var(--due-soft);
+  color: var(--due);
+  font-size: 0.86rem;
+}
+
 .screen { padding: 16px 16px 8px; }
 
 .screen-header { margin-bottom: 18px; }

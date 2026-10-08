@@ -24,19 +24,6 @@ export function SettingsScreen() {
     void currentPushState().then(setPushState)
   }, [])
 
-  // Keeps the stored timezone in step with the device, silently - a task's
-  // reminder is computed against this value, so someone who moved should get
-  // reminded at the right local time without opening a settings toggle for it.
-  useEffect(() => {
-    if (!profile || !session) return
-    const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-    if (profile.timezone === deviceTimezone) return
-    void api
-      .updateProfile(session.user.id, { timezone: deviceTimezone })
-      .then(setProfile)
-      .catch(() => {})
-  }, [profile, session, setProfile])
-
   if (!profile || !session) return null
 
   async function toggleReminders(enabled: boolean) {

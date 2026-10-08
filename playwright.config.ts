@@ -23,6 +23,9 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:5184',
     trace: 'retain-on-failure',
+    // Matches the fake profile's own timezone, so the app's on-load timezone
+    // sync has nothing to change unless a test sets it up to.
+    timezoneId: 'Asia/Jerusalem',
     ...(existsSync(sandboxChromiumPath)
       ? { launchOptions: { executablePath: sandboxChromiumPath } }
       : {}),

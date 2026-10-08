@@ -27,6 +27,7 @@ export const en: Strings = {
     loading: 'Loading...',
     tryAgain: 'Try again',
     somethingWrong: 'Something went wrong',
+    staleBanner: 'No connection. Showing the last data loaded.',
     undo: 'Undo',
     close: 'Close',
     delete: 'Delete',

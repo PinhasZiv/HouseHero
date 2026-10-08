@@ -123,6 +123,11 @@ export interface FakeDb {
   otherPeople: { id: string; display_name: string | null; avatar_url: string | null; email: string | null; lifetime_points: number; spendable_points: number }[]
   /** Every send-assignment invocation this session made, in call order. */
   assignmentNotifications: { taskId: string }[]
+  /** While true, every REST call fails with a server error. (A 500 rather
+   *  than a dropped connection: supabase-js retries dropped GETs on its own
+   *  for ~7s per request, which only slows the test down - the app treats
+   *  both failures the same way.) */
+  failing?: boolean
 }
 
 export function makeFakeDb(overrides?: Partial<FakeDb>): FakeDb {
@@ -334,6 +339,7 @@ function applyUndoLastSkip(db: FakeDb, taskId: string) {
 
 export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void> {
   await page.route('**/rest/v1/**', async (route) => {
+    if (db.failing) return json(route, { message: 'service unavailable' }, 500)
     const request = route.request()
     const url = new URL(request.url())
     const method = request.method()
@@ -414,6 +420,13 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
       // fetchPeople: a narrower column set, always an array.
       const { id, display_name, avatar_url, email, lifetime_points, spendable_points } = db.profile
       return json(route, [{ id, display_name, avatar_url, email, lifetime_points, spendable_points }, ...db.otherPeople])
+    }
+
+    if (table === 'profiles' && method === 'PATCH') {
+      const idFilter = eqValue(url, 'id')
+      if (idFilter !== db.profile.id) return json(route, { message: 'not your profile' }, 403)
+      Object.assign(db.profile, request.postDataJSON() as Record<string, unknown>)
+      return json(route, wantsSingle ? db.profile : [db.profile])
     }
 
     if (table === 'spaces' && method === 'GET') return json(route, db.spaces)

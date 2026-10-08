@@ -29,6 +29,7 @@ export const he = {
     loading: 'טוען...',
     tryAgain: 'ניסיון נוסף',
     somethingWrong: 'משהו השתבש',
+    staleBanner: 'אין חיבור. מוצגים הנתונים האחרונים שנטענו.',
     undo: 'ביטול',
     close: 'סגירה',
     delete: 'מחיקה',
