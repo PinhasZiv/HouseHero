@@ -214,6 +214,7 @@ export const en: Strings = {
     assignedTo: 'Assigned to',
     add: 'Add task',
     delete: 'Delete this task',
+    duplicate: 'Duplicate this task',
     confirmDelete: (name: string) => `Delete "${name}"? This removes it for everyone in the space.`,
     errorNoName: 'Give the task a name.',
     errorPoints: 'Points must be between 1 and 1000.',

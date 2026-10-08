@@ -51,7 +51,8 @@ test.describe('converting a completed recurring task to one-time', () => {
     await page.getByRole('button', { name: 'חד-פעמית' }).click()
     await page.locator('.sheet').getByRole('button', { name: 'שמירה' }).click()
 
-    expect(db.tasks[0].is_done).toBe(true)
+    // The save is async - checking db right after the click raced it.
+    await expect.poll(() => db.tasks[0].is_done).toBe(true)
     // Moved into the completed section, not still asking to be done again.
     await expect(page.locator('.completed-group')).toBeVisible()
     await page.locator('.completed-group summary').click()
@@ -82,6 +83,9 @@ test.describe('converting a completed recurring task to one-time', () => {
     await page.getByRole('button', { name: 'חד-פעמית' }).click()
     await page.locator('.sheet').getByRole('button', { name: 'שמירה' }).click()
 
+    // Wait for the save to land, or is_done would trivially still be false.
+    await expect(page.locator('form.sheet')).toHaveCount(0)
+    expect(db.tasks[0].task_type).toBe('one_time')
     expect(db.tasks[0].is_done).toBe(false)
     await expect(page.locator('.task-card', { hasText: 'לשטוף כלים' })).toBeVisible()
     await expect(page.locator('.completed-group')).toHaveCount(0)

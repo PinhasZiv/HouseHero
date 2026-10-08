@@ -216,6 +216,7 @@ export const he = {
     assignedTo: 'שייכת ל',
     add: 'הוספת משימה',
     delete: 'מחיקת המשימה',
+    duplicate: 'שכפול המשימה',
     confirmDelete: (name: string) => `למחוק את "${name}"? המשימה תימחק אצל כל מי שנמצא במרחב.`,
     errorNoName: 'צריך לתת למשימה שם.',
     errorPoints: 'הניקוד צריך להיות בין 1 ל-1000.',
