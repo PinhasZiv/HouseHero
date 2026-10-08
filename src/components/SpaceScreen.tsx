@@ -8,6 +8,7 @@ import { useI18n } from '../lib/i18n'
 import { useDialog } from '../lib/useDialog'
 import type { Member } from '../lib/types'
 import { ConfirmSheet } from './ConfirmSheet'
+import { VacationCard } from './VacationCard'
 
 /** Who is in the space, how to invite someone else, and how to leave it. */
 export function SpaceScreen() {
@@ -143,6 +144,8 @@ export function SpaceScreen() {
           </div>
         )}
       </section>
+
+      <VacationCard spaceId={currentSpace.id} isOwner={isOwner} members={members} />
 
       <section className="card">
         <h3>{t.space.inviteTitle}</h3>

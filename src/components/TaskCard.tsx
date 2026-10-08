@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { celebrateAt, failAt } from '../lib/celebrate'
-import { classify } from '../lib/taskDue'
+import { classify, withPause } from '../lib/taskDue'
 import {
   describeInterval,
   describeWeeklyDays,
@@ -90,10 +90,10 @@ export function TaskCard({
   highlighted = false,
 }: TaskCardProps) {
   const { t, language } = useI18n()
-  const { reminderOverrides } = useApp()
+  const { reminderOverrides, isPaused } = useApp()
   const [busy, setBusy] = useState(false)
   const [justCompleted, setJustCompleted] = useState(false)
-  const info = classify(task, today)
+  const info = withPause(classify(task, today), isPaused(task))
 
   const isChecked = info.status === 'completed_today' || info.status === 'done'
   // Undoing only ever applies the same day it happened - an older completion
@@ -230,6 +230,7 @@ export function TaskCard({
           )}
           {info.status === 'due' && <span className="badge badge-due">{t.task.badgeDue}</span>}
           {info.status === 'active' && <span className="badge badge-active">{t.task.badgeActive}</span>}
+          {info.status === 'paused' && <span className="badge badge-paused">{t.vacation.badge}</span>}
           <span className="badge badge-points">
             <StarIcon size={12} /> {t.task.pointsBadge(task.points)}
           </span>
@@ -270,6 +271,8 @@ export function TaskCard({
             </span>
           ) : info.status === 'cancelled' ? (
             <span>{t.task.cancelledLabel}</span>
+          ) : info.status === 'paused' ? (
+            <span>{t.vacation.pausedLabel}</span>
           ) : (
             <span>{t.task.dueOn(formatDate(task.due_date, language))}</span>
           )}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CompletionChoice } from '../lib/api'
-import { classify, compareByCompletion, compareBySchedule, todayIn } from '../lib/taskDue'
+import { classify, compareByCompletion, compareBySchedule, todayIn, withPause } from '../lib/taskDue'
+import { personalPause, spacePause, type Pause } from '../lib/pauses'
 import { useApp } from '../state/AppState'
 import { useSnooze } from '../state/useSnooze'
 import { useCompletion } from '../state/useCompletion'
@@ -14,6 +15,7 @@ import * as api from '../lib/api'
 import { readParam, stripParam } from '../lib/urlParams'
 import type { Member, Task } from '../lib/types'
 import { useAddTask } from '../state/useAddTask'
+import { usePause } from '../state/usePause'
 import { PlusIcon } from './Icons'
 import { TaskForm } from './TaskForm'
 
@@ -42,7 +44,7 @@ const HIGHLIGHT_MS = 2500
  * contradict the notification that led here.
  */
 export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
-  const { tasks, spaces, people, today, session, snoozes, profile, currentSpace } = useApp()
+  const { tasks, spaces, people, today, session, snoozes, profile, currentSpace, pauses, isPaused } = useApp()
   const { t, language } = useI18n()
   const { complete, undo } = useCompletion()
   const { snooze, cancelSnooze } = useSnooze()
@@ -55,6 +57,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
   const [adding, setAdding] = useState(false)
   const [members, setMembers] = useState<Member[]>([])
   const addTask = useAddTask()
+  const { end: endPause } = usePause()
   // A notification about a single task carries its id - that card gets
   // scrolled to and briefly called out, instead of leaving the person to
   // hunt for it in the list.
@@ -104,10 +107,11 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
     const done: Task[] = []
     const startingToday: Task[] = []
     const snoozed: { task: Task; until: string }[] = []
+    const paused: Task[] = []
     let hiddenOthers = 0
 
     for (const task of tasks) {
-      const { status } = classify(task, today)
+      const { status } = withPause(classify(task, today), isPaused(task))
       const until = snoozes.get(task.id)
       const stillSnoozed = (status === 'late' || status === 'due') && until && new Date(until) > new Date()
 
@@ -117,7 +121,8 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
         status === 'late' ||
         status === 'due' ||
         status === 'completed_today' ||
-        status === 'skipped_today'
+        status === 'skipped_today' ||
+        status === 'paused'
       if (!onToday) continue
 
       // Someone else's assigned task: they get its reminder, not this
@@ -128,7 +133,10 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
         continue
       }
 
-      if (status === 'active') active.push(task)
+      // Frozen for a vacation: still visible, so nothing seems to vanish,
+      // but out of the way and never counted as waiting.
+      if (status === 'paused') paused.push(task)
+      else if (status === 'active') active.push(task)
       // A window opening in a few days does not belong on "today" - only one
       // whose window starts before this day is out (checked in onToday).
       else if (status === 'scheduled') startingToday.push(task)
@@ -149,10 +157,11 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
     done.sort(compareByCompletion)
     startingToday.sort((a, b) => (a.starts_at ?? '').localeCompare(b.starts_at ?? ''))
     snoozed.sort((a, b) => a.until.localeCompare(b.until))
+    paused.sort(compareBySchedule)
     const skippedCount = done.filter((task) => classify(task, today).status === 'skipped_today').length
-    return { active, late, due, done, startingToday, snoozed, hiddenOthers, skippedCount }
+    return { active, late, due, done, startingToday, snoozed, paused, hiddenOthers, skippedCount }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, today, snoozes, tick, timezone, showOthers, selfId])
+  }, [tasks, today, snoozes, tick, timezone, showOthers, selfId, isPaused])
 
   // The Snooze action on a notification opens here with ?snooze=1: there is
   // no single task to point at (the notification can cover several), so it
@@ -168,6 +177,24 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
   }, [])
 
   const spaceNames = useMemo(() => new Map(spaces.map((space) => [space.id, space.name])), [spaces])
+
+  // Every space this viewer is on vacation in - their own pause, or the
+  // whole space's. The button ends whichever one they are allowed to end.
+  const vacations = useMemo(() => {
+    const result: { spaceName: string; pause: Pause; self: boolean; canEnd: boolean }[] = []
+    for (const space of spaces) {
+      const whole = spacePause(pauses, space.id)
+      const mine = selfId ? personalPause(pauses, space.id, selfId) : null
+      if (whole) {
+        // The creator is the owner - joining never makes anyone one - and
+        // only the owner can end a whole-space vacation (end_pause() checks).
+        result.push({ spaceName: space.name, pause: whole, self: false, canEnd: space.created_by === selfId })
+      } else if (mine) {
+        result.push({ spaceName: space.name, pause: mine, self: true, canEnd: true })
+      }
+    }
+    return result
+  }, [spaces, pauses, selfId])
   const showSpaceNames = spaces.length > 1
 
   // Whoever was credited can undo, same as always; so can whoever actually
@@ -243,6 +270,17 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
           </button>
         )}
       </header>
+
+      {vacations.map(({ spaceName, pause, self, canEnd }) => (
+        <div key={pause.id} className="vacation-banner" role="status">
+          <span>{self ? t.vacation.bannerSelf(spaceName) : t.vacation.bannerSpace(spaceName)}</span>
+          {canEnd && (
+            <button type="button" className="btn btn-ghost btn-small" onClick={() => void endPause(pause)}>
+              {self ? t.vacation.back : t.vacation.backSpace}
+            </button>
+          )}
+        </div>
+      ))}
 
       {groups.active.length > 0 && (
         <section className="task-group">
@@ -338,6 +376,26 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
             />
           ))}
         </section>
+      )}
+
+      {groups.paused.length > 0 && (
+        <details className="task-group paused-group">
+          <summary className="group-title completed-summary">
+            {t.vacation.groupPaused} ({groups.paused.length})
+          </summary>
+          {groups.paused.map((task) => (
+            <TaskCard
+              key={task.id}
+              highlighted={task.id === highlightId}
+              task={task}
+              today={today}
+              spaceName={showSpaceNames ? spaceNames.get(task.space_id) : undefined}
+              assignedName={assignedName(task)}
+              onComplete={() => requestComplete(task)}
+              onOpen={() => setViewingHistory(task)}
+            />
+          ))}
+        </details>
       )}
 
       {groups.done.length > 0 && (

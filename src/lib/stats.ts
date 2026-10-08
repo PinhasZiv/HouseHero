@@ -5,6 +5,7 @@
 import { cycleLateness, dayOfWeek, daysBetween, missedCycles as cyclesMissedFor } from './taskDue'
 import type { StatsCompletion } from './api'
 import type { Task } from './types'
+import { activityFloor, isUserPaused, type Pause } from './pauses'
 
 /** How late a completion actually reads as, once wrapped to the task's own
  *  repeating schedule - see cycleLateness() for why a chronically-late
@@ -192,10 +193,17 @@ export function missedCyclesFromHistory(completions: StatsCompletion[]): MissedC
  *  cycles right now, even though nobody has completed them yet - the "still
  *  slipping" half a completion history alone cannot show, since these have
  *  no completion row at all. */
-export function missedCyclesFromOpenTasks(tasks: Task[], today: string): MissedCyclesEntry[] {
+export function missedCyclesFromOpenTasks(
+  tasks: Task[],
+  today: string,
+  isPaused: (task: Task) => boolean = () => false,
+): MissedCyclesEntry[] {
   const entries: MissedCyclesEntry[] = []
   for (const task of tasks) {
     if (task.is_done || task.task_type !== 'recurring') continue
+    // Frozen for a vacation: its due date is restarted on return, so the
+    // cycles going by meanwhile were never really missed.
+    if (isPaused(task)) continue
     const rawLate = daysBetween(task.due_date, today)
     const missed = cyclesMissedFor(task, task.due_date, rawLate)
     if (missed > 0) entries.push({ taskId: task.id, title: task.title, missed })
@@ -214,9 +222,10 @@ export function missedCyclesSummary(
   completions: StatsCompletion[],
   tasks: Task[],
   today: string,
+  isPaused?: (task: Task) => boolean,
 ): MissedCyclesSummary {
   const byTask = new Map<string, MissedCyclesEntry>()
-  for (const entry of [...missedCyclesFromHistory(completions), ...missedCyclesFromOpenTasks(tasks, today)]) {
+  for (const entry of [...missedCyclesFromHistory(completions), ...missedCyclesFromOpenTasks(tasks, today, isPaused)]) {
     const existing = byTask.get(entry.taskId) ?? { taskId: entry.taskId, title: entry.title, missed: 0 }
     existing.missed += entry.missed
     byTask.set(entry.taskId, existing)
@@ -239,7 +248,12 @@ export const INACTIVE_THRESHOLD_DAYS = 3
  * including someone who never has at all, which the leaderboard itself
  * cannot show since it only ever lists people who already have a completion.
  */
-export function inactiveMembers(memberIds: string[], completions: StatsCompletion[], today: string): InactiveMember[] {
+export function inactiveMembers(
+  memberIds: string[],
+  completions: StatsCompletion[],
+  today: string,
+  vacation?: { pauses: Pause[]; spaceId: string },
+): InactiveMember[] {
   const lastByUser = new Map<string, string>()
   for (const row of completions) {
     const current = lastByUser.get(row.user_id)
@@ -247,8 +261,14 @@ export function inactiveMembers(memberIds: string[], completions: StatsCompletio
   }
 
   return memberIds
+    // Away right now: silence is the whole point.
+    .filter((userId) => !vacation || !isUserPaused(vacation.pauses, vacation.spaceId, userId))
     .map((userId) => {
-      const last = lastByUser.get(userId)
+      let last = lastByUser.get(userId) ?? null
+      // Back from a vacation: the count starts from the day of return, not
+      // from the last thing done before leaving.
+      const floor = vacation ? activityFloor(vacation.pauses, vacation.spaceId, userId) : null
+      if (floor && (!last || floor > last)) last = floor
       return { userId, daysSinceLastCompletion: last ? daysBetween(last, today) : null }
     })
     .filter((entry) => entry.daysSinceLastCompletion === null || entry.daysSinceLastCompletion >= INACTIVE_THRESHOLD_DAYS)
