@@ -49,6 +49,9 @@ export function useCompletion() {
       ...task,
       due_date: outcome.nextDueDate ?? task.due_date,
       last_completed_date: completedOn,
+      // The done section sorts by this, so leaving the old value in place
+      // made the card jump once the server's row arrived.
+      last_completed_at: choice.completedAt ?? new Date().toISOString(),
       last_completed_by: credited,
       last_completed_actor: selfId,
       occurrences_completed: outcome.occurrencesCompleted,
