@@ -27,6 +27,18 @@ const TAB_ICONS: Record<Tab, (props: { size?: number }) => JSX.Element> = {
 
 const TAB_ORDER: Tab[] = ['today', 'tasks', 'rewards', 'stats', 'more']
 
+/** A notification can open the app on a specific tab (a reward request lands
+ *  on Rewards). One-shot: consumed so a later reload starts on Today again. */
+function consumeTabFlag(): Tab {
+  const params = new URLSearchParams(window.location.search)
+  const requested = params.get('tab')
+  if (!requested) return 'today'
+  params.delete('tab')
+  const rest = params.toString()
+  window.history.replaceState(window.history.state, '', window.location.pathname + (rest ? `?${rest}` : ''))
+  return (TAB_ORDER as string[]).includes(requested) ? (requested as Tab) : 'today'
+}
+
 export default function App() {
   useEffect(() => {
     void registerServiceWorker()
@@ -50,7 +62,7 @@ export default function App() {
 function Shell() {
   const { session, loading, error, stale, reload, spaces, currentSpace, setCurrentSpaceId } = useApp()
   const { t } = useI18n()
-  const [tab, setTab] = useState<Tab>('today')
+  const [tab, setTab] = useState<Tab>(consumeTabFlag)
 
   if (loading) {
     return (

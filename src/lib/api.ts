@@ -483,8 +483,26 @@ export async function fetchRedemptions(spaceId: string): Promise<RewardRedemptio
 
 export async function requestRedemption(rewardId: string): Promise<RewardRedemption> {
   const { data, error } = await supabase.rpc('request_redemption', { p_reward: rewardId }).single()
-  if (error) throw error
+  if (error) {
+    throw new Error(error.message.includes('insufficient_points') ? t().rewards.notEnoughPoints : error.message)
+  }
   return data as RewardRedemption
+}
+
+/**
+ * Tells the other side of a reward request what just happened - a new request
+ * to everyone else in the space, a decision back to the requester. Best-effort
+ * and fire-and-forget, the same as notifyAssignment().
+ */
+export async function notifyRedemption(redemptionId: string): Promise<void> {
+  try {
+    await withRetry(async () => {
+      const { error } = await supabase.functions.invoke('send-redemption', { body: { redemptionId } })
+      if (error) throw error
+    }, COLD_START_RETRY_DELAYS_MS)
+  } catch (cause) {
+    console.error('could not send the redemption notification', cause)
+  }
 }
 
 export async function approveRedemption(redemptionId: string): Promise<RewardRedemption> {

@@ -290,6 +290,15 @@ export const he = {
     errorCost: 'המחיר צריך להיות לפחות נקודה אחת.',
     added: (title: string) => `${title} נוסף.`,
     deleted: 'התגמול נמחק.',
+    missingPoints: (n: number) => `חסרות ${n}`,
+    reservedNote: (n: number) => `${pointsWord(n, 'he')} שמורות לבקשות שממתינות לאישור.`,
+    historyTitle: (n: number) => `היסטוריית מימושים (${n})`,
+    historyRow: (who: string, title: string) => `${who}: ${title}`,
+    status: {
+      approved: 'אושר',
+      rejected: 'נדחה',
+      cancelled: 'בוטל',
+    },
   },
 
   stats: {

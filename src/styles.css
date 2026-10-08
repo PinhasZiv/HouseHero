@@ -497,6 +497,10 @@ button { font: inherit; cursor: pointer; }
 }
 
 .chip-assign { background: var(--accent-soft); color: var(--accent-strong); }
+.chip-status-approved { background: var(--accent-soft); color: var(--accent-strong); }
+.chip-status-rejected { background: var(--late-soft); color: var(--late); }
+.chip-status-cancelled { background: var(--surface-2); color: var(--text-muted); }
+.reserved-note { margin: -6px 0 14px; }
 
 .complete-button {
   display: flex;

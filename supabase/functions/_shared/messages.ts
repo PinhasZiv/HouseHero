@@ -100,6 +100,44 @@ export const TEST_NOTIFICATION: Record<Language, { title: string; body: string }
   },
 }
 
+/** To everyone else in the space when someone asks to redeem a reward - one of
+ *  them has to approve it, and until now nobody found out unless they happened
+ *  to open the Rewards tab. */
+export function composeRedemptionRequest(
+  rewardTitle: string,
+  cost: number,
+  byName: string | null,
+  language: Language,
+): { title: string; body: string } {
+  if (language === 'en') {
+    return {
+      title: 'A reward is waiting for approval',
+      body: `${byName ?? 'Someone'} asked for "${rewardTitle}" (${cost} points).`,
+    }
+  }
+  return {
+    title: 'בקשה לתגמול מחכה לאישור',
+    body: `${byName ?? 'מישהו'} ביקש/ה את "${rewardTitle}" (${cost} נק').`,
+  }
+}
+
+/** To the requester once someone else approves or rejects their request. */
+export function composeRedemptionDecision(
+  rewardTitle: string,
+  approved: boolean,
+  byName: string | null,
+  language: Language,
+): { title: string; body: string } {
+  if (language === 'en') {
+    return approved
+      ? { title: 'Reward approved!', body: `${byName ?? 'Someone'} approved "${rewardTitle}". Enjoy!` }
+      : { title: 'Reward request declined', body: `${byName ?? 'Someone'} declined "${rewardTitle}".` }
+  }
+  return approved
+    ? { title: 'התגמול אושר!', body: `${byName ?? 'מישהו'} אישר/ה את "${rewardTitle}". תהנה/י!` }
+    : { title: 'הבקשה לתגמול נדחתה', body: `${byName ?? 'מישהו'} דחה/תה את "${rewardTitle}".` }
+}
+
 /**
  * The one-shot push sent the moment a task is assigned to someone specific -
  * separate from composeReminder, which only fires later, at the task's own

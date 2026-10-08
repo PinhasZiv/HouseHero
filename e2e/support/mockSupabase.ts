@@ -123,6 +123,8 @@ export interface FakeDb {
   otherPeople: { id: string; display_name: string | null; avatar_url: string | null; email: string | null; lifetime_points: number; spendable_points: number }[]
   /** Every send-assignment invocation this session made, in call order. */
   assignmentNotifications: { taskId: string }[]
+  /** Every send-redemption invocation this session made, in call order. */
+  redemptionNotifications: { redemptionId: string }[]
   /** While true, every REST call fails with a server error. (A 500 rather
    *  than a dropped connection: supabase-js retries dropped GETs on its own
    *  for ~7s per request, which only slows the test down - the app treats
@@ -162,6 +164,7 @@ export function makeFakeDb(overrides?: Partial<FakeDb>): FakeDb {
     redemptions: [],
     otherPeople: [],
     assignmentNotifications: [],
+    redemptionNotifications: [],
     ...overrides,
   }
 }
@@ -380,6 +383,14 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
       if (fn === 'request_redemption') {
         const reward = db.rewards.find((r) => r.id === body.p_reward)
         if (!reward) return json(route, { message: 'no_such_reward' }, 404)
+        // Mirrors request_redemption(): what is left after this person's own
+        // pending requests has to cover the cost.
+        const reserved = db.redemptions
+          .filter((r) => r.requested_by === FAKE_USER_ID && r.status === 'pending')
+          .reduce((sum, r) => sum + r.cost, 0)
+        if (db.profile.spendable_points - reserved < reward.cost) {
+          return json(route, { message: 'insufficient_points' }, 400)
+        }
         const redemption: FakeRedemption = {
           id: `redemption-${db.redemptions.length + 1}`,
           space_id: reward.space_id,
@@ -393,6 +404,27 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
           decided_at: null,
         }
         db.redemptions.push(redemption)
+        return json(route, wantsSingle ? redemption : [redemption])
+      }
+      if (fn === 'approve_redemption' || fn === 'reject_redemption') {
+        const redemption = db.redemptions.find((r) => r.id === body.p_redemption)
+        if (!redemption) return json(route, { message: 'no_such_redemption' }, 404)
+        if (redemption.status !== 'pending') return json(route, { message: 'not_pending' }, 409)
+        if (redemption.requested_by === FAKE_USER_ID) {
+          return json(route, { message: fn === 'approve_redemption' ? 'cannot_approve_own_request' : 'cannot_reject_own_request' }, 403)
+        }
+        if (fn === 'approve_redemption') {
+          const requester = db.otherPeople.find((p) => p.id === redemption.requested_by)
+          if (!requester || requester.spendable_points < redemption.cost) {
+            return json(route, { message: 'insufficient_points' }, 400)
+          }
+          requester.spendable_points -= redemption.cost
+          redemption.status = 'approved'
+          redemption.approved_by = FAKE_USER_ID
+        } else {
+          redemption.status = 'rejected'
+        }
+        redemption.decided_at = new Date().toISOString()
         return json(route, wantsSingle ? redemption : [redemption])
       }
       if (fn === 'cancel_redemption') {
@@ -619,6 +651,11 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
     if (fn === 'send-assignment') {
       const body = route.request().postDataJSON() as { taskId: string }
       db.assignmentNotifications.push({ taskId: body.taskId })
+      return json(route, { ok: true, delivered: 1, devices: 1 })
+    }
+    if (fn === 'send-redemption') {
+      const body = route.request().postDataJSON() as { redemptionId: string }
+      db.redemptionNotifications.push({ redemptionId: body.redemptionId })
       return json(route, { ok: true, delivered: 1, devices: 1 })
     }
     return json(route, { message: `unmocked function: ${fn}` }, 404)

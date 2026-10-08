@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import * as api from '../lib/api'
 import { burstConfetti, failAt } from '../lib/celebrate'
 import { errorMessage } from '../lib/errors'
+import { formatDate } from '../lib/format'
 import { useI18n } from '../lib/i18n'
+import { supabase } from '../lib/supabase'
 import { useApp } from '../state/AppState'
 import { useToast } from './Toast'
 import { PointsBar } from './PointsBar'
@@ -120,7 +122,7 @@ function RewardForm({
 
 export function RewardsScreen() {
   const { currentSpace, session, profile, people } = useApp()
-  const { t } = useI18n()
+  const { t, language } = useI18n()
   const toast = useToast()
   const selfId = session?.user.id ?? null
 
@@ -151,14 +153,43 @@ export function RewardsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSpace?.id])
 
+  // A request (or a decision on one) made on someone else's phone shows up
+  // here without leaving and reopening the tab.
+  useEffect(() => {
+    if (!currentSpace) return
+    const channel = supabase
+      .channel(`redemptions-${currentSpace.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reward_redemptions', filter: `space_id=eq.${currentSpace.id}` },
+        () => void load().catch(() => {}),
+      )
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSpace?.id])
+
   if (!currentSpace || !profile) return null
 
   const pending = redemptions.filter((r) => r.status === 'pending')
+  const history = redemptions.filter((r) => r.status !== 'pending')
+  // Points already promised to this person's own pending requests - the
+  // server refuses a request that does not fit in what is left.
+  const reserved = pending.filter((r) => r.requested_by === selfId).reduce((sum, r) => sum + r.cost, 0)
+  const available = profile.spendable_points - reserved
+
+  function personName(userId: string): string {
+    const person = people.get(userId)
+    return person?.display_name || person?.email || t.task.someoneElse
+  }
 
   async function redeem(reward: Reward, event: React.MouseEvent<HTMLButtonElement>) {
     const { clientX: x, clientY: y } = event
     try {
-      await api.requestRedemption(reward.id)
+      const redemption = await api.requestRedemption(reward.id)
+      void api.notifyRedemption(redemption.id)
       burstConfetti(x, y)
       toast.show(t.rewards.requested(reward.title))
       await load()
@@ -172,6 +203,7 @@ export function RewardsScreen() {
     const { clientX: x, clientY: y } = event
     try {
       await api.approveRedemption(redemption.id)
+      void api.notifyRedemption(redemption.id)
       burstConfetti(x, y)
       toast.show(t.rewards.approved(redemption.reward_title))
       setCelebrate(true)
@@ -189,6 +221,7 @@ export function RewardsScreen() {
     const { clientX: x, clientY: y } = event
     try {
       await api.rejectRedemption(redemption.id)
+      void api.notifyRedemption(redemption.id)
       toast.show(t.rewards.rejected(redemption.reward_title))
       await load()
     } catch (cause) {
@@ -244,6 +277,7 @@ export function RewardsScreen() {
       </header>
 
       <PointsBar lifetime={profile.lifetime_points} spendable={profile.spendable_points} celebrate={celebrate} />
+      {reserved > 0 && <p className="muted small reserved-note">{t.rewards.reservedNote(reserved)}</p>}
 
       {pending.length > 0 && (
         <section className="task-group">
@@ -323,22 +357,26 @@ export function RewardsScreen() {
               <div className="task-main">
                 <div className="task-headline">
                   <h3 className="task-name">{reward.title}</h3>
-                  <span
-                    className={`badge badge-points ${profile.spendable_points < reward.cost ? 'badge-muted' : ''}`}
-                  >
+                  <span className={`badge badge-points ${available < reward.cost ? 'badge-muted' : ''}`}>
                     {t.rewards.cost(reward.cost)}
                   </span>
                 </div>
                 {reward.description && <p className="task-meta">{reward.description}</p>}
               </div>
-              <button
-                type="button"
-                className="complete-button"
-                onClick={(event) => redeem(reward, event)}
-                aria-label={t.rewards.redeemAria(reward.title)}
-              >
-                {t.rewards.redeem}
-              </button>
+              {available < reward.cost ? (
+                <button type="button" className="complete-button complete-button-muted" disabled>
+                  {t.rewards.missingPoints(reward.cost - Math.max(0, available))}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="complete-button"
+                  onClick={(event) => redeem(reward, event)}
+                  aria-label={t.rewards.redeemAria(reward.title)}
+                >
+                  {t.rewards.redeem}
+                </button>
+              )}
               <button
                 type="button"
                 className="icon-button"
@@ -350,6 +388,27 @@ export function RewardsScreen() {
             </article>
           ))}
         </section>
+      )}
+
+      {history.length > 0 && (
+        <details className="task-group completed-group redemption-history">
+          <summary className="group-title completed-summary">{t.rewards.historyTitle(history.length)}</summary>
+          <ul className="history-list">
+            {history.map((redemption) => (
+              <li key={redemption.id} className="history-row">
+                <span className="history-date">
+                  {formatDate((redemption.decided_at ?? redemption.requested_at).slice(0, 10), language)}
+                </span>
+                <span className="history-who">
+                  {t.rewards.historyRow(personName(redemption.requested_by), redemption.reward_title)}
+                </span>
+                <span className={`chip chip-status-${redemption.status}`}>
+                  {t.rewards.status[redemption.status as 'approved' | 'rejected' | 'cancelled']}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
 
       <button type="button" className="fab" onClick={() => setAdding(true)} aria-label={t.rewards.addAria}>
