@@ -440,10 +440,15 @@ button { font: inherit; cursor: pointer; }
   flex-wrap: wrap;
 }
 
+/* Up to two lines before a long name is cut - most of it stays readable
+   without opening the task; the full name is in its details sheet. */
 .task-headline h3 {
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 /* A task's title may be Hebrew or English. plaintext lets each name pick its
