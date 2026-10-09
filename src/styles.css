@@ -479,6 +479,12 @@ button { font: inherit; cursor: pointer; }
   unicode-bidi: isolate;
 }
 
+/* The one schedule fact the card keeps: how long until the next time. */
+.task-countdown {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .badge {
   font-size: 0.74rem;
   font-weight: 650;

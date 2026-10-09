@@ -86,6 +86,7 @@ export const en: Strings = {
     nextIn: (when: string) => `next ${when}`,
     dueOn: (date: string) => `due: ${date}`,
     nextOn: (date: string) => `next: ${date}`,
+    countdown: (n: number) => `in ${days(n, 'en')}`,
     someoneElse: 'someone else',
     assignedTo: (who: string) => `assigned to ${who}`,
     assignedToYou: 'assigned to you',
@@ -143,6 +144,8 @@ export const en: Strings = {
       assignedTo: 'Assigned to',
       ends: 'Ends',
       endsAfterCount: (n: number) => `After ${n} times`,
+      nextOccurrence: 'Next time',
+      dueDate: 'Due date',
     },
   },
 

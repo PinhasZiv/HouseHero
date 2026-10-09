@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import * as api from '../lib/api'
-import { describeInterval, describeWeeklyDays, formatDate, formatSnoozeUntil, formatTime, personLabel } from '../lib/format'
+import { describeInterval, describeWeeklyDays, formatDate, formatSnoozeUntil, formatTime, personLabel, relativeDay } from '../lib/format'
 import { googleCalendarUrl } from '../lib/googleCalendar'
 import { useI18n } from '../lib/i18n'
 import { useDialog } from '../lib/useDialog'
@@ -150,6 +150,15 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
         <dl className="task-detail-grid">
           <dt>{t.history.detail.points}</dt>
           <dd>{t.task.pointsBadge(task.points)}</dd>
+
+          {task.task_type !== 'time_limited' && !task.is_done && (
+            <>
+              <dt>{task.task_type === 'recurring' ? t.history.detail.nextOccurrence : t.history.detail.dueDate}</dt>
+              <dd>
+                {formatDate(task.due_date, language)} · {relativeDay(task.due_date, today, language)}
+              </dd>
+            </>
+          )}
 
           {task.task_type === 'time_limited' ? (
             <>

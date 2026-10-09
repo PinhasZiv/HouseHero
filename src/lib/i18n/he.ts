@@ -89,6 +89,7 @@ export const he = {
     nextIn: (when: string) => `הבאה ${when}`,
     dueOn: (date: string) => `יעד: ${date}`,
     nextOn: (date: string) => `הבאה: ${date}`,
+    countdown: (n: number) => `עוד ${days(n, 'he')}`,
     someoneElse: 'מישהו אחר',
     assignedTo: (who: string) => `שייכת ל${who}`,
     assignedToYou: 'שייכת אליך',
@@ -146,6 +147,8 @@ export const he = {
       assignedTo: 'שייכת ל',
       ends: 'מסתיימת',
       endsAfterCount: (n: number) => `אחרי ${n} פעמים`,
+      nextOccurrence: 'המופע הבא',
+      dueDate: 'תאריך יעד',
     },
   },
 

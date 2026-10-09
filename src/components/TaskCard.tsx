@@ -1,14 +1,10 @@
 import { useState } from 'react'
 import { celebrateAt, failAt } from '../lib/celebrate'
-import { classify, withPause } from '../lib/taskDue'
+import { classify, daysBetween, withPause } from '../lib/taskDue'
 import {
-  describeInterval,
-  describeWeeklyDays,
-  formatDate,
   formatSnoozeUntil,
   formatTime,
   personLabel,
-  relativeDay,
   type PersonLabel,
 } from '../lib/format'
 import { useI18n, type Language } from '../lib/i18n'
@@ -179,12 +175,14 @@ export function TaskCard({
     }
   }
 
-  const recurrenceLabel =
-    task.task_type === 'recurring'
-      ? task.recurrence_mode === 'weekly_days'
-        ? describeWeeklyDays(task.weekly_days ?? [], language)
-        : describeInterval(task.interval_days ?? 1, language)
-      : null
+  // At a glance only one thing about the schedule matters: how long until
+  // this comes around again. The date itself and the repeat pattern are one
+  // tap away, in the task's details sheet.
+  const daysUntilNext = task.is_done ? null : daysBetween(today, task.due_date)
+  const countdownLabel = daysUntilNext !== null && daysUntilNext > 0 ? t.task.countdown(daysUntilNext) : null
+  // Not yet due: the countdown is the headline fact, so it leads the line.
+  // (Done today or skipped, it follows "done by ..." instead.)
+  const leadingCountdown = !snoozedUntil && info.status === 'upcoming' ? countdownLabel : null
 
   // Tells apart copies of the same chore at different times of day (morning
   // and evening drops). This viewer's own override wins, so it matches the
@@ -237,8 +235,8 @@ export function TaskCard({
         </div>
 
         <p className="task-meta">
+          {leadingCountdown && <span className="task-countdown">{leadingCountdown}</span>}
           {spaceName && <span className="chip">{spaceName}</span>}
-          {recurrenceLabel && <span>{recurrenceLabel}</span>}
           {reminderLabel && <span className="task-meta-time">{reminderLabel}</span>}
           {assignedName && <span className="chip chip-assign">{assignedName}</span>}
           {snoozedUntil ? (
@@ -252,14 +250,12 @@ export function TaskCard({
                     ? t.task.completedByGroup(completedBy.count)
                     : t.task.completedBy(completedBy.name ?? t.task.someoneElse)}
               </span>
-              {task.task_type === 'recurring' && !task.is_done && (
-                <span>{t.task.nextIn(relativeDay(task.due_date, today, language))}</span>
-              )}
+              {countdownLabel && <span className="task-countdown">{countdownLabel}</span>}
             </>
           ) : info.status === 'skipped_today' ? (
             <>
               <span>{t.task.skippedLabel}</span>
-              {!task.is_done && <span>{t.task.nextIn(relativeDay(task.due_date, today, language))}</span>}
+              {countdownLabel && <span className="task-countdown">{countdownLabel}</span>}
             </>
           ) : info.status === 'active' && task.expires_at ? (
             <span>{t.task.activeUntil(formatSnoozeUntil(task.expires_at, today, language))}</span>
@@ -273,9 +269,10 @@ export function TaskCard({
             <span>{t.task.cancelledLabel}</span>
           ) : info.status === 'paused' ? (
             <span>{t.vacation.pausedLabel}</span>
-          ) : (
-            <span>{t.task.dueOn(formatDate(task.due_date, language))}</span>
-          )}
+          ) : null
+          // Not yet due leads with its countdown (above); due today or late
+          // already says so in its badge; a finished task has no next time.
+          }
         </p>
       </button>
 
