@@ -86,7 +86,7 @@ export const en: Strings = {
     nextIn: (when: string) => `next ${when}`,
     dueOn: (date: string) => `due: ${date}`,
     nextOn: (date: string) => `next: ${date}`,
-    countdown: (n: number) => `in ${days(n, 'en')}`,
+    countdown: (n: number) => (n === 1 ? 'tomorrow' : `in ${days(n, 'en')}`),
     someoneElse: 'someone else',
     assignedTo: (who: string) => `assigned to ${who}`,
     assignedToYou: 'assigned to you',
