@@ -73,6 +73,16 @@ describe('counting in Hebrew', () => {
   })
 })
 
+describe('the countdown on a task card', () => {
+  it('says tomorrow for one day, and counts the rest', () => {
+    expect(he.task.countdown(1)).toBe('מחר')
+    expect(he.task.countdown(2)).toBe('עוד יומיים')
+    expect(he.task.countdown(9)).toBe('עוד 9 ימים')
+    expect(en.task.countdown(1)).toBe('tomorrow')
+    expect(en.task.countdown(5)).toBe('in 5 days')
+  })
+})
+
 describe('counting in English', () => {
   it('pluralises normally', () => {
     expect(days(1, 'en')).toBe('1 day')
