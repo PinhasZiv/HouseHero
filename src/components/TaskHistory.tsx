@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import * as api from '../lib/api'
 import { describeInterval, describeWeeklyDays, formatDate, formatSnoozeUntil, formatTime, personLabel, relativeDay } from '../lib/format'
 import { googleCalendarUrl } from '../lib/googleCalendar'
+import { currentOccurrence } from '../lib/taskDue'
 import { useI18n } from '../lib/i18n'
 import { useDialog } from '../lib/useDialog'
 import { useApp } from '../state/AppState'
@@ -66,6 +67,11 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
       cancelled = true
     }
   }, [task.id, toast])
+
+  // Not the raw due_date: a recurring task a full cycle or more overdue is on
+  // a later occurrence than the one it was first due on - the same one its
+  // card's badge counts from.
+  const occurrence = currentOccurrence(task, today)
 
   const scheduleLabel =
     task.task_type === 'one_time'
@@ -153,9 +159,15 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
 
           {task.task_type !== 'time_limited' && !task.is_done && (
             <>
-              <dt>{task.task_type === 'recurring' ? t.history.detail.nextOccurrence : t.history.detail.dueDate}</dt>
+              <dt>
+                {task.task_type !== 'recurring'
+                  ? t.history.detail.dueDate
+                  : occurrence <= today
+                    ? t.history.detail.currentOccurrence
+                    : t.history.detail.nextOccurrence}
+              </dt>
               <dd>
-                {formatDate(task.due_date, language)} · {relativeDay(task.due_date, today, language)}
+                {formatDate(occurrence, language)} · {relativeDay(occurrence, today, language)}
               </dd>
             </>
           )}

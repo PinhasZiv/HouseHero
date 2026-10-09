@@ -3,6 +3,7 @@ import {
   actionable,
   addDays,
   classify,
+  currentOccurrence,
   cycleLateness,
   daysBetween,
   formatTimeIn,
@@ -480,5 +481,40 @@ describe('planSkip', () => {
     const outcome = planSkip(t, '2026-05-10')
     expect(outcome.finished).toBe(false)
     expect(outcome.occurrencesCompleted).toBe(2)
+  })
+})
+
+describe('currentOccurrence', () => {
+  // 2026-10-02 and 2026-10-09 are both Fridays.
+  it('is today for a weekly task a full week overdue - its badge says due today, not a week late', () => {
+    const weekly = task({ interval_days: 7, due_date: '2026-10-02' })
+    expect(classify(weekly, '2026-10-09').status).toBe('due')
+    expect(currentOccurrence(weekly, '2026-10-09')).toBe('2026-10-09')
+  })
+
+  it('is the latest occurrence that went by, for a task late past a full cycle', () => {
+    const weekly = task({ interval_days: 7, due_date: '2026-09-28' })
+    // 11 days late on a 7-day cycle: 4 days into the second missed week.
+    expect(classify(weekly, '2026-10-09').daysLate).toBe(4)
+    expect(currentOccurrence(weekly, '2026-10-09')).toBe('2026-10-05')
+  })
+
+  it('is the due date itself while late within one cycle', () => {
+    expect(currentOccurrence(task({ due_date: '2026-10-07' }), '2026-10-09')).toBe('2026-10-07')
+  })
+
+  it('is the due date itself for a task not yet due', () => {
+    expect(currentOccurrence(task({ due_date: '2026-10-12' }), '2026-10-09')).toBe('2026-10-12')
+  })
+
+  it('follows the chosen weekdays for a weekly-days task', () => {
+    // Sundays and Wednesdays; due Sunday 2026-09-27, today Friday 2026-10-09.
+    const days = task({ recurrence_mode: 'weekly_days', interval_days: null, weekly_days: [0, 3], due_date: '2026-09-27' })
+    expect(currentOccurrence(days, '2026-10-09')).toBe('2026-10-07')
+  })
+
+  it('never moves a one-time task off its due date', () => {
+    const once = task({ task_type: 'one_time', recurrence_mode: null, interval_days: null, due_date: '2026-09-20' })
+    expect(currentOccurrence(once, '2026-10-09')).toBe('2026-09-20')
   })
 })

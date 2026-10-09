@@ -105,3 +105,31 @@ test('a long name wraps to two lines before it is cut', async ({ page }) => {
   const height = (await name.boundingBox())?.height ?? 0
   expect(Math.round(height / lineHeight)).toBe(2)
 })
+
+test('a weekly task a full week overdue is due today in its details too, not "a week ago"', async ({ page }) => {
+  const db = makeFakeDb({
+    tasks: [
+      task('wrapped', 'ניקוי שירותים', { interval_days: 7, due_date: shift(-7) }),
+      task('late', 'ניקיון בית', { interval_days: 7, due_date: shift(-9) }),
+    ],
+  })
+  await seed(page, db)
+  await page.goto('/')
+  await page.locator('.tab-bar').getByRole('button', { name: 'משימות' }).click()
+
+  const wrapped = page.locator('.task-card', { hasText: 'ניקוי שירותים' })
+  await expect(wrapped.locator('.badge-due')).toBeVisible()
+  await wrapped.locator('.task-main').click()
+  const sheet = page.getByRole('dialog', { name: 'ניקוי שירותים' })
+  await expect(sheet).toContainText('המופע הנוכחי')
+  await expect(sheet).toContainText('היום')
+  await expect(sheet).not.toContainText('לפני')
+  await sheet.getByRole('button', { name: 'סגירה' }).click()
+
+  // Nine days on a weekly cycle: two days into the second missed week -
+  // matching its "two days late" badge.
+  const late = page.locator('.task-card', { hasText: 'ניקיון בית' })
+  await expect(late.locator('.badge-late')).toContainText('יומיים')
+  await late.locator('.task-main').click()
+  await expect(page.getByRole('dialog', { name: 'ניקיון בית' })).toContainText('לפני יומיים')
+})

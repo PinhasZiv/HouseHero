@@ -145,6 +145,7 @@ export const he = {
       ends: 'מסתיימת',
       endsAfterCount: (n: number) => `אחרי ${n} פעמים`,
       nextOccurrence: 'המופע הבא',
+      currentOccurrence: 'המופע הנוכחי',
       dueDate: 'תאריך יעד',
     },
   },
