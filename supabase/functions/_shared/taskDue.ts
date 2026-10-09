@@ -222,6 +222,20 @@ export function missedCycles(task: CyclicTask, dueDate: string, rawDaysLate: num
   return cycleProgress(task, dueDate, rawDaysLate).cyclesMissed
 }
 
+/**
+ * The date of the occurrence a task is on right now - what its badge counts
+ * from - rather than the raw due_date. The two differ once a recurring task
+ * has gone a full cycle or more without being done: due_date stays on the
+ * first occurrence that was missed, while the lateness wraps to the latest
+ * one (see cycleLateness()). A weekly task due last Friday is, this Friday,
+ * simply due today - and this returns today, not last Friday.
+ */
+export function currentOccurrence(task: DueTask, today: string): string {
+  const rawLate = daysBetween(task.due_date, today)
+  if (rawLate <= 0) return task.due_date
+  return addDays(today, -cycleLateness(task, task.due_date, rawLate))
+}
+
 export function classify(task: DueTask, today: string, now: Date = new Date()): DueInfo {
   if (task.task_type === 'time_limited') return classifyTimeLimited(task, today, now)
 

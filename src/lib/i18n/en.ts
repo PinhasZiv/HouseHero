@@ -142,6 +142,7 @@ export const en: Strings = {
       ends: 'Ends',
       endsAfterCount: (n: number) => `After ${n} times`,
       nextOccurrence: 'Next time',
+      currentOccurrence: 'This time',
       dueDate: 'Due date',
     },
   },
