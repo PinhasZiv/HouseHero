@@ -180,8 +180,8 @@ export function TaskCard({
   // tap away, in the task's details sheet.
   const daysUntilNext = task.is_done ? null : daysBetween(today, task.due_date)
   const countdownLabel = daysUntilNext !== null && daysUntilNext > 0 ? t.task.countdown(daysUntilNext) : null
-  // Not yet due: the countdown is the headline fact, so it leads the line.
-  // (Done today or skipped, it follows "done by ..." instead.)
+  // Only a task not yet due shows it, leading the line - done or skipped
+  // today is settled, and due or late says so in its badge.
   const leadingCountdown = !snoozedUntil && info.status === 'upcoming' ? countdownLabel : null
 
   // Tells apart copies of the same chore at different times of day (morning
@@ -250,13 +250,11 @@ export function TaskCard({
                     ? t.task.completedByGroup(completedBy.count)
                     : t.task.completedBy(completedBy.name ?? t.task.someoneElse)}
               </span>
-              {countdownLabel && <span className="task-countdown">{countdownLabel}</span>}
             </>
           ) : info.status === 'skipped_today' ? (
-            <>
-              <span>{t.task.skippedLabel}</span>
-              {countdownLabel && <span className="task-countdown">{countdownLabel}</span>}
-            </>
+            // Done or skipped is settled for today: when it comes around again
+            // only muddles that, and the details sheet still says.
+            <span>{t.task.skippedLabel}</span>
           ) : info.status === 'active' && task.expires_at ? (
             <span>{t.task.activeUntil(formatSnoozeUntil(task.expires_at, today, language))}</span>
           ) : info.status === 'scheduled' && task.starts_at ? (
