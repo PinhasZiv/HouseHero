@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import * as api from '../lib/api'
 import { describeInterval, describeWeeklyDays, formatDate, formatSnoozeUntil, formatTime, personLabel, relativeDay } from '../lib/format'
 import { googleCalendarUrl } from '../lib/googleCalendar'
-import { currentOccurrence } from '../lib/taskDue'
+import { currentOccurrence, formatTimeIn, todayIn } from '../lib/taskDue'
+import { buildTimeline, type TimelineEntry } from '../lib/taskTimeline'
 import { useI18n } from '../lib/i18n'
 import { useDialog } from '../lib/useDialog'
 import { useApp } from '../state/AppState'
 import type { Task, TaskHistoryEntry, TaskSkipEntry } from '../lib/types'
-import { CalendarIcon, PencilIcon } from './Icons'
+import { CalendarIcon, CheckIcon, PencilIcon, SkipIcon, TodayIcon, XIcon } from './Icons'
 import { ReminderOverrideSheet } from './ReminderOverrideSheet'
 import { useToast } from './Toast'
 
@@ -28,7 +29,7 @@ interface TaskHistoryProps {
  * everything else about that completion as if it had not happened.
  */
 export function TaskHistory({ task, onClose }: TaskHistoryProps) {
-  const { people, session, today, reminderOverrides, patchReminderOverride } = useApp()
+  const { people, session, today, profile, reminderOverrides, patchReminderOverride, pauses, isPaused } = useApp()
   const { t, language } = useI18n()
   const { titleId, dialogProps } = useDialog<HTMLDivElement>(onClose)
   const toast = useToast()
@@ -36,6 +37,8 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
   const [entries, setEntries] = useState<TaskHistoryEntry[] | null>(null)
   const [skipEntries, setSkipEntries] = useState<TaskSkipEntry[] | null>(null)
   const [editingReminder, setEditingReminder] = useState(false)
+  const [historyLimit, setHistoryLimit] = useState(50)
+  const timezone = profile?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
   const myOverride = reminderOverrides.get(task.id) ?? null
 
   // A personal override only makes sense for a wall-clock reminder time - an
@@ -50,7 +53,7 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([api.fetchHistory(task.id), api.fetchSkipHistory(task.id)])
+    Promise.all([api.fetchHistory(task.id, historyLimit), api.fetchSkipHistory(task.id, historyLimit)])
       .then(([rows, skipRows]) => {
         if (cancelled) return
         setEntries(rows)
@@ -66,7 +69,7 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
     return () => {
       cancelled = true
     }
-  }, [task.id, toast])
+  }, [task.id, toast, historyLimit])
 
   // Not the raw due_date: a recurring task a full cycle or more overdue is on
   // a later occurrence than the one it was first due on - the same one its
@@ -90,44 +93,55 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
           people.get(task.assigned_to)?.display_name || people.get(task.assigned_to)?.email || t.task.someoneElse,
         )
 
-  // A "together" completion inserts one row per space member, all sharing
-  // completion_group - collapse those into a single entry rather than
-  // listing the same moment once per person.
-  const seenGroups = new Set<string>()
-  const completionRows = (entries ?? [])
-    .filter((entry) => {
-      if (!entry.completion_group) return true
-      if (seenGroups.has(entry.completion_group)) return false
-      seenGroups.add(entry.completion_group)
-      return true
-    })
-    .map((entry) => {
-      const label = entry.completion_group
-        ? t.history.entryGroup(
-            entry.points_awarded,
-            (entries ?? []).filter((row) => row.completion_group === entry.completion_group).length,
-          )
-        : (() => {
-            const who = personLabel(entry.user_id, people, selfId, language)
-            const whoText =
-              who?.kind === 'other' ? t.task.completedBy(who.name ?? t.task.someoneElse) : t.task.completedByYou
-            return t.history.entry(whoText, entry.points_awarded)
-          })()
-      return { key: entry.id, date: entry.completed_on, createdAt: entry.created_at, label, muted: false }
-    })
+  // Every cycle, newest first: done (by whom, when), skipped (by whom,
+  // when), missed, and vacations - see buildTimeline().
+  const timeline =
+    entries === null || skipEntries === null
+      ? null
+      : buildTimeline(task, entries, skipEntries, pauses, today, isPaused(task))
+  const mayHaveMore = (entries?.length ?? 0) >= historyLimit || (skipEntries?.length ?? 0) >= historyLimit
 
-  // Skips never carry points or crediting, so they get their own muted row -
-  // the history reads as "handled, one way or another" rather than implying
-  // every entry here was an actual completion.
-  const skipRows = (skipEntries ?? []).map((entry) => ({
-    key: entry.id,
-    date: entry.skipped_on,
-    createdAt: entry.created_at,
-    label: t.task.skippedLabel,
-    muted: true,
-  }))
+  function who(userId: string): { you: boolean; name: string } {
+    const label = personLabel(userId, people, selfId, language)
+    return label?.kind === 'other' ? { you: false, name: label.name ?? t.task.someoneElse } : { you: true, name: '' }
+  }
 
-  const displayEntries = [...completionRows, ...skipRows].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  /** The time it was logged - only when that was on the day it is listed
+   *  under; a completion backdated to yesterday was not done at the time
+   *  someone tapped it in. */
+  function loggedAt(createdAt: string, date: string): string | null {
+    const at = new Date(createdAt)
+    if (todayIn(timezone, at) !== date) return null
+    return formatTimeIn(timezone, createdAt)
+  }
+
+  function describe(entry: TimelineEntry): string {
+    switch (entry.kind) {
+      case 'done': {
+        const main =
+          entry.people > 1
+            ? t.history.entryGroup(entry.points, entry.people)
+            : (() => {
+                const person = who(entry.userId)
+                return t.history.entry(person.you ? t.task.completedByYou : t.task.completedBy(person.name), entry.points)
+              })()
+        const time = loggedAt(entry.createdAt, entry.date)
+        return time ? `${main} · ${time}` : main
+      }
+      case 'skipped': {
+        const person = who(entry.userId)
+        const main = person.you ? t.history.skippedByYou : t.history.skippedBy(person.name)
+        const time = loggedAt(entry.createdAt, entry.date)
+        return time ? `${main} · ${time}` : main
+      }
+      case 'missed':
+        return t.history.missed
+      case 'vacation': {
+        const main = entry.userId === null ? t.history.vacationSpace : t.history.vacationPerson(who(entry.userId).you ? t.space.you : who(entry.userId).name)
+        return `${main} · ${entry.until ? t.history.vacationUntil(formatDate(entry.until, language)) : t.history.vacationOngoing}`
+      }
+    }
+  }
 
   async function saveReminderOverride(hour: number, minute: number) {
     if (!selfId) return
@@ -239,19 +253,37 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
 
         <h3 className="group-title">{t.history.sectionTitle}</h3>
 
-        {entries === null || skipEntries === null ? (
+        {timeline === null ? (
           <p className="muted">{t.common.loading}</p>
-        ) : displayEntries.length === 0 ? (
+        ) : timeline.length === 0 ? (
           <p className="muted">{t.history.empty}</p>
         ) : (
           <ul className="history-list">
-            {displayEntries.map((entry) => (
-              <li key={entry.key} className={`history-row ${entry.muted ? 'history-row-muted' : ''}`}>
-                <span className="history-date">{formatDate(entry.date, language)}</span>
-                <span className="history-who">{entry.label}</span>
+            {timeline.map((entry) => (
+              <li key={entry.key} className={`history-row history-row-${entry.kind}`}>
+                <span className="history-date">
+                  <span className="history-mark" aria-hidden="true">
+                    {entry.kind === 'done' ? (
+                      <CheckIcon size={14} />
+                    ) : entry.kind === 'skipped' ? (
+                      <SkipIcon size={14} />
+                    ) : entry.kind === 'missed' ? (
+                      <XIcon size={14} />
+                    ) : (
+                      <TodayIcon size={14} />
+                    )}
+                  </span>
+                  {formatDate(entry.date, language)}
+                </span>
+                <span className="history-who">{describe(entry)}</span>
               </li>
             ))}
           </ul>
+        )}
+        {mayHaveMore && (
+          <button type="button" className="link-button" onClick={() => setHistoryLimit((n) => n + 50)}>
+            {t.history.loadMore}
+          </button>
         )}
 
         <div className="sheet-actions">

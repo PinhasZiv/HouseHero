@@ -1028,10 +1028,17 @@ button { font: inherit; cursor: pointer; }
 
 .history-row:last-child { border-block-end: 0; }
 .history-who { color: var(--text-muted); }
-/* A skipped occurrence reads as a lesser event than an actual completion -
-   no points, nobody credited - so its row sits back visually rather than
-   looking like one more entry in the same achievement list. */
-.history-row-muted .history-date { color: var(--text-muted); }
+/* One mark per kind of cycle, so a run of misses stands out at a glance. A
+   skip sits back visually - no points, nobody credited - and a miss is
+   called out without shouting. */
+.history-date { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.history-mark { display: inline-flex; color: var(--accent); }
+.history-row-skipped .history-date,
+.history-row-skipped .history-mark { color: var(--text-muted); }
+.history-row-missed .history-mark,
+.history-row-missed .history-who { color: var(--late); }
+.history-row-vacation .history-mark,
+.history-row-vacation .history-who { color: var(--away); }
 
 /* ----------------------------------------------------------- fields --- */
 

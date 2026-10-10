@@ -140,8 +140,9 @@ test.describe('skipping a recurring task occurrence', () => {
     await page.locator('.task-main', { hasText: 'להכניס מדיח' }).click()
 
     await expect(page.locator('.sheet').getByRole('heading', { name: 'להכניס מדיח' })).toBeVisible()
-    const historyRow = page.locator('.history-row', { hasText: 'דולגה הפעם' })
+    // Says who skipped it, and is its own kind of row - not a completion.
+    const historyRow = page.locator('.history-row', { hasText: 'דולגה על ידך' })
     await expect(historyRow).toBeVisible()
-    await expect(historyRow).toHaveClass(/history-row-muted/)
+    await expect(historyRow).toHaveClass(/history-row-skipped/)
   })
 })

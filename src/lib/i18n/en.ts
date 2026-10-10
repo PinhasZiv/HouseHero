@@ -126,8 +126,16 @@ export const en: Strings = {
 
   history: {
     addToGoogleCalendar: 'Add to Google Calendar',
-    sectionTitle: 'Completion history',
+    sectionTitle: 'History',
     empty: 'Not completed yet.',
+    skippedBy: (who: string) => `skipped by ${who}`,
+    skippedByYou: 'skipped by you',
+    missed: 'missed',
+    vacationSpace: 'Whole space on vacation',
+    vacationPerson: (who: string) => `${who} on vacation`,
+    vacationUntil: (date: string) => `until ${date}`,
+    vacationOngoing: 'still away',
+    loadMore: 'Show older history',
     entry: (who: string, points: number) => `${who} · +${points} pts`,
     entryGroup: (points: number, count: number) =>
       `Done together · ${peopleWord(count, 'en')} · +${points} pts each`,

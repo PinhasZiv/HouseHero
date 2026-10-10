@@ -129,6 +129,9 @@ export interface TaskHistoryEntry {
   /** Non-null only for a "together" completion - every row of the same event shares this id, so the UI can collapse them into one entry. */
   completion_group: string | null
   created_at: string
+  /** The task's due date when this completion happened - what tells which
+   *  occurrences went by unhandled before it. */
+  prev_due_date?: string | null
 }
 
 /** One skip of a recurring task's occurrence - no points, no credit to
@@ -139,6 +142,7 @@ export interface TaskSkipEntry {
   user_id: string
   skipped_on: string
   created_at: string
+  prev_due_date?: string | null
 }
 
 /**

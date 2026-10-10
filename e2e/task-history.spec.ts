@@ -98,7 +98,7 @@ test.describe('task completion history', () => {
     await expect(card).toBeVisible()
     await card.locator('.task-main').click()
 
-    const sheet = page.locator('.sheet', { hasText: 'היסטוריית הביצוע' })
+    const sheet = page.locator('.sheet', { hasText: 'היסטוריה' })
     await expect(sheet).toBeVisible()
     await expect(sheet.locator('.history-row', { hasText: 'בוצעה על ידך' })).toContainText('+10')
     await expect(sheet.locator('.history-row', { hasText: 'Dana' })).toContainText('+10')
@@ -284,7 +284,7 @@ test.describe('task completion history', () => {
     const card = page.locator('.task-card', { hasText: 'לנקות את המטבח' })
     await card.locator('.task-main').click()
 
-    const sheet = page.locator('.sheet', { hasText: 'היסטוריית הביצוע' })
+    const sheet = page.locator('.sheet', { hasText: 'היסטוריה' })
     await expect(sheet).toBeVisible()
     // One entry for the whole event, not one per participant.
     await expect(sheet.locator('.history-row')).toHaveCount(1)
