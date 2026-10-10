@@ -51,7 +51,7 @@ test('a card shows only how long until the next time - not the date or the repea
   await expect(later).not.toContainText('פעם בשבועיים')
 })
 
-test('a task done today counts down to its next time', async ({ page }) => {
+test('a task done or skipped today shows no countdown - it is settled for the day', async ({ page }) => {
   const db = makeFakeDb({
     tasks: [
       task('done', 'להשקות עציצים', {
@@ -61,14 +61,25 @@ test('a task done today counts down to its next time', async ({ page }) => {
         last_completed_by: [FAKE_USER_ID],
         last_completed_actor: FAKE_USER_ID,
       }),
+      task('skipped', 'להוציא זבל', { due_date: shift(2), last_skipped_date: appToday(), last_skipped_by: FAKE_USER_ID }),
     ],
   })
   await seed(page, db)
   await page.goto('/')
   await page.locator('.completed-group summary').click()
-  const card = page.locator('.task-card', { hasText: 'להשקות עציצים' })
-  await expect(card).toContainText('בוצעה על ידך')
-  await expect(card.locator('.task-countdown')).toHaveText('עוד 3 ימים')
+
+  const done = page.locator('.task-card', { hasText: 'להשקות עציצים' })
+  await expect(done).toContainText('בוצעה על ידך')
+  await expect(done.locator('.task-countdown')).toHaveCount(0)
+  await expect(done).not.toContainText('עוד')
+
+  const skipped = page.locator('.task-card', { hasText: 'להוציא זבל' })
+  await expect(skipped).toContainText('דולגה הפעם')
+  await expect(skipped.locator('.task-countdown')).toHaveCount(0)
+
+  // When it comes around again is still one tap away.
+  await done.locator('.task-main').click()
+  await expect(page.getByRole('dialog', { name: 'להשקות עציצים' })).toContainText('בעוד 3 ימים')
 })
 
 test('due today shows no countdown - its badge already says so', async ({ page }) => {
