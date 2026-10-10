@@ -692,8 +692,9 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
 
     if (table === 'task_skips' && method === 'GET') {
       const taskId = eqValue(url, 'task_id')
+      const spaceId = eqValue(url, 'space_id')
       const rows = db.taskSkips
-        .filter((row) => row.task_id === taskId)
+        .filter((row) => (spaceId ? row.space_id === spaceId : row.task_id === taskId))
         .sort((a, b) => b.created_at.localeCompare(a.created_at))
       return json(route, rows)
     }

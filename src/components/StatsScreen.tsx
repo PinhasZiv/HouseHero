@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as api from '../lib/api'
-import { daysBetween } from '../lib/taskDue'
-import { cyclesWord, formatDateTime, weekdayName } from '../lib/format'
+import { addDays, daysBetween } from '../lib/taskDue'
+import { cyclesWord, describeInterval, formatDateTime, weekdayName } from '../lib/format'
+import {
+  planIntervalChange,
+  suggestInterval,
+  summarizeCadence,
+  SUGGESTION_WINDOW_DAYS,
+  type CadenceSuggestion,
+} from '../lib/cadence'
+import type { Task } from '../lib/types'
 import { useI18n } from '../lib/i18n'
 import { useDialog } from '../lib/useDialog'
 import type { Language } from '../lib/i18n/types'
@@ -128,13 +136,27 @@ function PersonStatsSheet({
   )
 }
 
+const DISMISSED_KEY = 'househero.cadence.dismissed'
+/** How long "not now" keeps a suggestion away. */
+const DISMISS_DAYS = 30
+
+function readDismissed(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(DISMISSED_KEY) ?? '{}') as Record<string, string>
+  } catch {
+    return {}
+  }
+}
+
 /** Points, completion counts, and "who did what" for the current space. */
 export function StatsScreen() {
-  const { currentSpace, today, people, session, tasks, pauses, isPaused } = useApp()
+  const { currentSpace, today, people, session, tasks, pauses, isPaused, patchTask } = useApp()
   const { t, language } = useI18n()
   const toast = useToast()
   const [completions, setCompletions] = useState<StatsCompletion[] | null>(null)
   const [memberIds, setMemberIds] = useState<string[] | null>(null)
+  const [skips, setSkips] = useState<{ task_id: string; skipped_on: string; prev_due_date: string }[]>([])
+  const [dismissed, setDismissed] = useState<Record<string, string>>(readDismissed)
   const [selected, setSelected] = useState<{ userId: string; name: string } | null>(null)
   // A handful of widgets keep their own fixed lookback (last 7 days, the
   // 6-week trend, "when was this person last active") regardless of this -
@@ -146,10 +168,15 @@ export function StatsScreen() {
     let cancelled = false
     setCompletions(null)
     setMemberIds(null)
-    Promise.all([api.fetchStatsCompletions(currentSpace.id), api.fetchMembers(currentSpace.id)])
-      .then(([rows, members]) => {
+    Promise.all([
+      api.fetchStatsCompletions(currentSpace.id),
+      api.fetchMembers(currentSpace.id),
+      api.fetchStatsSkips(currentSpace.id),
+    ])
+      .then(([rows, members, skipRows]) => {
         if (cancelled) return
         setCompletions(rows)
+        setSkips(skipRows)
         setMemberIds(members.map((member) => member.user_id))
       })
       .catch((cause) => {
@@ -235,6 +262,59 @@ export function StatsScreen() {
       ),
     [memberIds, completions, today, pauses, currentSpace],
   )
+  // Done early / on time / late / skipped / missed, over the range toggle.
+  const spaceTasks = useMemo(() => tasks.filter((task) => task.space_id === currentSpace?.id), [tasks, currentSpace])
+  const timing = useMemo(
+    () =>
+      summarizeCadence(
+        spaceTasks,
+        completions ?? [],
+        skips,
+        today,
+        range === 'month' ? `${today.slice(0, 7)}-01` : null,
+        isPaused,
+      ).total,
+    [spaceTasks, completions, skips, today, range, isPaused],
+  )
+  const timingTotal = timing.early + timing.onTime + timing.late + timing.skipped + timing.missed
+
+  // Interval changes worth offering - always over the last 60 days, whatever
+  // the range toggle says, so one quiet month cannot hide or invent a trend.
+  const suggestions = useMemo(() => {
+    const { byTask } = summarizeCadence(
+      spaceTasks,
+      completions ?? [],
+      skips,
+      today,
+      addDays(today, -SUGGESTION_WINDOW_DAYS),
+      isPaused,
+    )
+    return spaceTasks
+      .map((task) => ({ task, suggestion: suggestInterval(task, byTask.get(task.id)) }))
+      .filter((item): item is { task: Task; suggestion: CadenceSuggestion } => item.suggestion !== null)
+      .filter(({ task }) => !dismissed[task.id] || daysBetween(dismissed[task.id], today) >= DISMISS_DAYS)
+  }, [spaceTasks, completions, skips, today, isPaused, dismissed])
+
+  async function applySuggestion(task: Task, suggestion: CadenceSuggestion) {
+    const plan = planIntervalChange(task, suggestion.suggested, suggestion.current, today)
+    try {
+      patchTask(await api.updateTaskInterval(task.id, plan.interval_days, plan.due_date))
+      toast.show(t.stats.intervalChanged(task.title, describeInterval(plan.interval_days, language)))
+    } catch (cause) {
+      toast.showError(cause)
+    }
+  }
+
+  function dismissSuggestion(taskId: string) {
+    const next = { ...dismissed, [taskId]: today }
+    setDismissed(next)
+    try {
+      localStorage.setItem(DISMISSED_KEY, JSON.stringify(next))
+    } catch {
+      // Storage blocked; it just comes back next time.
+    }
+  }
+
   const missedCycles = useMemo(
     () => missedCyclesSummary(rangedCompletions, tasks, today, isPaused),
     [rangedCompletions, tasks, today, isPaused],
@@ -375,6 +455,52 @@ export function StatsScreen() {
               </div>
             )}
           </section>
+
+          {timingTotal > 0 && (
+            <section className="card">
+              <h3>{t.stats.timingTitle}</h3>
+              <ul className="timing-list">
+                {(['early', 'onTime', 'late', 'skipped', 'missed'] as const).map((kind) => (
+                  <li key={kind} className={`timing-row timing-${kind}`}>
+                    <span>{t.stats.timing[kind]}</span>
+                    <div className="timing-track" aria-hidden="true">
+                      <div className="timing-fill" style={{ width: `${Math.round((timing[kind] / timingTotal) * 100)}%` }} />
+                    </div>
+                    <span className="timing-count">{timing[kind]}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {suggestions.length > 0 && (
+            <section className="card cadence-suggestions">
+              <h3>{t.stats.suggestionsTitle}</h3>
+              <ul className="suggestion-list">
+                {suggestions.map(({ task, suggestion }) => (
+                  <li key={task.id} className="suggestion">
+                    <strong>{task.title}</strong>
+                    <p className="muted small">
+                      {suggestion.direction === 'shorter'
+                        ? t.stats.suggestShorter(
+                            describeInterval(Math.max(1, Math.round(suggestion.actualGap ?? suggestion.suggested)), language),
+                            describeInterval(suggestion.current, language),
+                          )
+                        : t.stats.suggestLonger(suggestion.dropped, suggestion.cycles, describeInterval(suggestion.current, language))}
+                    </p>
+                    <div className="suggestion-actions">
+                      <button type="button" className="btn btn-primary btn-small" onClick={() => void applySuggestion(task, suggestion)}>
+                        {t.stats.applySuggestion(describeInterval(suggestion.suggested, language))}
+                      </button>
+                      <button type="button" className="btn btn-ghost btn-small" onClick={() => dismissSuggestion(task.id)}>
+                        {t.stats.notNow}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {stats.topTask && (
             <section className="card">

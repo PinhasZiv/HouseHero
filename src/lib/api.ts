@@ -594,6 +594,35 @@ export interface StatsCompletion {
 }
 
 /** Every completion in a space, for the Stats screen to aggregate client-side. */
+/** Every skip in the space, for the Stats screen's timing breakdown and
+ *  interval suggestions - a skip is "not needed this time", the clearest
+ *  sign of a task set to repeat too often. */
+export async function fetchStatsSkips(
+  spaceId: string,
+): Promise<{ task_id: string; skipped_on: string; prev_due_date: string }[]> {
+  const { data, error } = await supabase
+    .from('task_skips')
+    .select('task_id, skipped_on, prev_due_date')
+    .eq('space_id', spaceId)
+    .order('skipped_on', { ascending: false })
+    .limit(1000)
+  if (error) throw error
+  return data ?? []
+}
+
+/** Changes how often a task repeats, with the next due date that follows
+ *  from it - see planIntervalChange(). */
+export async function updateTaskInterval(taskId: string, intervalDays: number, dueDate: string): Promise<Task> {
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({ interval_days: intervalDays, due_date: dueDate })
+    .eq('id', taskId)
+    .select()
+    .single()
+  if (error) throw error
+  return data as Task
+}
+
 export async function fetchStatsCompletions(spaceId: string): Promise<StatsCompletion[]> {
   const { data, error } = await supabase
     .from('task_completions')

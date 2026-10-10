@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import * as api from '../lib/api'
 import { describeInterval, describeWeeklyDays, formatDate, formatSnoozeUntil, formatTime, personLabel, relativeDay } from '../lib/format'
 import { googleCalendarUrl } from '../lib/googleCalendar'
-import { currentOccurrence, formatTimeIn, todayIn } from '../lib/taskDue'
+import { addDays, currentOccurrence, formatTimeIn, todayIn } from '../lib/taskDue'
+import { median, summarizeCadence, SUGGESTION_WINDOW_DAYS } from '../lib/cadence'
 import { buildTimeline, type TimelineEntry } from '../lib/taskTimeline'
 import { useI18n } from '../lib/i18n'
 import { useDialog } from '../lib/useDialog'
@@ -100,6 +101,30 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
       ? null
       : buildTimeline(task, entries, skipEntries, pauses, today, isPaused(task))
   const mayHaveMore = (entries?.length ?? 0) >= historyLimit || (skipEntries?.length ?? 0) >= historyLimit
+
+  // This task's own rhythm over the last 60 days, from the same rows.
+  const cadenceLine = (() => {
+    if (task.task_type !== 'recurring' || entries === null || skipEntries === null) return null
+    const counts = summarizeCadence(
+      [task],
+      entries.map((row) => ({ ...row, task_id: task.id })),
+      skipEntries.map((row) => ({ ...row, task_id: task.id })),
+      today,
+      addDays(today, -SUGGESTION_WINDOW_DAYS),
+      () => isPaused(task),
+    ).byTask.get(task.id)
+    if (!counts) return null
+    const parts = [
+      counts.early && t.history.cadence.early(counts.early),
+      counts.onTime && t.history.cadence.onTime(counts.onTime),
+      counts.late && t.history.cadence.late(counts.late),
+      counts.skipped && t.history.cadence.skipped(counts.skipped),
+      counts.missed && t.history.cadence.missed(counts.missed),
+    ].filter(Boolean) as string[]
+    const gap = task.recurrence_mode === 'interval' && counts.gaps.length >= 2 ? median(counts.gaps) : null
+    if (gap !== null) parts.push(t.history.cadence.actual(describeInterval(Math.max(1, Math.round(gap)), language)))
+    return parts.length ? `${t.history.cadence.prefix} ${parts.join(' · ')}` : null
+  })()
 
   function who(userId: string): { you: boolean; name: string } {
     const label = personLabel(userId, people, selfId, language)
@@ -252,6 +277,8 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
         </a>
 
         <h3 className="group-title">{t.history.sectionTitle}</h3>
+
+        {cadenceLine && <p className="muted small cadence-summary">{cadenceLine}</p>}
 
         {timeline === null ? (
           <p className="muted">{t.common.loading}</p>
