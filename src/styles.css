@@ -799,6 +799,42 @@ button { font: inherit; cursor: pointer; }
   font-variant-numeric: tabular-nums;
 }
 
+/* When tasks get done: one meter per kind, each a share of all of them, in
+   the same track/fill language as the bars above. */
+.timing-list { list-style: none; margin: 0; padding: 0; align-self: stretch; }
+.timing-row {
+  display: grid;
+  grid-template-columns: 76px 1fr 32px;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  font-size: 0.9rem;
+}
+.timing-track { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.timing-fill { height: 100%; border-radius: 4px; background: var(--accent); }
+.timing-count { text-align: end; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.timing-early .timing-fill { background: var(--accent-strong); }
+.timing-late .timing-fill { background: var(--due); }
+.timing-skipped .timing-fill { background: var(--text-muted); }
+.timing-missed .timing-fill { background: var(--late); }
+
+/* A suggestion is an offer, not a warning: plain card rows, each with the
+   one-tap change and a way to say not now. */
+.suggestion-list { list-style: none; margin: 0; padding: 0; align-self: stretch; }
+.suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+  border-block-end: 1px solid var(--border);
+}
+.suggestion:last-child { border-block-end: 0; }
+.suggestion p { margin: 0; }
+.suggestion-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+
+/* One task's own rhythm, under its details. */
+.cadence-summary { margin: 0 0 6px; }
+
 /* ------------------------------------------------------------ buttons --- */
 
 .btn {

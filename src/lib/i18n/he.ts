@@ -139,6 +139,15 @@ export const he = {
     vacationUntil: (date: string) => `עד ${date}`,
     vacationOngoing: 'עדיין בחופשה',
     loadMore: 'הצגת היסטוריה ישנה יותר',
+    cadence: {
+      prefix: 'ב-60 הימים האחרונים:',
+      early: (n: number) => `${n} לפני הזמן`,
+      onTime: (n: number) => `${n} בזמן`,
+      late: (n: number) => `${n} באיחור`,
+      skipped: (n: number) => (n === 1 ? 'דילוג אחד' : `${n} דילוגים`),
+      missed: (n: number) => (n === 1 ? 'פספוס אחד' : `${n} פספוסים`),
+      actual: (label: string) => `בפועל ${label}`,
+    },
     entry: (who: string, points: number) => `${who} · +${points} נק'`,
     entryGroup: (points: number, count: number) =>
       `בוצע יחד · ${peopleWord(count, 'he')} · +${points} נק' לכל אחד/ת`,
@@ -314,6 +323,22 @@ export const he = {
 
   stats: {
     title: 'סטטיסטיקות',
+    timingTitle: 'מתי משימות מבוצעות',
+    timing: {
+      early: 'לפני הזמן',
+      onTime: 'בזמן',
+      late: 'באיחור',
+      skipped: 'דולגו',
+      missed: 'התפספסו',
+    },
+    suggestionsTitle: 'הצעות לתדירות',
+    suggestShorter: (actual: string, current: string) =>
+      `בפועל מבוצעת בערך ${actual}, ובדרך כלל לפני הזמן. מוגדרת ${current}.`,
+    suggestLonger: (dropped: number, cycles: number, current: string) =>
+      `${dropped} מתוך ${cycles} המחזורים האחרונים דולגו או התפספסו. מוגדרת ${current}.`,
+    applySuggestion: (label: string) => `לשנות ל${label}`,
+    notNow: 'לא עכשיו',
+    intervalChanged: (title: string, label: string) => `${title} תחזור מעכשיו ${label}.`,
     lifetimeTitle: 'נקודות שנצברו',
     spendableTitle: 'זמינות למימוש',
 
@@ -339,7 +364,7 @@ export const he = {
     columnPoints: 'נקודות',
     total: 'סה"כ',
 
-    onTimeLabel: 'בזמן',
+    onTimeLabel: 'בזמן או לפני',
     weeklyTrendTitle: 'מגמה שבועית',
     weeksAgoLabel: (n: number) => (n === 0 ? 'השבוע' : n === 1 ? 'לפני שבוע' : `לפני ${n} שבועות`),
     neglectedTaskTitle: 'המשימה הכי מוזנחת',

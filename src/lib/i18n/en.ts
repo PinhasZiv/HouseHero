@@ -136,6 +136,15 @@ export const en: Strings = {
     vacationUntil: (date: string) => `until ${date}`,
     vacationOngoing: 'still away',
     loadMore: 'Show older history',
+    cadence: {
+      prefix: 'Last 60 days:',
+      early: (n: number) => `${n} early`,
+      onTime: (n: number) => `${n} on time`,
+      late: (n: number) => `${n} late`,
+      skipped: (n: number) => (n === 1 ? '1 skip' : `${n} skips`),
+      missed: (n: number) => (n === 1 ? '1 missed' : `${n} missed`),
+      actual: (label: string) => `actually ${label}`,
+    },
     entry: (who: string, points: number) => `${who} · +${points} pts`,
     entryGroup: (points: number, count: number) =>
       `Done together · ${peopleWord(count, 'en')} · +${points} pts each`,
@@ -311,6 +320,22 @@ export const en: Strings = {
 
   stats: {
     title: 'Stats',
+    timingTitle: 'When tasks get done',
+    timing: {
+      early: 'early',
+      onTime: 'on time',
+      late: 'late',
+      skipped: 'skipped',
+      missed: 'missed',
+    },
+    suggestionsTitle: 'Frequency suggestions',
+    suggestShorter: (actual: string, current: string) =>
+      `Actually done about ${actual}, usually ahead of time. Set to ${current}.`,
+    suggestLonger: (dropped: number, cycles: number, current: string) =>
+      `${dropped} of the last ${cycles} cycles were skipped or missed. Set to ${current}.`,
+    applySuggestion: (label: string) => `Change to ${label}`,
+    notNow: 'Not now',
+    intervalChanged: (title: string, label: string) => `${title} now repeats ${label}.`,
     lifetimeTitle: 'Lifetime points',
     spendableTitle: 'Available to spend',
 
@@ -336,7 +361,7 @@ export const en: Strings = {
     columnPoints: 'Points',
     total: 'Total',
 
-    onTimeLabel: 'On time',
+    onTimeLabel: 'On time or early',
     weeklyTrendTitle: 'Weekly trend',
     weeksAgoLabel: (n: number) => (n === 0 ? 'This week' : n === 1 ? 'Last week' : `${n} weeks ago`),
     neglectedTaskTitle: 'Most neglected task',
