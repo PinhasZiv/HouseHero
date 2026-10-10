@@ -129,8 +129,16 @@ export const he = {
 
   history: {
     addToGoogleCalendar: 'הוספה ליומן Google',
-    sectionTitle: 'היסטוריית הביצוע',
+    sectionTitle: 'היסטוריה',
     empty: 'עוד לא בוצעה אף פעם.',
+    skippedBy: (who: string) => `דולגה על ידי ${who}`,
+    skippedByYou: 'דולגה על ידך',
+    missed: 'התפספסה',
+    vacationSpace: 'חופשה של כל המרחב',
+    vacationPerson: (who: string) => `${who} בחופשה`,
+    vacationUntil: (date: string) => `עד ${date}`,
+    vacationOngoing: 'עדיין בחופשה',
+    loadMore: 'הצגת היסטוריה ישנה יותר',
     entry: (who: string, points: number) => `${who} · +${points} נק'`,
     entryGroup: (points: number, count: number) =>
       `בוצע יחד · ${peopleWord(count, 'he')} · +${points} נק' לכל אחד/ת`,

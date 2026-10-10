@@ -236,6 +236,28 @@ export function currentOccurrence(task: DueTask, today: string): string {
   return addDays(today, -cycleLateness(task, task.due_date, rawLate))
 }
 
+/**
+ * The dates of the occurrences that went by entirely between `dueDate` and
+ * `handledOn` - the ones missedCycles() counts, as actual dates. A weekly
+ * task due 25 Sep and done 10 Oct missed 25 Sep and 2 Oct (and its 9 Oct
+ * occurrence was done a day late). Same grid walk as cycleProgress(), so the
+ * dates always agree with that count. Empty for a non-recurring task.
+ */
+export function missedOccurrenceDates(task: CyclicTask, dueDate: string, handledOn: string): string[] {
+  const missed = missedCycles(task, dueDate, daysBetween(dueDate, handledOn))
+  if (missed <= 0) return []
+  const dates: string[] = []
+  let gridPoint = dueDate
+  for (let i = 0; i < missed; i++) {
+    dates.push(gridPoint)
+    gridPoint =
+      task.recurrence_mode === 'weekly_days' && task.weekly_days?.length
+        ? nextWeeklyDate(task.weekly_days, gridPoint)
+        : addDays(gridPoint, task.interval_days ?? 1)
+  }
+  return dates
+}
+
 export function classify(task: DueTask, today: string, now: Date = new Date()): DueInfo {
   if (task.task_type === 'time_limited') return classifyTimeLimited(task, today, now)
 

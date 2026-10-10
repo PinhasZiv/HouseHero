@@ -431,10 +431,10 @@ export async function clearReminderOverride(taskId: string, userId: string): Pro
 }
 
 /** Recent completions for a task, newest first. */
-export async function fetchHistory(taskId: string, limit = 20): Promise<TaskHistoryEntry[]> {
+export async function fetchHistory(taskId: string, limit = 50): Promise<TaskHistoryEntry[]> {
   const { data, error } = await supabase
     .from('task_completions')
-    .select('id, user_id, points_awarded, completed_on, created_at, completion_group')
+    .select('id, user_id, points_awarded, completed_on, created_at, completion_group, prev_due_date')
     .eq('task_id', taskId)
     .order('created_at', { ascending: false })
     .limit(limit)
@@ -445,10 +445,10 @@ export async function fetchHistory(taskId: string, limit = 20): Promise<TaskHist
 /** Recent skips for a task, newest first - a small, separate history from
  *  completions, since a skip carries none of what those do (points, who
  *  else was credited). */
-export async function fetchSkipHistory(taskId: string, limit = 20): Promise<TaskSkipEntry[]> {
+export async function fetchSkipHistory(taskId: string, limit = 50): Promise<TaskSkipEntry[]> {
   const { data, error } = await supabase
     .from('task_skips')
-    .select('id, user_id, skipped_on, created_at')
+    .select('id, user_id, skipped_on, created_at, prev_due_date')
     .eq('task_id', taskId)
     .order('created_at', { ascending: false })
     .limit(limit)
