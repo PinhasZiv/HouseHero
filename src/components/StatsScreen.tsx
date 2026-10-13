@@ -576,8 +576,15 @@ export function StatsScreen() {
                 const height = Math.round((week.count / weekChartMax) * 100)
                 return (
                   <div key={week.weeksAgo} className="week-chart-col">
-                    <span className="week-chart-value">{week.count}</span>
-                    <div className="week-chart-bar" style={{ height: `${height}%` }} />
+                    {/* The bar's height is a share of its own track only -
+                        measured against the whole column, which also holds the
+                        labels, the tallest bars got squeezed to fit and lost
+                        their proportions. The count rides on top of the bar. */}
+                    <div className="week-chart-track">
+                      <div className="week-chart-bar" style={{ height: `${height}%` }}>
+                        <span className="week-chart-value">{week.count}</span>
+                      </div>
+                    </div>
                     <span className="week-chart-label">{t.stats.weeksAgoLabel(week.weeksAgo)}</span>
                   </div>
                 )

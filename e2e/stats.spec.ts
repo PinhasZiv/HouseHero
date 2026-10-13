@@ -415,6 +415,30 @@ test.describe('stats screen', () => {
     await expect(columns.first().locator('.week-chart-value')).toHaveText('1')
   })
 
+  test('weekly trend bars are proportional to their counts', async ({ page }) => {
+    // The counts from a real report: 25 this week next to 12 and 13 used to
+    // draw barely taller, since the tallest bars were squeezed to fit the
+    // column alongside its labels.
+    const perWeek = [25, 12, 13, 9, 7]
+    const taskCompletions = perWeek.flatMap((count, weeksAgo) =>
+      Array.from({ length: count }, (_, i) => ({
+        id: `w${weeksAgo}-${i}`, task_id: 'task-a', user_id: FAKE_USER_ID, points_awarded: 1,
+        completed_on: isoDaysFromToday(-7 * weeksAgo), created_at: new Date().toISOString(), completion_group: null,
+      })),
+    )
+    await seed(page, makeFakeDb({ tasks: [statsTask({ id: 'task-a', title: 'לנקות את המטבח' })], taskCompletions }))
+    await page.goto('/')
+    await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
+
+    const bars = page.locator('.card', { hasText: 'מגמה שבועית' }).locator('.week-chart-bar')
+    await expect(bars).toHaveCount(6)
+    const heights = await bars.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height))
+    perWeek.forEach((count, i) => {
+      // Within a pixel or two of the exact share of the tallest bar.
+      expect(Math.abs(heights[i] / heights[0] - count / 25)).toBeLessThan(0.03)
+    })
+  })
+
   test('the range toggle narrows the leaderboard and totals to the current calendar month', async ({ page }) => {
     const db = makeFakeDb({
       tasks: [statsTask({ id: 'task-a', title: 'לנקות את המטבח' })],
