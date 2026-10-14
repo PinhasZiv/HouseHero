@@ -33,6 +33,38 @@
         // Storage blocked; the markup's default stands and React corrects it.
       }
     </script>
+    <script>
+      // If one of the app's own files fails to load - say, a copy of the page
+      // from before a deploy asking for files the deploy removed - load the
+      // page again once, rather than leave a blank screen. Once per minute at
+      // most, so a real outage cannot turn into a reload loop.
+      window.__househeroRecover = function () {
+        try {
+          var last = Number(sessionStorage.getItem('househero.recoveredAt') || 0)
+          if (Date.now() - last < 60000) return false
+          sessionStorage.setItem('househero.recoveredAt', String(Date.now()))
+        } catch (error) {
+          return false
+        }
+        location.reload()
+        return true
+      }
+      window.addEventListener(
+        'error',
+        function (event) {
+          var el = event.target
+          var src = el && (el.src || el.href)
+          if (src && (el.tagName === 'SCRIPT' || el.tagName === 'LINK') && src.indexOf('/assets/') !== -1) {
+            window.__househeroRecover()
+          }
+        },
+        true,
+      )
+      // Vite's signal that a file a screen needs could not be loaded.
+      window.addEventListener('vite:preloadError', function () {
+        window.__househeroRecover()
+      })
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

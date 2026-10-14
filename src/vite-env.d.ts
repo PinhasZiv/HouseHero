@@ -9,3 +9,8 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+interface Window {
+  /** Reloads the page once a minute at most - see index.html. */
+  __househeroRecover?: () => boolean
+}

@@ -29,6 +29,8 @@ export const he = {
     loading: 'טוען...',
     tryAgain: 'ניסיון נוסף',
     somethingWrong: 'משהו השתבש',
+    crashBody: 'אפשר לטעון את האפליקציה מחדש. שום נתון לא אבד.',
+    reload: 'טעינה מחדש',
     staleBanner: 'אין חיבור. מוצגים הנתונים האחרונים שנטענו.',
     undo: 'ביטול',
     close: 'סגירה',

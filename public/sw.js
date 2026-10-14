@@ -11,9 +11,13 @@
  */
 
 // Stamped with a hash of the build at build time (scripts/swVersion.ts), so
-// each deploy gets a fresh cache and 'activate' below drops the old one.
+// each deploy gets a fresh cache - see 'activate' below for what is dropped.
 const CACHE = 'househero-v1'
 const SCOPE_PATH = new URL(self.registration.scope).pathname
+// Remembers which cache the version before this one used, so it survives
+// exactly one deploy - see 'activate'.
+const META_CACHE = 'househero-meta'
+const META_KEY = `${SCOPE_PATH}__househero_meta__`
 
 // The notification body/title come from the server already worded in the
 // person's own language (see supabase/functions/_shared/messages.ts), but the
@@ -24,17 +28,46 @@ const ACTION_LABELS = {
   en: { open: 'Open list', snooze: 'Snooze' },
 }
 
+/**
+ * The app shell from the server itself, never the browser's HTTP cache.
+ * GitHub Pages lets browsers reuse a page for 10 minutes, so a plain fetch
+ * right after a deploy could hand back the previous version's HTML - which
+ * names files the deploy just removed. That was the white screen. Revalidating
+ * costs one small request (a 304 when nothing changed).
+ */
+function fetchFresh(url) {
+  return fetch(url, { cache: 'no-cache', credentials: 'same-origin' })
+}
+
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.add(SCOPE_PATH)).catch(() => {}))
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      .then((cache) =>
+        fetchFresh(SCOPE_PATH).then((response) => (response.ok ? cache.put(SCOPE_PATH, response) : undefined)),
+      )
+      .catch(() => {}),
+  )
   self.skipWaiting()
 })
 
+// Keeps this version's cache and the one before it, and drops anything older.
+// Dropping the previous one right away used to strand a copy of the app still
+// open on that version (or one whose page came from the HTTP cache): its
+// files were gone from the phone and, after the deploy, from the server too.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
-      .then(() => self.clients.claim()),
+    (async () => {
+      const meta = await caches.open(META_CACHE)
+      const saved = await meta.match(META_KEY)
+      const record = saved ? await saved.json().catch(() => ({})) : {}
+      const previous = record.current && record.current !== CACHE ? record.current : (record.previous ?? null)
+      const keep = new Set([CACHE, META_CACHE, previous].filter(Boolean))
+      const keys = await caches.keys()
+      await Promise.all(keys.filter((key) => !keep.has(key)).map((key) => caches.delete(key)))
+      await meta.put(META_KEY, new Response(JSON.stringify({ current: CACHE, previous })))
+      await self.clients.claim()
+    })(),
   )
 })
 
@@ -45,31 +78,46 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url)
   if (url.origin !== self.location.origin) return // never cache Supabase calls
 
-  // Navigations: try the network so a deploy is picked up immediately, and fall
-  // back to the cached shell when offline.
+  // Navigations: the newest shell from the server, so a deploy is picked up
+  // at once; the cached one only when offline.
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      fetchFresh(request.url)
+        // A navigation may not be answered with a redirected response; let
+        // the browser follow any redirect itself.
+        .then((response) => (response.redirected ? fetch(request) : response))
         .then((response) => {
-          const copy = response.clone()
-          caches.open(CACHE).then((cache) => cache.put(SCOPE_PATH, copy)).catch(() => {})
+          if (response.ok) {
+            const copy = response.clone()
+            caches.open(CACHE).then((cache) => cache.put(SCOPE_PATH, copy)).catch(() => {})
+          }
           return response
         })
-        .catch(() => caches.match(SCOPE_PATH).then((hit) => hit || Response.error())),
+        // This version's own shell first - the previous one is still cached.
+        .catch(() =>
+          caches
+            .open(CACHE)
+            .then((cache) => cache.match(SCOPE_PATH))
+            .then((hit) => hit || caches.match(SCOPE_PATH))
+            .then((hit) => hit || Response.error()),
+        ),
     )
     return
   }
 
-  // Built assets carry a content hash in the filename, so a cache hit is always
-  // the right answer for them.
+  // Built assets carry a content hash in the filename, so a cache hit - in
+  // this version's cache or the previous one's - is always the right answer.
   if (/\.(js|css|png|svg|webmanifest|woff2?)$/.test(url.pathname)) {
     event.respondWith(
       caches.match(request).then(
         (hit) =>
           hit ||
           fetch(request).then((response) => {
-            const copy = response.clone()
-            caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => {})
+            // Never keep an error: a 404 cached once would stay a 404.
+            if (response.ok) {
+              const copy = response.clone()
+              caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => {})
+            }
             return response
           }),
       ),
