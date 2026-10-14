@@ -27,6 +27,8 @@ export const en: Strings = {
     loading: 'Loading...',
     tryAgain: 'Try again',
     somethingWrong: 'Something went wrong',
+    crashBody: 'Reloading the app should fix it. Nothing was lost.',
+    reload: 'Reload',
     staleBanner: 'No connection. Showing the last data loaded.',
     undo: 'Undo',
     close: 'Close',

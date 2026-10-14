@@ -20,7 +20,13 @@ type Tab = 'today' | 'tasks' | 'rewards' | 'stats' | 'more'
 // of the first download. It is fetched in the background right after start
 // (see Shell), so it is there - and in the service worker's cache - well
 // before anyone taps it, even offline.
-const loadStats = () => import('./components/StatsScreen')
+// A copy of the app from before a deploy can ask for a Stats file that is no
+// longer there; reloading picks up the current version (see index.html).
+const loadStats = () =>
+  import('./components/StatsScreen').catch((cause: unknown) => {
+    window.__househeroRecover?.()
+    throw cause
+  })
 const StatsScreen = lazy(() => loadStats().then((module) => ({ default: module.StatsScreen })))
 
 // The icons are fixed, the labels are not, so only the labels are looked up
