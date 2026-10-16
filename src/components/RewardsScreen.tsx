@@ -35,7 +35,7 @@ function RewardForm({
   const [description, setDescription] = useState(existing?.description ?? '')
   const [cost, setCost] = useState(existing?.cost ?? 50)
   const [busy, setBusy] = useState(false)
-  const { titleId, dialogProps } = useDialog<HTMLFormElement>(onCancel)
+  const { titleId, dialogProps } = useDialog<HTMLDivElement>(onCancel)
   const [error, setError] = useState<string | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
@@ -56,57 +56,59 @@ function RewardForm({
   return (
     <>
       <div className="sheet-backdrop" onClick={onCancel} role="presentation">
-        <form className="sheet" {...dialogProps} onClick={(event) => event.stopPropagation()} onSubmit={save}>
-          <h2 id={titleId}>{existing ? t.rewards.titleEdit : t.rewards.titleNew}</h2>
+        <div className="sheet" {...dialogProps} onClick={(event) => event.stopPropagation()}>
+          <form className="sheet-form" onSubmit={save}>
+            <h2 id={titleId}>{existing ? t.rewards.titleEdit : t.rewards.titleNew}</h2>
 
-          <label className="field">
-            <span>{t.rewards.name}</span>
-            <input
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder={t.rewards.namePlaceholder}
-              maxLength={80}
-              autoFocus
-            />
-          </label>
+            <label className="field">
+              <span>{t.rewards.name}</span>
+              <input
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder={t.rewards.namePlaceholder}
+                maxLength={80}
+                autoFocus
+              />
+            </label>
 
-          <label className="field">
-            <span>{t.taskForm.description}</span>
-            <input
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              maxLength={200}
-            />
-          </label>
+            <label className="field">
+              <span>{t.taskForm.description}</span>
+              <input
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                maxLength={200}
+              />
+            </label>
 
-          <label className="field">
-            <span>{t.rewards.costLabel}</span>
-            <input
-              type="number"
-              min={1}
-              max={100000}
-              value={cost}
-              onChange={(event) => setCost(Number(event.target.value))}
-            />
-          </label>
+            <label className="field">
+              <span>{t.rewards.costLabel}</span>
+              <input
+                type="number"
+                min={1}
+                max={100000}
+                value={cost}
+                onChange={(event) => setCost(Number(event.target.value))}
+              />
+            </label>
 
-          {error && <p className="error-text">{error}</p>}
+            {error && <p className="error-text">{error}</p>}
 
-          <div className="sheet-actions">
-            <button type="button" className="btn btn-ghost" onClick={onCancel}>
-              {t.common.cancel}
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={busy}>
-              {busy ? t.common.saving : existing ? t.common.save : t.rewards.add}
-            </button>
-          </div>
+            <div className="sheet-actions">
+              <button type="button" className="btn btn-ghost" onClick={onCancel}>
+                {t.common.cancel}
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={busy}>
+                {busy ? t.common.saving : existing ? t.common.save : t.rewards.add}
+              </button>
+            </div>
 
-          {onDelete && (
-            <button type="button" className="btn btn-danger-text" onClick={() => setConfirmingDelete(true)}>
-              {t.rewards.delete}
-            </button>
-          )}
-        </form>
+            {onDelete && (
+              <button type="button" className="btn btn-danger-text" onClick={() => setConfirmingDelete(true)}>
+                {t.rewards.delete}
+              </button>
+            )}
+          </form>
+        </div>
       </div>
 
       {onDelete && confirmingDelete && (
@@ -275,7 +277,7 @@ export function RewardsScreen() {
   return (
     <div className="screen fade-in">
       <header className="screen-header">
-        <h2>{t.rewards.title}</h2>
+        <h1>{t.rewards.title}</h1>
       </header>
 
       <PointsBar lifetime={profile.lifetime_points} spendable={profile.spendable_points} celebrate={celebrate} />
@@ -395,7 +397,7 @@ export function RewardsScreen() {
       {history.length > 0 && (
         <details className="task-group completed-group redemption-history">
           <summary className="group-title completed-summary">{t.rewards.historyTitle(history.length)}</summary>
-          <ul className="history-list">
+          <ul className="history-list" tabIndex={0}>
             {history.map((redemption) => (
               <li key={redemption.id} className="history-row">
                 <span className="history-date">

@@ -162,7 +162,7 @@ test.describe('rewards', () => {
     await page.getByRole('button', { name: 'עריכת קפה בבית קפה' }).click()
 
     await page.getByRole('button', { name: 'מחיקת התגמול' }).click()
-    const sheet = page.locator('div.sheet', { hasText: 'מחיקת התגמול' })
+    const sheet = page.locator('.sheet:not(:has(form))', { hasText: 'מחיקת התגמול' })
     await expect(sheet).toBeVisible()
     await sheet.getByRole('button', { name: 'ביטול' }).click()
     await expect(sheet).toBeHidden()
@@ -171,7 +171,7 @@ test.describe('rewards', () => {
     // Cancelling the confirm sheet only dismisses it - the edit form
     // underneath is still open, so a second attempt reuses it directly.
     await page.getByRole('button', { name: 'מחיקת התגמול' }).click()
-    await page.locator('div.sheet', { hasText: 'מחיקת התגמול' }).getByRole('button', { name: 'מחיקת התגמול' }).click()
+    await page.locator('.sheet:not(:has(form))', { hasText: 'מחיקת התגמול' }).getByRole('button', { name: 'מחיקת התגמול' }).click()
 
     await expect(page.getByText('התגמול נמחק.')).toBeVisible()
     expect(db.rewards).toHaveLength(0)

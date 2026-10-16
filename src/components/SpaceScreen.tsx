@@ -303,7 +303,7 @@ export function SpaceSetup({
   const [busy, setBusy] = useState(false)
   // The very first space has nothing to go back to - only the later
   // create/join sheet can be dismissed.
-  const { titleId, dialogProps } = useDialog<HTMLFormElement>(onDone, { closable: allowCancel })
+  const { titleId, dialogProps } = useDialog<HTMLDivElement>(onDone, { closable: allowCancel })
   const [error, setError] = useState<string | null>(null)
 
   async function submit(event: React.FormEvent) {
@@ -327,67 +327,69 @@ export function SpaceSetup({
 
   return (
     <div className="sheet-backdrop" onClick={allowCancel ? onDone : undefined} role="presentation">
-      <form className="sheet" {...dialogProps} onClick={(event) => event.stopPropagation()} onSubmit={submit}>
-        <h2 id={titleId}>{mode === 'create' ? t.spaceSetup.titleCreate : t.spaceSetup.titleJoin}</h2>
+      <div className="sheet" {...dialogProps} onClick={(event) => event.stopPropagation()}>
+        <form className="sheet-form" onSubmit={submit}>
+          <h2 id={titleId}>{mode === 'create' ? t.spaceSetup.titleCreate : t.spaceSetup.titleJoin}</h2>
 
-        <div className="segmented">
-          <button
-            type="button"
-            className={mode === 'create' ? 'segment segment-active' : 'segment'}
-            onClick={() => setMode('create')}
-          >
-            {t.spaceSetup.tabCreate}
-          </button>
-          <button
-            type="button"
-            className={mode === 'join' ? 'segment segment-active' : 'segment'}
-            onClick={() => setMode('join')}
-          >
-            {t.spaceSetup.tabJoin}
-          </button>
-        </div>
-
-        {mode === 'create' ? (
-          <label className="field">
-            <span>{t.spaceSetup.nameIt}</span>
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder={t.spaceSetup.namePlaceholder}
-              maxLength={60}
-              autoComplete="off"
-            />
-            <small>{t.spaceSetup.nameHint}</small>
-          </label>
-        ) : (
-          <label className="field">
-            <span>{t.spaceSetup.codeLabel}</span>
-            <input
-              value={code}
-              onChange={(event) => setCode(event.target.value.toUpperCase())}
-              placeholder={t.spaceSetup.codePlaceholder}
-              maxLength={6}
-              autoCapitalize="characters"
-              autoComplete="off"
-              className="code-input"
-            />
-            <small>{t.spaceSetup.codeHint}</small>
-          </label>
-        )}
-
-        {error && <p className="error-text">{error}</p>}
-
-        <div className="sheet-actions">
-          {allowCancel && (
-            <button type="button" className="btn btn-ghost" onClick={onDone}>
-              {t.common.cancel}
+          <div className="segmented">
+            <button
+              type="button"
+              className={mode === 'create' ? 'segment segment-active' : 'segment'}
+              onClick={() => setMode('create')}
+            >
+              {t.spaceSetup.tabCreate}
             </button>
+            <button
+              type="button"
+              className={mode === 'join' ? 'segment segment-active' : 'segment'}
+              onClick={() => setMode('join')}
+            >
+              {t.spaceSetup.tabJoin}
+            </button>
+          </div>
+
+          {mode === 'create' ? (
+            <label className="field">
+              <span>{t.spaceSetup.nameIt}</span>
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder={t.spaceSetup.namePlaceholder}
+                maxLength={60}
+                autoComplete="off"
+              />
+              <small>{t.spaceSetup.nameHint}</small>
+            </label>
+          ) : (
+            <label className="field">
+              <span>{t.spaceSetup.codeLabel}</span>
+              <input
+                value={code}
+                onChange={(event) => setCode(event.target.value.toUpperCase())}
+                placeholder={t.spaceSetup.codePlaceholder}
+                maxLength={6}
+                autoCapitalize="characters"
+                autoComplete="off"
+                className="code-input"
+              />
+              <small>{t.spaceSetup.codeHint}</small>
+            </label>
           )}
-          <button type="submit" className="btn btn-primary" disabled={busy}>
-            {busy ? t.common.working : mode === 'create' ? t.spaceSetup.create : t.spaceSetup.join}
-          </button>
-        </div>
-      </form>
+
+          {error && <p className="error-text">{error}</p>}
+
+          <div className="sheet-actions">
+            {allowCancel && (
+              <button type="button" className="btn btn-ghost" onClick={onDone}>
+                {t.common.cancel}
+              </button>
+            )}
+            <button type="submit" className="btn btn-primary" disabled={busy}>
+              {busy ? t.common.working : mode === 'create' ? t.spaceSetup.create : t.spaceSetup.join}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

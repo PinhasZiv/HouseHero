@@ -105,7 +105,7 @@ function PersonStatsSheet({
                   <span>{task.count}</span>
                   <span>{task.points}</span>
                 </summary>
-                <ul className="history-list">
+                <ul className="history-list" tabIndex={0}>
                   {task.timestamps.slice(0, MAX_TIMESTAMPS_SHOWN).map((iso, index) => (
                     <li key={index} className="history-row">
                       <span className="history-date">{formatDateTime(iso, language)}</span>
@@ -358,7 +358,7 @@ export function StatsScreen() {
   return (
     <div className="screen fade-in">
       <header className="screen-header">
-        <h2>{t.stats.title}</h2>
+        <h1>{t.stats.title}</h1>
       </header>
 
       <div className="segmented" role="tablist" aria-label={t.stats.rangeAria}>
@@ -523,7 +523,7 @@ export function StatsScreen() {
               {missedCycles.total > 0 && (
                 <section className="card card-warning">
                   <h3>{t.stats.missedCyclesTitle}</h3>
-                  <ul className="history-list">
+                  <ul className="history-list" tabIndex={0}>
                     {missedCycles.byTask.map((entry) => {
                       // byTask is sorted worst-first, so the first entry's
                       // count is always the scale each bar is relative to.
@@ -545,7 +545,7 @@ export function StatsScreen() {
               {inactive.length > 0 && (
                 <section className="card card-warning">
                   <h3>{t.stats.inactiveTitle}</h3>
-                  <ul className="history-list">
+                  <ul className="history-list" tabIndex={0}>
                     {inactive.map((entry) => (
                       <li key={entry.userId} className="history-row">
                         <span>{personName(entry.userId)}</span>
@@ -566,7 +566,7 @@ export function StatsScreen() {
 
           <section className="card">
             <h3>{t.stats.weeklyTrendTitle}</h3>
-            <div className="week-chart" role="img" aria-label={t.stats.weeklyTrendTitle}>
+            <div className="week-chart" role="img" aria-label={t.stats.weeklyTrendTitle} tabIndex={0}>
               {/* weeklyTrend() itself returns oldest-first (its own documented
                   contract); rendered newest-first instead, so the current
                   week - the one column anyone actually opens this for - sits

@@ -286,8 +286,9 @@ test.describe('a time-limited task whose window has already closed', () => {
 
     await page.locator('.sheet').getByRole('button', { name: 'הוספת משימה' }).click()
 
-    // A new task was created - the expired original is untouched.
-    expect(db.tasks).toHaveLength(2)
+    // A new task was created - the expired original is untouched. The save
+    // is a request the page makes after the click, so wait for it to land.
+    await expect.poll(() => db.tasks.length).toBe(2)
     const original = db.tasks.find((t) => t.id === 'task-expired')
     expect(original?.is_done).toBe(true)
     const duplicate = db.tasks.find((t) => t.id !== 'task-expired')

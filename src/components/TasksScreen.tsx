@@ -272,7 +272,7 @@ export function TasksScreen() {
   return (
     <div className="screen fade-in">
       <header className="screen-header">
-        <h2>{currentSpace.name}</h2>
+        <h1>{currentSpace.name}</h1>
         <p className="screen-subtitle">
           {spaceTasks.length === 0 ? t.tasks.empty : t.tasks.count(spaceTasks.length)}
         </p>
