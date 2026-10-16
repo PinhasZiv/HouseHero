@@ -56,6 +56,13 @@ export function floatScore(x: number, y: number, amount: number): void {
 
 /** Fires both effects from a click/tap position - the common case. */
 export function celebrateAt(x: number, y: number, points?: number): void {
+  // A short buzz to go with it, where the phone allows one (Android; Safari
+  // on iPhone has no vibration for web pages).
+  try {
+    navigator.vibrate?.(15)
+  } catch {
+    // Some browsers throw instead of ignoring it.
+  }
   burstConfetti(x, y)
   if (points) floatScore(x, y, points)
 }

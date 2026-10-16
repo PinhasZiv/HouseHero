@@ -12,7 +12,7 @@ import { SpaceSetup } from './components/SpaceScreen'
 import { applyLanguageToDocument, useI18n } from './lib/i18n'
 import { useBackClose } from './lib/useDialog'
 import { readParam, stripParam } from './lib/urlParams'
-import { ChartIcon, DotsIcon, GiftIcon, HouseMark, ListIcon, TodayIcon } from './components/Icons'
+import { ChartIcon, DotsIcon, GiftIcon, HouseMark, ListIcon, StarIcon, TodayIcon } from './components/Icons'
 
 type Tab = 'today' | 'tasks' | 'rewards' | 'stats' | 'more'
 
@@ -69,7 +69,7 @@ export default function App() {
 }
 
 function Shell() {
-  const { session, loading, error, stale, reload, spaces, currentSpace, setCurrentSpaceId } = useApp()
+  const { session, loading, error, stale, reload, spaces, currentSpace, setCurrentSpaceId, profile } = useApp()
   const { t } = useI18n()
   const [tab, setTab] = useState<Tab>(tabFromUrl)
   useEffect(() => stripParam('tab'), [])
@@ -123,20 +123,35 @@ function Shell() {
           <HouseMark size={26} />
           <span>{t.appName}</span>
         </div>
-        {spaces.length > 1 && tab !== 'today' && (
-          <select
-            className="space-select"
-            value={currentSpace?.id ?? ''}
-            onChange={(event) => setCurrentSpaceId(event.target.value)}
-            aria-label={t.space.switchAria}
-          >
-            {spaces.map((space) => (
-              <option key={space.id} value={space.id}>
-                {space.name}
-              </option>
-            ))}
-          </select>
-        )}
+        <div className="app-bar-end">
+          {spaces.length > 1 && tab !== 'today' && (
+            <select
+              className="space-select"
+              value={currentSpace?.id ?? ''}
+              onChange={(event) => setCurrentSpaceId(event.target.value)}
+              aria-label={t.space.switchAria}
+            >
+              {spaces.map((space) => (
+                <option key={space.id} value={space.id}>
+                  {space.name}
+                </option>
+              ))}
+            </select>
+          )}
+          {/* Points to spend, always in sight - and a way to the rewards they
+              buy. The Rewards tab shows them itself, so not there. */}
+          {profile && tab !== 'rewards' && (
+            <button
+              type="button"
+              className="points-chip"
+              onClick={() => setTab('rewards')}
+              aria-label={t.today.pointsChipAria(profile.spendable_points)}
+            >
+              <StarIcon size={14} />
+              <span>{profile.spendable_points}</span>
+            </button>
+          )}
+        </div>
       </header>
 
       {stale && (
