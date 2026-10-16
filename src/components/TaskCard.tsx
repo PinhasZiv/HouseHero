@@ -5,6 +5,7 @@ import {
   formatSnoozeUntil,
   formatTime,
   personLabel,
+  relativeDay,
   type PersonLabel,
 } from '../lib/format'
 import { useI18n, type Language } from '../lib/i18n'
@@ -53,6 +54,9 @@ interface TaskCardProps {
   onUndoSkip?: () => Promise<void>
   /** Briefly called out - the card a notification was about. */
   highlighted?: boolean
+  /** Its completion was marked today, even if backdated to an earlier day -
+   *  it reads as done today, and can be undone like one. */
+  markedToday?: boolean
 }
 
 /**
@@ -84,6 +88,7 @@ export function TaskCard({
   onSkip,
   onUndoSkip,
   highlighted = false,
+  markedToday = false,
 }: TaskCardProps) {
   const { t, language } = useI18n()
   const { reminderOverrides, isPaused } = useApp()
@@ -91,11 +96,14 @@ export function TaskCard({
   const [justCompleted, setJustCompleted] = useState(false)
   const info = withPause(classify(task, today), isPaused(task))
 
-  const isChecked = info.status === 'completed_today' || info.status === 'done'
+  // Marked today but dated earlier: shown exactly like a completion today.
+  const markedEarlier = markedToday && info.status !== 'completed_today' && task.last_completed_date !== null
+  const shownStatus = markedEarlier ? 'completed_today' : info.status
+  const isChecked = shownStatus === 'completed_today' || shownStatus === 'done'
   // Undoing only ever applies the same day it happened - an older completion
   // stays checked, but settled, with nothing left to tap.
   const canCheck = !isChecked && Boolean(onComplete)
-  const canUncheck = isChecked && info.status === 'completed_today' && Boolean(onUndo)
+  const canUncheck = isChecked && shownStatus === 'completed_today' && Boolean(onUndo)
 
   async function complete(event: React.MouseEvent<HTMLButtonElement>) {
     if (!onComplete || busy) return
@@ -195,7 +203,7 @@ export function TaskCard({
 
   return (
     <article
-      className={`task-card task-${info.status} ${justCompleted ? 'task-just-completed' : ''} ${highlighted ? 'task-highlight' : ''}`}
+      className={`task-card task-${shownStatus} ${justCompleted ? 'task-just-completed' : ''} ${highlighted ? 'task-highlight' : ''}`}
       data-task-id={task.id}
     >
       {/* A completed task always shows its checkmark, even when this viewer
@@ -241,7 +249,7 @@ export function TaskCard({
           {assignedName && <span className="chip chip-assign">{assignedName}</span>}
           {snoozedUntil ? (
             <span>{t.task.snoozedUntil(formatSnoozeUntil(snoozedUntil, today, language))}</span>
-          ) : info.status === 'completed_today' ? (
+          ) : shownStatus === 'completed_today' ? (
             <>
               <span>
                 {!completedBy || completedBy.kind === 'you'
@@ -250,6 +258,10 @@ export function TaskCard({
                     ? t.task.completedByGroup(completedBy.count)
                     : t.task.completedBy(completedBy.name ?? t.task.someoneElse)}
               </span>
+              {/* Backdated: when it was actually done ("yesterday"). */}
+              {task.last_completed_date && task.last_completed_date !== today && (
+                <span>{relativeDay(task.last_completed_date, today, language)}</span>
+              )}
             </>
           ) : info.status === 'skipped_today' ? (
             // Done or skipped is settled for today: when it comes around again

@@ -19,7 +19,7 @@ type OwnerFilter = 'all' | 'mine' | 'everyone' | 'others'
 
 /** Every task in the selected space, whether or not it needs anything today. */
 export function TasksScreen() {
-  const { tasks, currentSpace, today, session, people, patchTask, removeTask, isPaused } = useApp()
+  const { tasks, currentSpace, today, session, people, patchTask, removeTask, isPaused, markedToday } = useApp()
   const { t, language } = useI18n()
   const { complete, undo } = useCompletion()
   const { skip, undo: undoSkip } = useSkip()
@@ -99,7 +99,10 @@ export function TasksScreen() {
       // A time-limited task can read as expired client-side well before the
       // periodic sweep sets is_done - it belongs in the record the moment
       // its window closes, not up to 15 minutes later.
-      if (task.is_done || status === 'completed_today' || status === 'expired' || status === 'cancelled') {
+      // Marked done today, even if dated earlier, sits with the done ones -
+      // where it can still be undone - until tomorrow.
+      const markedEarlier = markedToday.has(task.id) && task.last_completed_date !== null && status === 'upcoming'
+      if (task.is_done || markedEarlier || status === 'completed_today' || status === 'expired' || status === 'cancelled') {
         completed.push(task)
       } else {
         open.push(task)
@@ -112,7 +115,7 @@ export function TasksScreen() {
     completed.sort(compareByCompletion)
     return { openTasks: open, completedTasks: completed }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, currentSpace, today, tick, isPaused])
+  }, [tasks, currentSpace, today, tick, isPaused, markedToday])
 
   const spaceTasks = useMemo(() => [...openTasks, ...completedTasks], [openTasks, completedTasks])
 
@@ -208,6 +211,7 @@ export function TasksScreen() {
         today={today}
         assignedName={assignedName(task)}
         completedBy={completedByLabel(task, people, session?.user.id ?? null, language)}
+        markedToday={markedToday.has(task.id)}
         onComplete={!task.is_done ? () => requestComplete(task) : undefined}
         onUndo={canUndo(task) ? () => undo(task) : undefined}
         onCancel={

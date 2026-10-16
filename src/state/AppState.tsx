@@ -75,6 +75,11 @@ interface AppContextValue {
   patchPause: (pause: Pause) => void
   /** Whether a task is frozen right now - see isTaskPaused(). */
   isPaused: (task: Pick<Task, 'space_id' | 'assigned_to'>) => boolean
+  /** Tasks whose completion was marked today - even one backdated to an
+   *  earlier day - so they stay in "done today", and undoable. */
+  markedToday: Set<string>
+  /** Records a completion just marked, or forgets an undone one. */
+  noteMarked: (taskId: string, marked: boolean) => void
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
@@ -103,6 +108,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [snoozes, setSnoozes] = useState<Map<string, string>>(new Map())
   const [reminderOverrides, setReminderOverrides] = useState<Map<string, ReminderOverride>>(new Map())
   const [pauses, setPauses] = useState<Pause[]>([])
+  const [recentMarks, setRecentMarks] = useState<{ task_id: string; logged_at: string }[]>([])
   const [currentSpaceId, setCurrentSpaceIdState] = useState<string | null>(readStoredSpace)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -157,6 +163,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         api.fetchSnoozes(userId),
         api.fetchReminderOverrides(userId),
         api.fetchPauses(),
+        // Two days back covers "today" in any timezone; filtered below.
+        api.fetchCompletionsMarkedSince(new Date(Date.now() - 2 * 86_400_000).toISOString()),
       ])
     try {
       // A cold start (opening the PWA after it sat backgrounded, or from
@@ -167,7 +175,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // on its own, which is all "press try again" ever did, so this retries
       // silently rather than making it a manual step.
       const result = await withRetry(fetchEverything, COLD_START_RETRY_DELAYS_MS)
-      const [nextProfile, nextSpaces, nextTasks, nextPeople, nextSnoozes, nextReminderOverrides, nextPauses] = result
+      const [nextProfile, nextSpaces, nextTasks, nextPeople, nextSnoozes, nextReminderOverrides, nextPauses, nextMarks] =
+        result
       setProfile(nextProfile)
       adoptLanguage(nextProfile)
       setSpaces(nextSpaces)
@@ -178,6 +187,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         new Map(nextReminderOverrides.map((row) => [row.task_id, { hour: row.reminder_hour, minute: row.reminder_minute }])),
       )
       setPauses(nextPauses)
+      setRecentMarks(nextMarks)
       setCurrentSpaceIdState((current) => {
         const stillValid = current && nextSpaces.some((space) => space.id === current)
         return stillValid ? current : (nextSpaces[0]?.id ?? null)
@@ -222,6 +232,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSnoozes(new Map())
       setReminderOverrides(new Map())
       setPauses([])
+      setRecentMarks([])
       return
     }
     setLoading(true)
@@ -383,6 +394,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPauses((current) => [pause, ...current.filter((item) => item.id !== pause.id)])
   }, [])
 
+  const markedToday = useMemo(
+    () => new Set(recentMarks.filter((mark) => todayIn(timezone, new Date(mark.logged_at)) === today).map((mark) => mark.task_id)),
+    [recentMarks, timezone, today],
+  )
+
+  const noteMarked = useCallback((taskId: string, marked: boolean) => {
+    setRecentMarks((current) => {
+      const others = current.filter((mark) => mark.task_id !== taskId)
+      return marked ? [...others, { task_id: taskId, logged_at: new Date().toISOString() }] : others
+    })
+  }, [])
+
   const isPaused = useCallback(
     (task: Pick<Task, 'space_id' | 'assigned_to'>) => isTaskPaused(pauses, task),
     [pauses],
@@ -413,11 +436,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       pauses,
       patchPause,
       isPaused,
+      markedToday,
+      noteMarked,
     }),
     [
       session, profile, spaces, tasks, people, today, currentSpaceId,
       setCurrentSpaceId, loading, authReady, error, stale, reload, patchTask, removeTask,
       snoozes, patchSnooze, reminderOverrides, patchReminderOverride, pauses, patchPause, isPaused,
+      markedToday, noteMarked,
     ],
   )
 

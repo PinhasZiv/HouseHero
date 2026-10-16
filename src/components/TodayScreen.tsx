@@ -44,7 +44,7 @@ const HIGHLIGHT_MS = 2500
  * contradict the notification that led here.
  */
 export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
-  const { tasks, spaces, people, today, session, snoozes, profile, currentSpace, pauses, isPaused } = useApp()
+  const { tasks, spaces, people, today, session, snoozes, profile, currentSpace, pauses, isPaused, markedToday } = useApp()
   const { t, language } = useI18n()
   const { complete, undo } = useCompletion()
   const { snooze, cancelSnooze } = useSnooze()
@@ -115,7 +115,17 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
       const until = snoozes.get(task.id)
       const stillSnoozed = (status === 'late' || status === 'due') && until && new Date(until) > new Date()
 
+      // Marked today but dated earlier (a backdated completion): it was
+      // handled today, so it belongs with today's - and stays undoable there.
+      // Unless it is due again already; then the due list is where it goes.
+      const markedEarlier =
+        markedToday.has(task.id) &&
+        task.last_completed_date !== null &&
+        task.last_completed_date !== today &&
+        (status === 'upcoming' || status === 'done' || status === 'scheduled')
+
       const onToday =
+        markedEarlier ||
         status === 'active' ||
         (status === 'scheduled' && !!task.starts_at && todayIn(timezone, new Date(task.starts_at)) === today) ||
         status === 'late' ||
@@ -135,7 +145,8 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
 
       // Frozen for a vacation: still visible, so nothing seems to vanish,
       // but out of the way and never counted as waiting.
-      if (status === 'paused') paused.push(task)
+      if (markedEarlier) done.push(task)
+      else if (status === 'paused') paused.push(task)
       else if (status === 'active') active.push(task)
       // A window opening in a few days does not belong on "today" - only one
       // whose window starts before this day is out (checked in onToday).
@@ -161,7 +172,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
     const skippedCount = done.filter((task) => classify(task, today).status === 'skipped_today').length
     return { active, late, due, done, startingToday, snoozed, paused, hiddenOthers, skippedCount }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, today, snoozes, tick, timezone, showOthers, selfId, isPaused])
+  }, [tasks, today, snoozes, tick, timezone, showOthers, selfId, isPaused, markedToday])
 
   // The Snooze action on a notification opens here with ?snooze=1: there is
   // no single task to point at (the notification can cover several), so it
@@ -418,6 +429,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
                 today={today}
                 spaceName={showSpaceNames ? spaceNames.get(task.space_id) : undefined}
                 completedBy={completedByLabel(task, people, selfId, language)}
+                markedToday={markedToday.has(task.id)}
                 onComplete={skippedToday ? () => requestComplete(task) : undefined}
                 onUndo={!skippedToday && canUndo(task) ? () => undo(task) : undefined}
                 onUndoSkip={skippedToday && canUndoSkip(task) ? () => undoSkip(task) : undefined}
