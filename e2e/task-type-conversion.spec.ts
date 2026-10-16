@@ -85,7 +85,7 @@ test.describe('converting a completed recurring task to one-time', () => {
     await page.locator('.sheet').getByRole('button', { name: 'שמירה' }).click()
 
     // Wait for the save to land, or is_done would trivially still be false.
-    await expect(page.locator('form.sheet')).toHaveCount(0)
+    await expect(page.locator('.sheet:has(form)')).toHaveCount(0)
     expect(db.tasks[0].task_type).toBe('one_time')
     expect(db.tasks[0].is_done).toBe(false)
     await expect(page.locator('.task-card', { hasText: 'לשטוף כלים' })).toBeVisible()

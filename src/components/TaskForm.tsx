@@ -121,7 +121,7 @@ export function TaskForm({
     source?.reminder_policy?.finalReminderMinutesBeforeExpiry ?? 15,
   )
   const [busy, setBusy] = useState(false)
-  const { titleId, dialogProps } = useDialog<HTMLFormElement>(onCancel)
+  const { titleId, dialogProps } = useDialog<HTMLDivElement>(onCancel)
   const [error, setError] = useState<string | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
@@ -230,447 +230,444 @@ export function TaskForm({
   return (
     <>
     <div className="sheet-backdrop" onClick={onCancel} role="presentation">
-      <form
-        className="sheet"
-        {...dialogProps}
-        onClick={(event) => event.stopPropagation()}
-        onSubmit={save}
-      >
-        <h2 id={titleId}>{existing ? t.taskForm.titleEdit : t.taskForm.titleNew}</h2>
+      <div className="sheet" {...dialogProps} onClick={(event) => event.stopPropagation()}>
+        <form className="sheet-form" onSubmit={save}>
+          <h2 id={titleId}>{existing ? t.taskForm.titleEdit : t.taskForm.titleNew}</h2>
 
-        <label className="field">
-          <span>{t.taskForm.name}</span>
-          <input
-            id="task-title"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder={t.taskForm.namePlaceholder}
-            maxLength={80}
-            autoComplete="off"
-          />
-        </label>
-
-        <label className="field">
-          <span>{t.taskForm.description}</span>
-          <textarea
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            placeholder={t.taskForm.descriptionPlaceholder}
-            maxLength={2000}
-            rows={4}
-          />
-        </label>
-
-        <fieldset className="field">
-          <legend>{t.taskForm.type}</legend>
-          <div className="segmented">
-            <button
-              type="button"
-              className={taskType === 'one_time' ? 'segment segment-active' : 'segment'}
-              onClick={() => setTaskType('one_time')}
-            >
-              {t.taskForm.typeOneTime}
-            </button>
-            <button
-              type="button"
-              className={taskType === 'recurring' ? 'segment segment-active' : 'segment'}
-              onClick={() => setTaskType('recurring')}
-            >
-              {t.taskForm.typeRecurring}
-            </button>
-            <button
-              type="button"
-              className={taskType === 'time_limited' ? 'segment segment-active' : 'segment'}
-              onClick={() => setTaskType('time_limited')}
-            >
-              {t.taskForm.typeTimeLimited}
-            </button>
-          </div>
-        </fieldset>
-
-        {taskType === 'time_limited' && (
-          <>
-            <label className="field">
-              <span>{t.taskForm.windowStart}</span>
-              <input
-                type="datetime-local"
-                value={startsAt}
-                onChange={(event) => setStartsAt(event.target.value)}
-              />
-            </label>
-            <label className="field">
-              <span>{t.taskForm.windowEnd}</span>
-              <input
-                type="datetime-local"
-                value={expiresAt}
-                min={startsAt}
-                onChange={(event) => setExpiresAt(event.target.value)}
-              />
-            </label>
-
-            <fieldset className="field">
-              <legend>{t.taskForm.reminderPolicy}</legend>
-              <div className="segmented segmented-wrap">
-                <button
-                  type="button"
-                  className={reminderMode === 'none' ? 'segment segment-active' : 'segment'}
-                  onClick={() => setReminderMode('none')}
-                >
-                  {t.taskForm.reminderPolicyNone}
-                </button>
-                <button
-                  type="button"
-                  className={reminderMode === 'start_only' ? 'segment segment-active' : 'segment'}
-                  onClick={() => setReminderMode('start_only')}
-                >
-                  {t.taskForm.reminderPolicyStartOnly}
-                </button>
-                <button
-                  type="button"
-                  className={reminderMode === 'interval' || reminderMode === 'daily' ? 'segment segment-active' : 'segment'}
-                  onClick={() => setReminderMode('interval')}
-                >
-                  {t.taskForm.reminderPolicyInterval}
-                </button>
-              </div>
-
-              {(reminderMode === 'interval' || reminderMode === 'daily') && (
-                <>
-                  <div className="segmented">
-                    <button
-                      type="button"
-                      className={reminderMode === 'interval' && intervalUnit === 'minutes' ? 'segment segment-active' : 'segment'}
-                      onClick={() => {
-                        setReminderMode('interval')
-                        setIntervalUnit('minutes')
-                        setReminderIntervalValue(30)
-                      }}
-                    >
-                      {t.taskForm.minutesUnit}
-                    </button>
-                    <button
-                      type="button"
-                      className={reminderMode === 'interval' && intervalUnit === 'hours' ? 'segment segment-active' : 'segment'}
-                      onClick={() => {
-                        setReminderMode('interval')
-                        setIntervalUnit('hours')
-                        setReminderIntervalValue(2)
-                      }}
-                    >
-                      {t.taskForm.hoursUnit}
-                    </button>
-                    <button
-                      type="button"
-                      className={reminderMode === 'daily' ? 'segment segment-active' : 'segment'}
-                      onClick={() => setReminderMode('daily')}
-                    >
-                      {t.taskForm.intervalUnit}
-                    </button>
-                  </div>
-
-                  {reminderMode === 'interval' && (
-                    <>
-                      <div className="preset-row">
-                        {(intervalUnit === 'minutes' ? REMINDER_MINUTE_PRESETS : REMINDER_HOUR_PRESETS).map((n) => (
-                          <button
-                            key={n}
-                            type="button"
-                            className={reminderIntervalValue === n ? 'preset preset-active' : 'preset'}
-                            onClick={() => setReminderIntervalValue(n)}
-                          >
-                            {n}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="inline-field">
-                        <input
-                          type="number"
-                          min={intervalUnit === 'minutes' ? 5 : 1}
-                          max={intervalUnit === 'minutes' ? 1440 : 72}
-                          value={reminderIntervalValue}
-                          onChange={(event) => setReminderIntervalValue(Number(event.target.value))}
-                          aria-label={t.taskForm.reminderIntervalAria}
-                        />
-                        <span>{intervalUnit === 'minutes' ? t.taskForm.minutesUnit : t.taskForm.hoursUnit}</span>
-                      </div>
-                    </>
-                  )}
-
-                  {reminderMode === 'daily' && (
-                    <>
-                      <div className="preset-row">
-                        {REMINDER_DAILY_INTERVAL_PRESETS.map((n) => (
-                          <button
-                            key={n}
-                            type="button"
-                            className={dailyIntervalDays === n ? 'preset preset-active' : 'preset'}
-                            onClick={() => setDailyIntervalDays(n)}
-                          >
-                            {n}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="inline-field">
-                        <input
-                          type="number"
-                          min={1}
-                          max={30}
-                          value={dailyIntervalDays}
-                          onChange={(event) => setDailyIntervalDays(Number(event.target.value))}
-                          aria-label={t.taskForm.reminderDailyIntervalAria}
-                        />
-                        <span>{t.taskForm.intervalUnit}</span>
-                      </div>
-                      <label className="field">
-                        <span>{t.taskForm.reminderDailyTimeLabel}</span>
-                        <input
-                          type="time"
-                          value={`${String(dailyHour).padStart(2, '0')}:${String(dailyMinute).padStart(2, '0')}`}
-                          onChange={(event) => {
-                            const [h, m] = event.target.value.split(':').map(Number)
-                            if (Number.isFinite(h) && Number.isFinite(m)) {
-                              setDailyHour(h)
-                              setDailyMinute(m)
-                            }
-                          }}
-                          aria-label={t.taskForm.reminderDailyTimeAria}
-                        />
-                      </label>
-                    </>
-                  )}
-                </>
-              )}
-            </fieldset>
-
-            <label className="field">
-              <span className="inline-field">
-                <input
-                  type="checkbox"
-                  checked={finalReminderEnabled}
-                  onChange={(event) => setFinalReminderEnabled(event.target.checked)}
-                />
-                {t.taskForm.finalReminderToggle}
-              </span>
-              {finalReminderEnabled && (
-                <div className="inline-field">
-                  <input
-                    type="number"
-                    min={1}
-                    max={1440}
-                    value={finalReminderMinutes}
-                    onChange={(event) => setFinalReminderMinutes(Number(event.target.value))}
-                    aria-label={t.taskForm.finalReminderAria}
-                  />
-                  <span>{t.taskForm.minutesBeforeEnd}</span>
-                </div>
-              )}
-            </label>
-          </>
-        )}
-
-        {taskType === 'recurring' && (
-          <>
-            <fieldset className="field">
-              <legend>{t.taskForm.recurrenceMode}</legend>
-              <div className="segmented">
-                <button
-                  type="button"
-                  className={recurrenceMode === 'interval' ? 'segment segment-active' : 'segment'}
-                  onClick={() => setRecurrenceMode('interval')}
-                >
-                  {t.taskForm.modeInterval}
-                </button>
-                <button
-                  type="button"
-                  className={recurrenceMode === 'weekly_days' ? 'segment segment-active' : 'segment'}
-                  onClick={() => setRecurrenceMode('weekly_days')}
-                >
-                  {t.taskForm.modeWeekly}
-                </button>
-              </div>
-            </fieldset>
-
-            {recurrenceMode === 'interval' ? (
-              <fieldset className="field">
-                <legend>{t.taskForm.intervalLabel}</legend>
-                <div className="preset-row">
-                  {INTERVAL_PRESETS.map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      className={intervalDays === n ? 'preset preset-active' : 'preset'}
-                      onClick={() => setIntervalDays(n)}
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
-                <div className="inline-field">
-                  <input
-                    type="number"
-                    min={1}
-                    max={365}
-                    value={intervalDays}
-                    onChange={(event) => setIntervalDays(Number(event.target.value))}
-                    aria-label={t.taskForm.intervalAria}
-                  />
-                  <span>{t.taskForm.intervalUnit}</span>
-                </div>
-              </fieldset>
-            ) : (
-              <fieldset className="field">
-                <legend>{t.taskForm.weeklyDaysLabel}</legend>
-                <div className="weekday-row">
-                  {[0, 1, 2, 3, 4, 5, 6].map((day) => (
-                    <button
-                      key={day}
-                      type="button"
-                      className={weeklyDays.includes(day) ? 'weekday weekday-active' : 'weekday'}
-                      onClick={() => toggleWeekday(day)}
-                    >
-                      {weekdayShort(day, language)}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-            )}
-
-            <fieldset className="field">
-              <legend>{t.taskForm.endCondition}</legend>
-              <div className="segmented segmented-wrap end-condition">
-                <button
-                  type="button"
-                  className={endCondition === 'never' ? 'segment segment-active' : 'segment'}
-                  onClick={() => setEndCondition('never')}
-                >
-                  {t.taskForm.endNever}
-                </button>
-                <button
-                  type="button"
-                  className={endCondition === 'after_count' ? 'segment segment-active' : 'segment'}
-                  onClick={() => setEndCondition('after_count')}
-                >
-                  {t.taskForm.endAfterCount}
-                </button>
-                <button
-                  type="button"
-                  className={endCondition === 'on_date' ? 'segment segment-active' : 'segment'}
-                  onClick={() => setEndCondition('on_date')}
-                >
-                  {t.taskForm.endOnDate}
-                </button>
-              </div>
-              {endCondition === 'after_count' && (
-                <label className="inline-field">
-                  <span>{t.taskForm.endAfterCountLabel}</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={1000}
-                    value={endAfterCount}
-                    onChange={(event) => setEndAfterCount(Number(event.target.value))}
-                  />
-                </label>
-              )}
-              {endCondition === 'on_date' && (
-                <label className="field">
-                  <span>{t.taskForm.endDateLabel}</span>
-                  <input
-                    type="date"
-                    value={endDate}
-                    min={addDays(dueDate, 1)}
-                    onChange={(event) => setEndDate(event.target.value)}
-                  />
-                </label>
-              )}
-            </fieldset>
-          </>
-        )}
-
-        <div className="two-col">
           <label className="field">
-            <span>{t.taskForm.points}</span>
-            <div className="inline-field">
-              <input
-                type="number"
-                min={1}
-                max={1000}
-                value={points}
-                onChange={(event) => setPoints(Number(event.target.value))}
-                aria-label={t.taskForm.pointsAria}
-              />
-              <span>{t.taskForm.pointsUnit}</span>
-            </div>
+            <span>{t.taskForm.name}</span>
+            <input
+              id="task-title"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder={t.taskForm.namePlaceholder}
+              maxLength={80}
+              autoComplete="off"
+            />
           </label>
+
+          <label className="field">
+            <span>{t.taskForm.description}</span>
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder={t.taskForm.descriptionPlaceholder}
+              maxLength={2000}
+              rows={4}
+            />
+          </label>
+
+          <fieldset className="field">
+            <legend>{t.taskForm.type}</legend>
+            <div className="segmented">
+              <button
+                type="button"
+                className={taskType === 'one_time' ? 'segment segment-active' : 'segment'}
+                onClick={() => setTaskType('one_time')}
+              >
+                {t.taskForm.typeOneTime}
+              </button>
+              <button
+                type="button"
+                className={taskType === 'recurring' ? 'segment segment-active' : 'segment'}
+                onClick={() => setTaskType('recurring')}
+              >
+                {t.taskForm.typeRecurring}
+              </button>
+              <button
+                type="button"
+                className={taskType === 'time_limited' ? 'segment segment-active' : 'segment'}
+                onClick={() => setTaskType('time_limited')}
+              >
+                {t.taskForm.typeTimeLimited}
+              </button>
+            </div>
+          </fieldset>
+
+          {taskType === 'time_limited' && (
+            <>
+              <label className="field">
+                <span>{t.taskForm.windowStart}</span>
+                <input
+                  type="datetime-local"
+                  value={startsAt}
+                  onChange={(event) => setStartsAt(event.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span>{t.taskForm.windowEnd}</span>
+                <input
+                  type="datetime-local"
+                  value={expiresAt}
+                  min={startsAt}
+                  onChange={(event) => setExpiresAt(event.target.value)}
+                />
+              </label>
+
+              <fieldset className="field">
+                <legend>{t.taskForm.reminderPolicy}</legend>
+                <div className="segmented segmented-wrap">
+                  <button
+                    type="button"
+                    className={reminderMode === 'none' ? 'segment segment-active' : 'segment'}
+                    onClick={() => setReminderMode('none')}
+                  >
+                    {t.taskForm.reminderPolicyNone}
+                  </button>
+                  <button
+                    type="button"
+                    className={reminderMode === 'start_only' ? 'segment segment-active' : 'segment'}
+                    onClick={() => setReminderMode('start_only')}
+                  >
+                    {t.taskForm.reminderPolicyStartOnly}
+                  </button>
+                  <button
+                    type="button"
+                    className={reminderMode === 'interval' || reminderMode === 'daily' ? 'segment segment-active' : 'segment'}
+                    onClick={() => setReminderMode('interval')}
+                  >
+                    {t.taskForm.reminderPolicyInterval}
+                  </button>
+                </div>
+
+                {(reminderMode === 'interval' || reminderMode === 'daily') && (
+                  <>
+                    <div className="segmented">
+                      <button
+                        type="button"
+                        className={reminderMode === 'interval' && intervalUnit === 'minutes' ? 'segment segment-active' : 'segment'}
+                        onClick={() => {
+                          setReminderMode('interval')
+                          setIntervalUnit('minutes')
+                          setReminderIntervalValue(30)
+                        }}
+                      >
+                        {t.taskForm.minutesUnit}
+                      </button>
+                      <button
+                        type="button"
+                        className={reminderMode === 'interval' && intervalUnit === 'hours' ? 'segment segment-active' : 'segment'}
+                        onClick={() => {
+                          setReminderMode('interval')
+                          setIntervalUnit('hours')
+                          setReminderIntervalValue(2)
+                        }}
+                      >
+                        {t.taskForm.hoursUnit}
+                      </button>
+                      <button
+                        type="button"
+                        className={reminderMode === 'daily' ? 'segment segment-active' : 'segment'}
+                        onClick={() => setReminderMode('daily')}
+                      >
+                        {t.taskForm.intervalUnit}
+                      </button>
+                    </div>
+
+                    {reminderMode === 'interval' && (
+                      <>
+                        <div className="preset-row">
+                          {(intervalUnit === 'minutes' ? REMINDER_MINUTE_PRESETS : REMINDER_HOUR_PRESETS).map((n) => (
+                            <button
+                              key={n}
+                              type="button"
+                              className={reminderIntervalValue === n ? 'preset preset-active' : 'preset'}
+                              onClick={() => setReminderIntervalValue(n)}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="inline-field">
+                          <input
+                            type="number"
+                            min={intervalUnit === 'minutes' ? 5 : 1}
+                            max={intervalUnit === 'minutes' ? 1440 : 72}
+                            value={reminderIntervalValue}
+                            onChange={(event) => setReminderIntervalValue(Number(event.target.value))}
+                            aria-label={t.taskForm.reminderIntervalAria}
+                          />
+                          <span>{intervalUnit === 'minutes' ? t.taskForm.minutesUnit : t.taskForm.hoursUnit}</span>
+                        </div>
+                      </>
+                    )}
+
+                    {reminderMode === 'daily' && (
+                      <>
+                        <div className="preset-row">
+                          {REMINDER_DAILY_INTERVAL_PRESETS.map((n) => (
+                            <button
+                              key={n}
+                              type="button"
+                              className={dailyIntervalDays === n ? 'preset preset-active' : 'preset'}
+                              onClick={() => setDailyIntervalDays(n)}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="inline-field">
+                          <input
+                            type="number"
+                            min={1}
+                            max={30}
+                            value={dailyIntervalDays}
+                            onChange={(event) => setDailyIntervalDays(Number(event.target.value))}
+                            aria-label={t.taskForm.reminderDailyIntervalAria}
+                          />
+                          <span>{t.taskForm.intervalUnit}</span>
+                        </div>
+                        <label className="field">
+                          <span>{t.taskForm.reminderDailyTimeLabel}</span>
+                          <input
+                            type="time"
+                            value={`${String(dailyHour).padStart(2, '0')}:${String(dailyMinute).padStart(2, '0')}`}
+                            onChange={(event) => {
+                              const [h, m] = event.target.value.split(':').map(Number)
+                              if (Number.isFinite(h) && Number.isFinite(m)) {
+                                setDailyHour(h)
+                                setDailyMinute(m)
+                              }
+                            }}
+                            aria-label={t.taskForm.reminderDailyTimeAria}
+                          />
+                        </label>
+                      </>
+                    )}
+                  </>
+                )}
+              </fieldset>
+
+              <label className="field">
+                <span className="inline-field">
+                  <input
+                    type="checkbox"
+                    checked={finalReminderEnabled}
+                    onChange={(event) => setFinalReminderEnabled(event.target.checked)}
+                  />
+                  {t.taskForm.finalReminderToggle}
+                </span>
+                {finalReminderEnabled && (
+                  <div className="inline-field">
+                    <input
+                      type="number"
+                      min={1}
+                      max={1440}
+                      value={finalReminderMinutes}
+                      onChange={(event) => setFinalReminderMinutes(Number(event.target.value))}
+                      aria-label={t.taskForm.finalReminderAria}
+                    />
+                    <span>{t.taskForm.minutesBeforeEnd}</span>
+                  </div>
+                )}
+              </label>
+            </>
+          )}
+
+          {taskType === 'recurring' && (
+            <>
+              <fieldset className="field">
+                <legend>{t.taskForm.recurrenceMode}</legend>
+                <div className="segmented">
+                  <button
+                    type="button"
+                    className={recurrenceMode === 'interval' ? 'segment segment-active' : 'segment'}
+                    onClick={() => setRecurrenceMode('interval')}
+                  >
+                    {t.taskForm.modeInterval}
+                  </button>
+                  <button
+                    type="button"
+                    className={recurrenceMode === 'weekly_days' ? 'segment segment-active' : 'segment'}
+                    onClick={() => setRecurrenceMode('weekly_days')}
+                  >
+                    {t.taskForm.modeWeekly}
+                  </button>
+                </div>
+              </fieldset>
+
+              {recurrenceMode === 'interval' ? (
+                <fieldset className="field">
+                  <legend>{t.taskForm.intervalLabel}</legend>
+                  <div className="preset-row">
+                    {INTERVAL_PRESETS.map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        className={intervalDays === n ? 'preset preset-active' : 'preset'}
+                        onClick={() => setIntervalDays(n)}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="inline-field">
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={intervalDays}
+                      onChange={(event) => setIntervalDays(Number(event.target.value))}
+                      aria-label={t.taskForm.intervalAria}
+                    />
+                    <span>{t.taskForm.intervalUnit}</span>
+                  </div>
+                </fieldset>
+              ) : (
+                <fieldset className="field">
+                  <legend>{t.taskForm.weeklyDaysLabel}</legend>
+                  <div className="weekday-row">
+                    {[0, 1, 2, 3, 4, 5, 6].map((day) => (
+                      <button
+                        key={day}
+                        type="button"
+                        className={weeklyDays.includes(day) ? 'weekday weekday-active' : 'weekday'}
+                        onClick={() => toggleWeekday(day)}
+                      >
+                        {weekdayShort(day, language)}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+
+              <fieldset className="field">
+                <legend>{t.taskForm.endCondition}</legend>
+                <div className="segmented segmented-wrap end-condition">
+                  <button
+                    type="button"
+                    className={endCondition === 'never' ? 'segment segment-active' : 'segment'}
+                    onClick={() => setEndCondition('never')}
+                  >
+                    {t.taskForm.endNever}
+                  </button>
+                  <button
+                    type="button"
+                    className={endCondition === 'after_count' ? 'segment segment-active' : 'segment'}
+                    onClick={() => setEndCondition('after_count')}
+                  >
+                    {t.taskForm.endAfterCount}
+                  </button>
+                  <button
+                    type="button"
+                    className={endCondition === 'on_date' ? 'segment segment-active' : 'segment'}
+                    onClick={() => setEndCondition('on_date')}
+                  >
+                    {t.taskForm.endOnDate}
+                  </button>
+                </div>
+                {endCondition === 'after_count' && (
+                  <label className="inline-field">
+                    <span>{t.taskForm.endAfterCountLabel}</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={1000}
+                      value={endAfterCount}
+                      onChange={(event) => setEndAfterCount(Number(event.target.value))}
+                    />
+                  </label>
+                )}
+                {endCondition === 'on_date' && (
+                  <label className="field">
+                    <span>{t.taskForm.endDateLabel}</span>
+                    <input
+                      type="date"
+                      value={endDate}
+                      min={addDays(dueDate, 1)}
+                      onChange={(event) => setEndDate(event.target.value)}
+                    />
+                  </label>
+                )}
+              </fieldset>
+            </>
+          )}
+
+          <div className="two-col">
+            <label className="field">
+              <span>{t.taskForm.points}</span>
+              <div className="inline-field">
+                <input
+                  type="number"
+                  min={1}
+                  max={1000}
+                  value={points}
+                  onChange={(event) => setPoints(Number(event.target.value))}
+                  aria-label={t.taskForm.pointsAria}
+                />
+                <span>{t.taskForm.pointsUnit}</span>
+              </div>
+            </label>
+
+            {taskType !== 'time_limited' && (
+              <label className="field">
+                <span>{t.taskForm.reminderTime}</span>
+                <input
+                  type="time"
+                  value={`${String(reminderHour).padStart(2, '0')}:${String(reminderMinute).padStart(2, '0')}`}
+                  onChange={(event) => {
+                    const [h, m] = event.target.value.split(':').map(Number)
+                    if (Number.isFinite(h) && Number.isFinite(m)) {
+                      setReminderHour(h)
+                      setReminderMinute(m)
+                    }
+                  }}
+                  aria-label={t.taskForm.reminderAria}
+                />
+              </label>
+            )}
+          </div>
 
           {taskType !== 'time_limited' && (
             <label className="field">
-              <span>{t.taskForm.reminderTime}</span>
+              <span>{taskType === 'recurring' ? t.taskForm.firstDueDate : t.taskForm.dueDate}</span>
               <input
-                type="time"
-                value={`${String(reminderHour).padStart(2, '0')}:${String(reminderMinute).padStart(2, '0')}`}
-                onChange={(event) => {
-                  const [h, m] = event.target.value.split(':').map(Number)
-                  if (Number.isFinite(h) && Number.isFinite(m)) {
-                    setReminderHour(h)
-                    setReminderMinute(m)
-                  }
-                }}
-                aria-label={t.taskForm.reminderAria}
+                type="date"
+                value={dueDate}
+                onChange={(event) => setDueDate(event.target.value || today)}
               />
+              <small>{formatDate(dueDate, language)}</small>
             </label>
           )}
-        </div>
 
-        {taskType !== 'time_limited' && (
-          <label className="field">
-            <span>{taskType === 'recurring' ? t.taskForm.firstDueDate : t.taskForm.dueDate}</span>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(event) => setDueDate(event.target.value || today)}
-            />
-            <small>{formatDate(dueDate, language)}</small>
-          </label>
-        )}
+          {members.length > 1 && (
+            <label className="field">
+              <span>{t.taskForm.assignedTo}</span>
+              <select value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)}>
+                <option value="">{t.common.everyone}</option>
+                {members.map((member) => (
+                  <option key={member.user_id} value={member.user_id}>
+                    {member.profile?.display_name || member.profile?.email || t.space.memberFallback}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
-        {members.length > 1 && (
-          <label className="field">
-            <span>{t.taskForm.assignedTo}</span>
-            <select value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)}>
-              <option value="">{t.common.everyone}</option>
-              {members.map((member) => (
-                <option key={member.user_id} value={member.user_id}>
-                  {member.profile?.display_name || member.profile?.email || t.space.memberFallback}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+          {error && <p className="error-text">{error}</p>}
 
-        {error && <p className="error-text">{error}</p>}
+          <div className="sheet-actions">
+            <button type="button" className="btn btn-ghost" onClick={onCancel}>
+              {t.common.cancel}
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={busy}>
+              {busy ? t.common.saving : existing ? t.common.save : t.taskForm.add}
+            </button>
+          </div>
 
-        <div className="sheet-actions">
-          <button type="button" className="btn btn-ghost" onClick={onCancel}>
-            {t.common.cancel}
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={busy}>
-            {busy ? t.common.saving : existing ? t.common.save : t.taskForm.add}
-          </button>
-        </div>
+          {onDuplicate && (
+            <button type="button" className="btn btn-ghost" onClick={onDuplicate} disabled={busy}>
+              {t.taskForm.duplicate}
+            </button>
+          )}
 
-        {onDuplicate && (
-          <button type="button" className="btn btn-ghost" onClick={onDuplicate} disabled={busy}>
-            {t.taskForm.duplicate}
-          </button>
-        )}
-
-        {onDelete && (
-          <button type="button" className="btn btn-danger-text" onClick={() => setConfirmingDelete(true)}>
-            {t.taskForm.delete}
-          </button>
-        )}
-      </form>
+          {onDelete && (
+            <button type="button" className="btn btn-danger-text" onClick={() => setConfirmingDelete(true)}>
+              {t.taskForm.delete}
+            </button>
+          )}
+        </form>
+      </div>
     </div>
 
     {onDelete && confirmingDelete && (

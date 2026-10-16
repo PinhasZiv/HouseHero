@@ -62,14 +62,14 @@ test.describe('a personal reminder-time override', () => {
     await page.getByRole('button', { name: 'משימות' }).click()
     await page.locator('.task-card', { hasText: 'להוציא זבל' }).locator('.task-main').click()
 
-    const history = page.locator('div.sheet', { hasText: 'להוציא זבל' })
+    const history = page.locator('.sheet:not(:has(form))', { hasText: 'להוציא זבל' })
     await expect(history).toBeVisible()
     await expect(history).toContainText('09:00')
     await expect(history).not.toContainText('רק לך')
 
     await history.getByRole('button', { name: 'שינוי שעת התזכורת שלי עבור להוציא זבל' }).click()
 
-    const overrideSheet = page.locator('form.sheet', { hasText: 'שעת התזכורת שלי' })
+    const overrideSheet = page.locator('.sheet', { hasText: 'שעת התזכורת שלי' })
     await expect(overrideSheet).toBeVisible()
     await overrideSheet.locator('input[type="time"]').fill('20:00')
     await overrideSheet.getByRole('button', { name: 'שמירה' }).click()
@@ -109,11 +109,11 @@ test.describe('a personal reminder-time override', () => {
     await page.getByRole('button', { name: 'משימות' }).click()
     await page.locator('.task-card', { hasText: 'להשקות את הגינה' }).locator('.task-main').click()
 
-    const history = page.locator('div.sheet', { hasText: 'להשקות את הגינה' })
+    const history = page.locator('.sheet:not(:has(form))', { hasText: 'להשקות את הגינה' })
     await expect(history).toContainText('17:00')
 
     await history.getByRole('button', { name: 'שינוי שעת התזכורת שלי עבור להשקות את הגינה' }).click()
-    const overrideSheet = page.locator('form.sheet', { hasText: 'שעת התזכורת שלי' })
+    const overrideSheet = page.locator('.sheet', { hasText: 'שעת התזכורת שלי' })
     await overrideSheet.locator('input[type="time"]').fill('06:30')
     await overrideSheet.getByRole('button', { name: 'שמירה' }).click()
 
@@ -148,7 +148,7 @@ test.describe('a personal reminder-time override', () => {
     await page.getByRole('button', { name: 'משימות' }).click()
     await page.locator('.task-card', { hasText: 'לבדוק את התנור' }).locator('.task-main').click()
 
-    const history = page.locator('div.sheet', { hasText: 'לבדוק את התנור' })
+    const history = page.locator('.sheet:not(:has(form))', { hasText: 'לבדוק את התנור' })
     await expect(history).toBeVisible()
     // start_only/interval are a fixed offset from the window's own opening
     // instant, the same for everyone - there is no time-of-day here to make
@@ -166,11 +166,11 @@ test.describe('a personal reminder-time override', () => {
     await page.getByRole('button', { name: 'משימות' }).click()
     await page.locator('.task-card', { hasText: 'לשטוף כלים' }).locator('.task-main').click()
 
-    const history = page.locator('div.sheet', { hasText: 'לשטוף כלים' })
+    const history = page.locator('.sheet:not(:has(form))', { hasText: 'לשטוף כלים' })
     await expect(history).toContainText('07:00 (רק לך)')
 
     await history.getByRole('button', { name: 'שינוי שעת התזכורת שלי עבור לשטוף כלים' }).click()
-    const overrideSheet = page.locator('form.sheet', { hasText: 'שעת התזכורת שלי' })
+    const overrideSheet = page.locator('.sheet', { hasText: 'שעת התזכורת שלי' })
     await overrideSheet.getByRole('button', { name: 'איפוס לשעת ברירת המחדל' }).click()
 
     await expect(overrideSheet).toBeHidden()

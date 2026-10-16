@@ -285,7 +285,7 @@ export function TaskHistory({ task, onClose }: TaskHistoryProps) {
         ) : timeline.length === 0 ? (
           <p className="muted">{t.history.empty}</p>
         ) : (
-          <ul className="history-list">
+          <ul className="history-list" tabIndex={0}>
             {timeline.map((entry) => (
               <li key={entry.key} className={`history-row history-row-${entry.kind}`}>
                 <span className="history-date">

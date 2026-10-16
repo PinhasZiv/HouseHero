@@ -12,7 +12,7 @@ export function MoreScreen() {
   return (
     <div className="screen fade-in">
       <header className="screen-header">
-        <h2>{t.space.title}</h2>
+        <h1>{t.space.title}</h1>
         <p className="screen-subtitle">{t.space.subtitle}</p>
       </header>
       <SpaceScreen />

@@ -265,7 +265,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
   return (
     <div className="screen fade-in">
       <header className="screen-header">
-        <h2>{remaining > 0 ? t.today.titleActive : t.today.titleDone}</h2>
+        <h1>{remaining > 0 ? t.today.titleActive : t.today.titleDone}</h1>
         <p className="screen-subtitle">
           {remaining > 0
             ? t.today.needsAction(remaining)

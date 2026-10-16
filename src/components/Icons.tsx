@@ -139,9 +139,11 @@ export function XIcon({ size = 18, className }: IconProps) {
 
 /** Two forward chevrons - "skip ahead", for skipping one occurrence of a
  *  recurring task without it counting as late. */
+/** "Onward" - mirrored under RTL (see .icon-directional), so it points the
+ *  way Hebrew reads. */
 export function SkipIcon({ size = 18, className }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className ? `icon-directional ${className}` : 'icon-directional'} aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M5 6l7 6-7 6" />
       <path d="M13 6l7 6-7 6" />
     </svg>

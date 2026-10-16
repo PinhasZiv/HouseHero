@@ -36,7 +36,7 @@ export function ReminderOverrideSheet({
   const { t } = useI18n()
   const [value, setValue] = useState(formatTime(initialHour, initialMinute))
   const [busy, setBusy] = useState(false)
-  const { titleId, dialogProps } = useDialog<HTMLFormElement>(() => {
+  const { titleId, dialogProps } = useDialog<HTMLDivElement>(() => {
     if (!busy) onClose()
   })
   const [error, setError] = useState<string | null>(null)
@@ -70,38 +70,40 @@ export function ReminderOverrideSheet({
 
   return (
     <div className="sheet-backdrop" onClick={busy ? undefined : onClose} role="presentation">
-      <form className="sheet" {...dialogProps} onClick={(event) => event.stopPropagation()} onSubmit={save}>
-        <h2 id={titleId}>{t.reminderOverride.title}</h2>
-        <p className="screen-subtitle">{taskTitle}</p>
-        <p className="muted small">{t.reminderOverride.body}</p>
+      <div className="sheet" {...dialogProps} onClick={(event) => event.stopPropagation()}>
+        <form className="sheet-form" onSubmit={save}>
+          <h2 id={titleId}>{t.reminderOverride.title}</h2>
+          <p className="screen-subtitle">{taskTitle}</p>
+          <p className="muted small">{t.reminderOverride.body}</p>
 
-        <label className="field">
-          <span>{t.reminderOverride.timeLabel}</span>
-          <input
-            type="time"
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            disabled={busy}
-          />
-        </label>
+          <label className="field">
+            <span>{t.reminderOverride.timeLabel}</span>
+            <input
+              type="time"
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              disabled={busy}
+            />
+          </label>
 
-        {error && <p className="error-text">{error}</p>}
+          {error && <p className="error-text">{error}</p>}
 
-        <div className="sheet-actions">
-          <button type="button" className="btn btn-ghost" onClick={onClose} disabled={busy}>
-            {t.common.cancel}
-          </button>
-          <button type="submit" className="btn btn-primary" disabled={busy}>
-            {t.common.save}
-          </button>
-        </div>
+          <div className="sheet-actions">
+            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={busy}>
+              {t.common.cancel}
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={busy}>
+              {t.common.save}
+            </button>
+          </div>
 
-        {hasOverride && (
-          <button type="button" className="btn btn-danger-text btn-small" onClick={() => void reset()} disabled={busy}>
-            {t.reminderOverride.reset}
-          </button>
-        )}
-      </form>
+          {hasOverride && (
+            <button type="button" className="btn btn-danger-text btn-small" onClick={() => void reset()} disabled={busy}>
+              {t.reminderOverride.reset}
+            </button>
+          )}
+        </form>
+      </div>
     </div>
   )
 }

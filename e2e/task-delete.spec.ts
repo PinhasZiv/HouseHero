@@ -39,7 +39,7 @@ test.describe('deleting a task', () => {
     await page.locator('.task-card', { hasText: 'לשטוף כלים' }).getByRole('button', { name: 'עריכת לשטוף כלים' }).click()
 
     await page.getByRole('button', { name: 'מחיקת המשימה' }).click()
-    const sheet = page.locator('div.sheet', { hasText: 'מחיקת המשימה' })
+    const sheet = page.locator('.sheet:not(:has(form))', { hasText: 'מחיקת המשימה' })
     await expect(sheet).toBeVisible()
     await sheet.getByRole('button', { name: 'ביטול' }).click()
     await expect(sheet).toBeHidden()
@@ -67,7 +67,7 @@ test.describe('deleting a task', () => {
     await page.locator('.task-card', { hasText: 'לשטוף כלים' }).getByRole('button', { name: 'עריכת לשטוף כלים' }).click()
 
     await page.getByRole('button', { name: 'מחיקת המשימה' }).click()
-    await page.locator('div.sheet', { hasText: 'מחיקת המשימה' }).getByRole('button', { name: 'מחיקת המשימה' }).click()
+    await page.locator('.sheet:not(:has(form))', { hasText: 'מחיקת המשימה' }).getByRole('button', { name: 'מחיקת המשימה' }).click()
 
     await expect(page.getByText('המשימה נמחקה.')).toBeVisible()
     expect(db.tasks).toHaveLength(0)

@@ -27,8 +27,15 @@
   --done: #6a6785;
   --away: #1d7486;
   --away-soft: #e0f1f4;
-  --gold: #b8860b;
+  /* Darker than it looks like it needs to be: the points badge is small
+     text on --gold-soft, and #b8860b only reached 2.9:1 there. */
+  --gold: #8a6408;
   --gold-soft: #faf1dd;
+  /* Text and icons drawn on a solid --accent or --late fill. White works on
+     the light theme's deep colours; the dark theme's are pale, so it takes
+     dark text there (white on them was 2.5:1 and 2:1). */
+  --on-accent: #ffffff;
+  --on-late: #ffffff;
   --radius: 14px;
   --shadow: 0 1px 2px rgb(32 29 51 / 0.06), 0 4px 14px rgb(32 29 51 / 0.05);
   color-scheme: light;
@@ -55,6 +62,8 @@
     --away-soft: #10303a;
     --gold: #e8c06a;
     --gold-soft: #33280f;
+    --on-accent: #15112b;
+    --on-late: #2a0a05;
     --shadow: none;
     color-scheme: dark;
   }
@@ -247,6 +256,8 @@ button { font: inherit; cursor: pointer; }
 .screen { padding: 16px 16px 8px; }
 
 .screen-header { margin-bottom: 18px; }
+/* Each screen's title is its h1 for screen readers, at the size it always had. */
+.screen-header h1 { font-size: 1.35rem; }
 
 .link-button {
   margin-top: 6px;
@@ -346,6 +357,11 @@ button { font: inherit; cursor: pointer; }
 /* Completed tasks collapse behind a native <details> - closed by default,
    since what still needs doing matters more than a record of what doesn't. */
 .completed-summary {
+  /* The whole row is the tap target, not just the line of text. */
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  margin-bottom: 0;
   cursor: pointer;
   user-select: none;
   list-style: none;
@@ -413,7 +429,7 @@ button { font: inherit; cursor: pointer; }
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--on-accent);
   transition: transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1), background 120ms ease-out, border-color 120ms ease-out;
 }
 
@@ -491,7 +507,7 @@ button { font: inherit; cursor: pointer; }
 }
 
 .badge {
-  font-size: 0.74rem;
+  font-size: 0.8rem;
   font-weight: 650;
   padding: 3px 8px;
   border-radius: 999px;
@@ -500,7 +516,7 @@ button { font: inherit; cursor: pointer; }
 
 .badge-late { background: var(--late-soft); color: var(--late); }
 .badge-due { background: var(--accent-soft); color: var(--accent-strong); }
-.badge-active { background: var(--accent); color: #fff; }
+.badge-active { background: var(--accent); color: var(--on-accent); }
 .badge-paused { background: var(--away-soft); color: var(--away); }
 .badge-points {
   background: var(--gold-soft);
@@ -509,10 +525,12 @@ button { font: inherit; cursor: pointer; }
   align-items: center;
   gap: 3px;
 }
-.badge-muted { opacity: 0.55; }
+/* Out of reach (a reward costing more than you have): greyed rather than
+   faded, since a faded gold fell to 1.75:1. */
+.badge-muted { background: var(--surface-2); color: var(--text-muted); }
 
 .chip {
-  font-size: 0.74rem;
+  font-size: 0.8rem;
   padding: 2px 7px;
   border-radius: 999px;
   background: var(--surface-2);
@@ -543,7 +561,7 @@ button { font: inherit; cursor: pointer; }
 }
 
 .complete-button:disabled { opacity: 0.6; }
-.complete-button:active { background: var(--accent); color: #fff; transform: scale(0.93); }
+.complete-button:active { background: var(--accent); color: var(--on-accent); transform: scale(0.93); }
 
 .complete-button-muted { background: var(--surface-2); color: var(--text-muted); }
 .complete-button-muted:active { background: var(--border); color: var(--text); }
@@ -734,7 +752,7 @@ button { font: inherit; cursor: pointer; }
   align-items: flex-end;
   gap: 10px;
   width: 100%;
-  height: 150px;
+  height: 165px;
   padding: 4px 2px;
   box-sizing: border-box;
   overflow-x: auto;
@@ -768,7 +786,7 @@ button { font: inherit; cursor: pointer; }
   inset-inline: -10px;
   margin-bottom: 2px;
   text-align: center;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
@@ -783,10 +801,14 @@ button { font: inherit; cursor: pointer; }
 }
 .week-chart-label {
   flex-shrink: 0;
-  font-size: 0.66rem;
+  font-size: 0.75rem;
+  line-height: 1.15;
+  /* Two lines' room in every column, used or not: "לפני 4 שבועות" wraps
+     while "השבוע" does not, and the tracks above must stay the same height
+     for the bars to stay in proportion. */
+  height: 2.3em;
   color: var(--text-muted);
   text-align: center;
-  white-space: nowrap;
 }
 
 /* A missed-cycles row - the same track/fill meter language as the
@@ -869,7 +891,7 @@ button { font: inherit; cursor: pointer; }
 
 .btn:active { transform: scale(0.96); }
 
-.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary { background: var(--accent); color: var(--on-accent); }
 .btn-primary:active { background: var(--accent-strong); }
 .btn-primary:disabled { opacity: 0.55; }
 
@@ -885,10 +907,10 @@ button { font: inherit; cursor: pointer; }
  * than just the person tapping it (deleting a shared space for everyone,
  * say) - kept visually distinct from btn-danger-text's plain link styling,
  * which stays reserved for a destructive action that only affects yourself. */
-.btn-danger { background: var(--late); color: #fff; }
+.btn-danger { background: var(--late); color: var(--on-late); }
 .btn-danger:active { background: var(--late-strong); }
 
-.btn-small { min-height: 38px; padding: 8px 12px; font-size: 0.9rem; }
+.btn-small { min-height: 44px; padding: 8px 12px; font-size: 0.9rem; }
 
 .btn-google {
   background: var(--surface);
@@ -908,7 +930,7 @@ button { font: inherit; cursor: pointer; }
   border-radius: 50%;
   border: 0;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   display: grid;
   place-items: center;
   box-shadow: 0 4px 16px rgb(0 0 0 / 0.22);
@@ -946,7 +968,7 @@ button { font: inherit; cursor: pointer; }
   border: 0;
   background: none;
   color: var(--text-muted);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 600;
   transition: color 150ms ease-out, transform 150ms ease-out;
 }
@@ -984,6 +1006,10 @@ button { font: inherit; cursor: pointer; }
   from { transform: translateY(20px); opacity: 0.4; }
   to { transform: none; opacity: 1; }
 }
+
+/* A form inside a sheet adds no box of its own: the sheet lays out its
+   fields, and the sheet - not the form - is the dialog. */
+.sheet-form { display: contents; }
 
 .sheet-actions { display: flex; gap: 10px; }
 .sheet-actions .btn { flex: 1; }
@@ -1049,14 +1075,20 @@ button { font: inherit; cursor: pointer; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  /* A 44px target around a small icon; the negative margin keeps the row
+     it sits in from growing. */
+  width: 44px;
+  height: 44px;
+  margin: -9px;
   border: 0;
   border-radius: 999px;
   background: none;
   color: var(--text-muted);
   flex: none;
 }
+
+/* An arrow that means "onward" points the way the text runs. */
+[dir='rtl'] .icon-directional { transform: scaleX(-1); }
 
 .icon-button-small:active { background: var(--border); color: var(--text); }
 
@@ -1145,6 +1177,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .preset-row { display: flex; flex-wrap: wrap; gap: 7px; }
 
 .preset {
+  min-height: 44px;
+  min-width: 44px;
   padding: 8px 13px;
   border-radius: 999px;
   border: 1px solid var(--border);
@@ -1153,7 +1187,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   font-size: 0.88rem;
 }
 
-.preset-active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.preset-active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 
 .weekday-row { display: flex; gap: 6px; flex-wrap: wrap; }
 
@@ -1168,7 +1202,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   font-weight: 650;
 }
 
-.weekday-active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.weekday-active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 
 .code-input {
   /* Invite codes are Latin letters and digits: always left to right. */
@@ -1206,6 +1240,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 
 .segment {
   flex: 1;
+  min-height: 44px;
   padding: 9px;
   border: 0;
   border-radius: 9px;
@@ -1218,7 +1253,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 
 .space-select {
   width: auto;
-  min-height: 38px;
+  min-height: 44px;
   padding: 6px 10px;
   font-size: 0.9rem;
   max-width: 55%;
