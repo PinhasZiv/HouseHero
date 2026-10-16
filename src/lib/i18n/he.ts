@@ -78,6 +78,11 @@ export const he = {
     emptyTitle: 'עוד אין משימות',
     emptyBody: 'מוסיפים את הראשונה, ו-HouseHero יתחיל להזכיר לכולם במרחב.',
     addTask: 'הוספת משימה',
+    progress: (handled: number, total: number) => `${handled} מתוך ${total} טופלו היום`,
+    progressLeft: (n: number) => (n === 1 ? 'עוד אחת ותסגרו את היום' : `עוד ${n} ותסגרו את היום`),
+    progressDone: 'כל המשימות של היום טופלו',
+    streak: (n: number) => `רצף של ${days(n, 'he')}`,
+    pointsChipAria: (n: number) => (n === 1 ? 'נקודה אחת זמינה למימוש' : `${pointsWord(n, 'he')} זמינות למימוש`),
   },
 
   task: {
@@ -95,6 +100,15 @@ export const he = {
     unwaterAria: (name: string) => `ביטול הביצוע של ${name}`,
     completionUndone: (name: string) => `בוטל הביצוע של ${name}.`,
     snoozeAria: (name: string) => `השהיית התזכורת של ${name}`,
+    // The words under each card action's icon - the aria labels above say
+    // which task; these only say what the button does.
+    actionSnooze: 'השהיה',
+    actionResume: 'החזרה',
+    actionSkip: 'דילוג',
+    actionRestore: 'החזרה',
+    actionCancel: 'ביטול',
+    actionDuplicate: 'שכפול',
+    actionEdit: 'עריכה',
     cancelSnoozeAria: (name: string) => `ביטול ההשהיה של ${name}`,
     snoozedUntil: (when: string) => `מושהה עד ${when}`,
     editAria: (name: string) => `עריכת ${name}`,

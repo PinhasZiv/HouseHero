@@ -82,13 +82,22 @@ test('a task done or skipped today shows no countdown - it is settled for the da
   await expect(page.getByRole('dialog', { name: 'להשקות עציצים' })).toContainText('בעוד 3 ימים')
 })
 
-test('due today shows no countdown - its badge already says so', async ({ page }) => {
+test('due today shows no countdown - its badge, or the list it is in, already says so', async ({ page }) => {
   const db = makeFakeDb({ tasks: [task('today', 'להוציא זבל')] })
   await seed(page, db)
   await page.goto('/')
-  const card = page.locator('.task-card', { hasText: 'להוציא זבל' })
-  await expect(card.locator('.badge-due')).toBeVisible()
+  // On Today it sits under the "להיום" heading, which says it for every card.
+  const dueGroup = page.locator('.task-group', { hasText: 'להיום' })
+  const card = dueGroup.locator('.task-card', { hasText: 'להוציא זבל' })
+  await expect(card).toBeVisible()
+  await expect(card.locator('.badge-due')).toHaveCount(0)
   await expect(card.locator('.task-countdown')).toHaveCount(0)
+
+  // In the full list, among tasks due on other days, the badge says it.
+  await page.locator('.tab-bar').getByRole('button', { name: 'משימות' }).click()
+  const listed = page.locator('.task-card', { hasText: 'להוציא זבל' })
+  await expect(listed.locator('.badge-due')).toBeVisible()
+  await expect(listed.locator('.task-countdown')).toHaveCount(0)
 })
 
 test('the date and the repeat pattern are in the details sheet', async ({ page }) => {

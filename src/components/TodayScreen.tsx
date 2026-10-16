@@ -18,6 +18,8 @@ import { useAddTask } from '../state/useAddTask'
 import { usePause } from '../state/usePause'
 import { PlusIcon } from './Icons'
 import { TaskForm } from './TaskForm'
+import { TodayProgress } from './TodayProgress'
+import { useHouseStreak } from '../state/useHouseStreak'
 
 /** How often to re-check whether a snooze has run out while the screen is open. */
 const SNOOZE_TICK_MS = 30_000
@@ -58,6 +60,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
   const [members, setMembers] = useState<Member[]>([])
   const addTask = useAddTask()
   const { end: endPause } = usePause()
+  const pastStreak = useHouseStreak()
   // A notification about a single task carries its id - that card gets
   // scrolled to and briefly called out, instead of leaving the person to
   // hunt for it in the list.
@@ -249,6 +252,11 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
   }, [highlightId, tasks])
 
   const remaining = groups.active.length + groups.late.length + groups.due.length
+  // Today's whole list: what is settled, what is waiting, and what was put
+  // off for a while but is still today's - not the vacation-frozen ones.
+  const handledToday = groups.done.length
+  const totalToday = handledToday + remaining + groups.snoozed.length
+  const streak = pastStreak === null ? null : pastStreak + (totalToday > 0 && handledToday === totalToday ? 1 : 0)
 
   if (tasks.length === 0) {
     return (
@@ -281,6 +289,8 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
           </button>
         )}
       </header>
+
+      {totalToday > 0 && <TodayProgress handled={handledToday} total={totalToday} streak={streak} />}
 
       {vacations.map(({ spaceName, pause, self, canEnd }) => (
         <div key={pause.id} className="vacation-banner" role="status">
@@ -358,6 +368,7 @@ export function TodayScreen({ onManageTasks }: { onManageTasks: () => void }) {
               highlighted={task.id === highlightId}
               task={task}
               today={today}
+              hideDueBadge
               spaceName={showSpaceNames ? spaceNames.get(task.space_id) : undefined}
               assignedName={assignedName(task)}
               onComplete={() => requestComplete(task)}

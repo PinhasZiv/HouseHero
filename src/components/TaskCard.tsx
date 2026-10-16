@@ -20,6 +20,9 @@ interface TaskCardProps {
   task: Task
   today: string
   spaceName?: string
+  /** Leaves out the "today" badge - for a list whose own heading already
+   *  says every card in it is due today. */
+  hideDueBadge?: boolean
   completedBy?: CompletedBy
   assignedName?: string | null
   /** Resolves to false (rather than throwing) when the completion failed - the
@@ -74,6 +77,7 @@ export function TaskCard({
   task,
   today,
   spaceName,
+  hideDueBadge = false,
   completedBy,
   assignedName,
   onComplete,
@@ -234,7 +238,7 @@ export function TaskCard({
           {info.status === 'late' && (
             <span className="badge badge-late">{t.task.badgeLate(info.daysLate)}</span>
           )}
-          {info.status === 'due' && <span className="badge badge-due">{t.task.badgeDue}</span>}
+          {info.status === 'due' && !hideDueBadge && <span className="badge badge-due">{t.task.badgeDue}</span>}
           {info.status === 'active' && <span className="badge badge-active">{t.task.badgeActive}</span>}
           {info.status === 'paused' && <span className="badge badge-paused">{t.vacation.badge}</span>}
           <span className="badge badge-points">
@@ -289,72 +293,79 @@ export function TaskCard({
       {onSnooze && (
         <button
           type="button"
-          className="icon-button"
+          className="icon-button card-action"
           onClick={onSnooze}
           disabled={busy}
           aria-label={t.task.snoozeAria(task.title)}
         >
           <ClockIcon size={18} />
+          <span className="card-action-label" aria-hidden="true">{t.task.actionSnooze}</span>
         </button>
       )}
 
       {onCancelSnooze && (
         <button
           type="button"
-          className="icon-button"
+          className="icon-button card-action"
           onClick={cancelSnooze}
           disabled={busy}
           aria-label={t.task.cancelSnoozeAria(task.title)}
         >
           <UndoIcon size={18} />
+          <span className="card-action-label" aria-hidden="true">{t.task.actionResume}</span>
         </button>
       )}
 
       {onSkip && (
         <button
           type="button"
-          className="icon-button"
+          className="icon-button card-action"
           onClick={skipTask}
           disabled={busy}
           aria-label={t.task.skipAria(task.title)}
         >
           <SkipIcon size={18} />
+          <span className="card-action-label" aria-hidden="true">{t.task.actionSkip}</span>
         </button>
       )}
 
       {onUndoSkip && (
         <button
           type="button"
-          className="icon-button"
+          className="icon-button card-action"
           onClick={undoSkip}
           disabled={busy}
           aria-label={t.task.undoSkipAria(task.title)}
         >
           <UndoIcon size={18} />
+          <span className="card-action-label" aria-hidden="true">{t.task.actionRestore}</span>
         </button>
       )}
 
       {onCancel && (
         <button
           type="button"
-          className="icon-button"
+          className="icon-button card-action"
           onClick={cancelTask}
           disabled={busy}
           aria-label={t.task.cancelAria(task.title)}
         >
           <XIcon size={17} />
+          <span className="card-action-label" aria-hidden="true">{t.task.actionCancel}</span>
         </button>
       )}
 
       {onDuplicate && (
-        <button type="button" className="icon-button" onClick={onDuplicate} aria-label={t.task.duplicateAria(task.title)}>
+        <button type="button" className="icon-button card-action" onClick={onDuplicate} aria-label={t.task.duplicateAria(task.title)}>
           <CopyIcon size={17} />
+          <span className="card-action-label" aria-hidden="true">{t.task.actionDuplicate}</span>
         </button>
       )}
 
       {onEdit && (
-        <button type="button" className="icon-button" onClick={onEdit} aria-label={t.task.editAria(task.title)}>
+        <button type="button" className="icon-button card-action" onClick={onEdit} aria-label={t.task.editAria(task.title)}>
           <PencilIcon size={17} />
+          <span className="card-action-label" aria-hidden="true">{t.task.actionEdit}</span>
         </button>
       )}
     </article>

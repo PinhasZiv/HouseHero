@@ -235,6 +235,25 @@ button { font: inherit; cursor: pointer; }
   direction: ltr;
 }
 
+.app-bar-end { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+/* Points to spend - the same gold as every points badge. */
+.points-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gold-soft);
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+.points-chip:active { filter: brightness(0.95); }
+
 .app-body {
   flex: 1;
   padding-bottom: 88px;
@@ -270,6 +289,29 @@ button { font: inherit; cursor: pointer; }
   cursor: pointer;
 }
 .screen-header-secondary { margin-top: 8px; }
+
+/* Today's progress and the household's streak, above the lists. */
+.today-progress {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: -4px 0 18px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.today-progress-ring { flex: none; }
+.today-progress-track { stroke: var(--surface-2); }
+.today-progress-fill { stroke: var(--accent); transition: stroke-dashoffset 400ms ease-out; }
+.today-progress-count { fill: var(--text); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.today-progress-text { min-width: 0; }
+.today-progress-title { font-weight: 650; }
+.today-progress-details { color: var(--text-muted); font-size: 0.86rem; }
+@media (prefers-reduced-motion: reduce) {
+  .today-progress-fill { transition: none; }
+}
 
 .screen-subtitle {
   color: var(--text-muted);
@@ -579,6 +621,21 @@ button { font: inherit; cursor: pointer; }
 }
 
 .icon-button:active { background: var(--surface-2); color: var(--text); }
+
+/* A task card's actions: the icon with a word under it, since a clock or a
+   double arrow alone does not say what tapping it will do. */
+.card-action {
+  flex-direction: column;
+  gap: 4px;
+  min-width: 56px;
+  padding: 0 8px;
+}
+.card-action-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.1;
+  white-space: nowrap;
+}
 
 /* ------------------------------------------------------------ points --- */
 
