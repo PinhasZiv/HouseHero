@@ -104,6 +104,8 @@ export interface FakeDb {
      *  relevant to a test that cares about on-time/late stats, so it
      *  defaults to completed_on itself (always "on time") when omitted. */
     prev_due_date?: string
+    /** When it was marked (0016) - defaults to created_at when omitted. */
+    logged_at?: string
   }[]
   taskSkips: {
     id: string
@@ -258,6 +260,8 @@ function applyCompleteTask(
       points_awarded: task.points,
       completed_on: today,
       created_at: at,
+      // When it was marked - now, even for a backdated completion.
+      logged_at: new Date().toISOString(),
       completion_group: groupId,
       prev_due_date: prevDueDate,
     }
@@ -286,6 +290,8 @@ function applyUndoLastCompletion(db: FakeDb, taskId: string) {
     db.taskCompletions.splice(db.taskCompletions.indexOf(event), 1)
   }
 
+  // Like undo_last_completion(): the schedule goes back to where it was.
+  if (last.prev_due_date) task.due_date = last.prev_due_date
   task.is_done = false
   task.last_completed_date = null
   task.last_completed_at = null
@@ -648,6 +654,15 @@ export async function installSupabaseMock(page: Page, db: FakeDb): Promise<void>
         if (taskId) db.reminderOverrides.delete(taskId)
         return json(route, [])
       }
+    }
+
+    if (table === 'task_completions' && method === 'GET' && url.searchParams.has('logged_at')) {
+      // fetchCompletionsMarkedSince(): ?logged_at=gte.<iso>
+      const since = (url.searchParams.get('logged_at') ?? '').replace(/^gte\./, '')
+      const rows = db.taskCompletions
+        .map((row) => ({ task_id: row.task_id, logged_at: row.logged_at ?? row.created_at }))
+        .filter((row) => row.logged_at >= since)
+      return json(route, rows)
     }
 
     if (table === 'task_completions' && method === 'GET') {

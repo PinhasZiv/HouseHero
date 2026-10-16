@@ -431,6 +431,22 @@ export async function clearReminderOverride(taskId: string, userId: string): Pro
 }
 
 /** Recent completions for a task, newest first. */
+/**
+ * Completions marked since `since` (an ISO instant), by when they were marked
+ * - not when they happened, which a backdated completion puts in the past.
+ * What keeps a task marked today in "done today", and undoable.
+ */
+export async function fetchCompletionsMarkedSince(since: string): Promise<{ task_id: string; logged_at: string }[]> {
+  const { data, error } = await supabase
+    .from('task_completions')
+    .select('task_id, logged_at')
+    .gte('logged_at', since)
+  // Deployed before 0016_completion_logged_at.sql was run: nothing to go by.
+  if (error && (error.code === '42703' || error.code === 'PGRST204')) return []
+  if (error) throw error
+  return (data ?? []) as { task_id: string; logged_at: string }[]
+}
+
 export async function fetchHistory(taskId: string, limit = 50): Promise<TaskHistoryEntry[]> {
   const { data, error } = await supabase
     .from('task_completions')

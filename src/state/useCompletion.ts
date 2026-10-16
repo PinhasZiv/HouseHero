@@ -13,7 +13,7 @@ import type { Task } from '../lib/types'
  * Tasks list" cannot drift into two different implementations.
  */
 export function useCompletion() {
-  const { today, session, profile, people, setProfile, patchTask, reload } = useApp()
+  const { today, session, profile, people, setProfile, patchTask, reload, noteMarked } = useApp()
   const { t, language } = useI18n()
   const toast = useToast()
   const selfId = session?.user.id ?? null
@@ -57,6 +57,8 @@ export function useCompletion() {
       occurrences_completed: outcome.occurrencesCompleted,
       is_done: outcome.finished,
     })
+    // Marked today, whatever day it happened - stays in "done today".
+    noteMarked(task.id, true)
     if (creditsSelf && profile) {
       setProfile({
         ...profile,
@@ -91,6 +93,7 @@ export function useCompletion() {
       return true
     } catch (cause) {
       patchTask(previousTask)
+      noteMarked(task.id, false)
       if (creditsSelf && previousProfile) setProfile(previousProfile)
       toast.showError(cause)
       void reload()
@@ -108,6 +111,7 @@ export function useCompletion() {
     try {
       const restored = await api.undoTaskCompletion(task.id)
       patchTask(restored)
+      noteMarked(task.id, false)
       void reload() // the points that came off are on the profile, not the task
       if (!options?.silent) toast.show(t.task.completionUndone(task.title))
     } catch (cause) {
