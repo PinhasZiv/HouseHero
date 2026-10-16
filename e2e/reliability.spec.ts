@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test'
 import { FAKE_SPACE_ID, FAKE_USER_ID, installSupabaseMock, makeFakeDb, seedSession, type FakeDb } from './support/mockSupabase'
 
+/** A date `offset` days from "today" as the app itself sees it - the fake
+ *  profile's own timezone, which runs ahead of UTC late in the evening. */
 function isoDaysFromToday(offset: number): string {
-  const date = new Date()
-  date.setUTCDate(date.getUTCDate() + offset)
-  return date.toISOString().slice(0, 10)
+  const [y, m, d] = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date()).split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + offset)).toISOString().slice(0, 10)
 }
 
 async function seed(page: import('@playwright/test').Page, db: FakeDb) {
