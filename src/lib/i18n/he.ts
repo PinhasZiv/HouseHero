@@ -274,6 +274,7 @@ export const he = {
     groupEveryone: 'משימות של כולם',
     groupOthers: 'משויכות לאחרים',
     groupCompleted: (n: number) => `משימות שבוצעו (${n})`,
+    showOlderDone: (n: number) => `הצגת משימות ישנות יותר (${n})`,
   },
 
   rewards: {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as api from '../lib/api'
 import type { CompletionChoice } from '../lib/api'
-import { classify, compareByCompletion, compareBySchedule, withPause } from '../lib/taskDue'
+import { classify, compareByCompletion, compareBySchedule, daysBetween, todayIn, withPause } from '../lib/taskDue'
 import { useApp } from '../state/AppState'
 import { useCompletion } from '../state/useCompletion'
 import { useSkip } from '../state/useSkip'
@@ -17,9 +17,12 @@ import type { Member, Task } from '../lib/types'
 
 type OwnerFilter = 'all' | 'mine' | 'everyone' | 'others'
 
+/** How far back the done section reaches before the rest folds away. */
+const RECENT_DONE_DAYS = 7
+
 /** Every task in the selected space, whether or not it needs anything today. */
 export function TasksScreen() {
-  const { tasks, currentSpace, today, session, people, patchTask, removeTask, isPaused, markedToday } = useApp()
+  const { tasks, currentSpace, today, session, people, profile, patchTask, removeTask, isPaused, markedToday } = useApp()
   const { t, language } = useI18n()
   const { complete, undo } = useCompletion()
   const { skip, undo: undoSkip } = useSkip()
@@ -31,6 +34,7 @@ export function TasksScreen() {
   const [duplicating, setDuplicating] = useState<Task | null>(null)
   const [viewingHistory, setViewingHistory] = useState<Task | null>(null)
   const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>('all')
+  const [showOlderDone, setShowOlderDone] = useState(false)
   const [completing, setCompleting] = useState<{
     task: Task
     resolve: (result: boolean | void) => void
@@ -251,6 +255,20 @@ export function TasksScreen() {
     return !!task.assigned_to && task.assigned_to !== session?.user.id
   })
 
+  // The done section is about the last week. A one-time task finished a
+  // month ago is still on record, just out of the way, behind one tap.
+  const timezone = profile?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
+  function finishedOn(task: Task): string {
+    if (task.cancelled_at) return todayIn(timezone, new Date(task.cancelled_at))
+    if (task.expired_at) return todayIn(timezone, new Date(task.expired_at))
+    if (task.last_completed_date) return task.last_completed_date
+    return task.expires_at ? todayIn(timezone, new Date(task.expires_at)) : task.due_date
+  }
+  const recentDone = completedVisible.filter(
+    (task) => markedToday.has(task.id) || daysBetween(finishedOn(task), today) < RECENT_DONE_DAYS,
+  )
+  const olderDone = completedVisible.filter((task) => !recentDone.includes(task))
+
   return (
     <div className="screen fade-in">
       <header className="screen-header">
@@ -334,9 +352,17 @@ export function TasksScreen() {
           {completedVisible.length > 0 && (
             <details className="task-group completed-group">
               <summary className="group-title completed-summary">
-                {t.tasks.groupCompleted(completedVisible.length)}
+                {t.tasks.groupCompleted(recentDone.length)}
               </summary>
-              {completedVisible.map(renderCard)}
+              {recentDone.map(renderCard)}
+              {olderDone.length > 0 &&
+                (showOlderDone ? (
+                  olderDone.map(renderCard)
+                ) : (
+                  <button type="button" className="link-button" onClick={() => setShowOlderDone(true)}>
+                    {t.tasks.showOlderDone(olderDone.length)}
+                  </button>
+                ))}
             </details>
           )}
 

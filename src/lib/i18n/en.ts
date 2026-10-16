@@ -271,6 +271,7 @@ export const en: Strings = {
     groupEveryone: "Everyone's tasks",
     groupOthers: "Assigned to others",
     groupCompleted: (n: number) => `Completed tasks (${n})`,
+    showOlderDone: (n: number) => `Show older ones (${n})`,
   },
 
   rewards: {
