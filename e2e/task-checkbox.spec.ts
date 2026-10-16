@@ -117,9 +117,10 @@ test.describe('the task checkbox', () => {
         baseTask({
           id: 'task-1',
           title: 'משימה שהושלמה מזמן',
-          due_date: isoDaysFromToday(-10),
+          // An earlier day, but within the week the done section shows.
+          due_date: isoDaysFromToday(-4),
           is_done: true,
-          last_completed_date: isoDaysFromToday(-9),
+          last_completed_date: isoDaysFromToday(-3),
           last_completed_actor: FAKE_USER_ID,
         }),
       ],

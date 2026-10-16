@@ -98,3 +98,27 @@ test('a completion marked yesterday is not "done today"', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('.completed-group')).toHaveCount(0)
 })
+
+test('the done section shows the last week; older finished tasks fold behind a button', async ({ page }) => {
+  const doneOn = (id: string, title: string, daysAgo: number) =>
+    task(id, title, {
+      task_type: 'one_time', recurrence_mode: null, interval_days: null, is_done: true, occurrences_completed: 1,
+      last_completed_date: shift(-daysAgo), last_completed_at: `${shift(-daysAgo)}T10:00:00Z`,
+      last_completed_by: [FAKE_USER_ID], last_completed_actor: FAKE_USER_ID,
+    })
+  const db = makeFakeDb({
+    tasks: [doneOn('recent', 'לקנות נורות', 6), doneOn('old1', 'לבחור תמונות לאלבום', 26), doneOn('old2', 'לאסוף air tag', 29)],
+  })
+  await seed(page, db)
+  await page.goto('/')
+  await page.locator('.tab-bar').getByRole('button', { name: 'משימות' }).click()
+
+  const group = page.locator('.completed-group')
+  await expect(group.locator('summary')).toContainText('משימות שבוצעו (1)')
+  await group.locator('summary').click()
+  await expect(group.locator('.task-card')).toHaveCount(1)
+  await expect(group.locator('.task-card')).toContainText('לקנות נורות')
+
+  await group.getByRole('button', { name: 'הצגת משימות ישנות יותר (2)' }).click()
+  await expect(group.locator('.task-card')).toHaveCount(3)
+})
