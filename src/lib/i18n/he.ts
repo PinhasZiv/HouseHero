@@ -209,6 +209,7 @@ export const he = {
   },
 
   taskForm: {
+    moreOptions: 'אפשרויות נוספות',
     titleNew: 'משימה חדשה',
     titleEdit: 'עריכת משימה',
     name: 'שם',
@@ -382,6 +383,9 @@ export const he = {
     total: 'סה"כ',
 
     onTimeLabel: 'בזמן או לפני',
+    // One person's share: a missed cycle is nobody's in particular, so only
+    // what they did counts here.
+    onTimeOfDoneLabel: 'בזמן או לפני, מתוך מה שביצע',
     weeklyTrendTitle: 'מגמה שבועית',
     weeksAgoLabel: (n: number) => (n === 0 ? 'השבוע' : n === 1 ? 'לפני שבוע' : `לפני ${n} שבועות`),
     neglectedTaskTitle: 'המשימה הכי מוזנחת',
@@ -394,6 +398,14 @@ export const he = {
     inactiveDays: (n: number) => `${days(n, 'he')} בלי ביצוע`,
 
     missedCyclesTitle: 'פספוסי מחזור',
+  },
+
+  more: {
+    title: 'עוד',
+    spaceRow: 'המרחב והחברים',
+    vacationOn: 'מופעלת',
+    vacationOff: 'כבויה',
+    back: 'חזרה',
   },
 
   space: {

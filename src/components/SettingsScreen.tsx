@@ -13,7 +13,10 @@ import { LANGUAGE_NAMES, LANGUAGES, useI18n, type Language } from '../lib/i18n'
 import { useApp } from '../state/AppState'
 import { useToast } from './Toast'
 
-export function SettingsScreen() {
+/** Which setting a sub-screen of More shows. */
+export type SettingsPart = 'notifications' | 'language' | 'account'
+
+export function SettingsScreen({ part }: { part: SettingsPart }) {
   const { profile, session, setProfile } = useApp()
   const { t, language, setLanguage } = useI18n()
   const toast = useToast()
@@ -65,77 +68,83 @@ export function SettingsScreen() {
 
   return (
     <>
-      <section className="card">
-        <h3>{t.settings.language}</h3>
-        <p className="muted">{t.settings.languageBody}</p>
-        <div className="segmented" role="group" aria-label={t.settings.language}>
-          {LANGUAGES.map((option) => (
-            <button
-              key={option}
-              type="button"
-              lang={option}
-              className={option === language ? 'segment segment-active' : 'segment'}
-              aria-pressed={option === language}
-              onClick={() => chooseLanguage(option)}
-            >
-              {LANGUAGE_NAMES[option]}
-            </button>
-          ))}
-        </div>
-      </section>
+      {part === 'language' && (
+        <section className="card">
+          <h3>{t.settings.language}</h3>
+          <p className="muted">{t.settings.languageBody}</p>
+          <div className="segmented" role="group" aria-label={t.settings.language}>
+            {LANGUAGES.map((option) => (
+              <button
+                key={option}
+                type="button"
+                lang={option}
+                className={option === language ? 'segment segment-active' : 'segment'}
+                aria-pressed={option === language}
+                onClick={() => chooseLanguage(option)}
+              >
+                {LANGUAGE_NAMES[option]}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
-      <section className="card">
-        <h3>{t.settings.notifications}</h3>
-        <PushStatus state={pushState} />
+      {part === 'notifications' && (
+        <section className="card">
+          <h3>{t.settings.notifications}</h3>
+          <PushStatus state={pushState} />
 
-        {pushState === 'subscribed' ? (
-          <>
+          {pushState === 'subscribed' ? (
+            <>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={busy}
+                onClick={async () => {
+                  const result = await sendTestNotification()
+                  toast.show(result.message, { tone: result.ok ? 'info' : 'error' })
+                }}
+              >
+                {t.settings.sendTest}
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger-text"
+                disabled={busy}
+                onClick={() => toggleReminders(false)}
+              >
+                {t.settings.turnOff}
+              </button>
+            </>
+          ) : (
             <button
               type="button"
-              className="btn btn-ghost"
-              disabled={busy}
-              onClick={async () => {
-                const result = await sendTestNotification()
-                toast.show(result.message, { tone: result.ok ? 'info' : 'error' })
-              }}
+              className="btn btn-primary"
+              disabled={busy || pushState === 'unsupported' || pushState === 'unconfigured'}
+              onClick={() => toggleReminders(true)}
             >
-              {t.settings.sendTest}
+              {busy ? t.common.working : t.settings.turnOn}
             </button>
-            <button
-              type="button"
-              className="btn btn-danger-text"
-              disabled={busy}
-              onClick={() => toggleReminders(false)}
-            >
-              {t.settings.turnOff}
-            </button>
-          </>
-        ) : (
+          )}
+
+          {!isInstalled() && <p className="muted small">{t.settings.installHint}</p>}
+          <p className="muted small">{t.settings.timezone(profile.timezone)}</p>
+        </section>
+      )}
+
+      {part === 'account' && (
+        <section className="card">
+          <h3>{t.settings.account}</h3>
+          <p className="muted">{profile.email}</p>
           <button
             type="button"
-            className="btn btn-primary"
-            disabled={busy || pushState === 'unsupported' || pushState === 'unconfigured'}
-            onClick={() => toggleReminders(true)}
+            className="btn btn-ghost"
+            onClick={() => void signOut()}
           >
-            {busy ? t.common.working : t.settings.turnOn}
+            {t.settings.signOut}
           </button>
-        )}
-
-        {!isInstalled() && <p className="muted small">{t.settings.installHint}</p>}
-        <p className="muted small">{t.settings.timezone(profile.timezone)}</p>
-      </section>
-
-      <section className="card">
-        <h3>{t.settings.account}</h3>
-        <p className="muted">{profile.email}</p>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={() => void signOut()}
-        >
-          {t.settings.signOut}
-        </button>
-      </section>
+        </section>
+      )}
     </>
   )
 }

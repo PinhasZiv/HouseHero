@@ -18,6 +18,7 @@ test.describe('leaving or deleting a space', () => {
     await seed(page, db)
     await page.goto('/')
     await page.getByRole('button', { name: 'עוד' }).click()
+    await page.getByRole('button', { name: 'המרחב והחברים' }).click()
 
     await page.getByRole('button', { name: 'יציאה מהמרחב' }).click()
     const sheet = page.locator('.sheet', { hasText: 'יציאה מהמרחב' })
@@ -33,6 +34,7 @@ test.describe('leaving or deleting a space', () => {
     await seed(page, db)
     await page.goto('/')
     await page.getByRole('button', { name: 'עוד' }).click()
+    await page.getByRole('button', { name: 'המרחב והחברים' }).click()
 
     await page.getByRole('button', { name: 'יציאה מהמרחב' }).click()
     await page.locator('.sheet').getByRole('button', { name: 'יציאה מהמרחב' }).click()
@@ -47,6 +49,7 @@ test.describe('leaving or deleting a space', () => {
     await seed(page, db)
     await page.goto('/')
     await page.getByRole('button', { name: 'עוד' }).click()
+    await page.getByRole('button', { name: 'המרחב והחברים' }).click()
 
     await page.getByRole('button', { name: 'מחיקת המרחב לכולם' }).click()
     const sheet = page.locator('.sheet', { hasText: 'מחיקת המרחב לכולם' })
@@ -67,6 +70,7 @@ test.describe('managing a space as its owner', () => {
     await seed(page, db)
     await page.goto('/')
     await page.getByRole('button', { name: 'עוד' }).click()
+    await page.getByRole('button', { name: 'הזמנת אנשים' }).click()
     await expect(page.locator('.invite-code')).toHaveText('ABC123')
 
     await page.getByRole('button', { name: 'יצירת קוד חדש' }).click()
@@ -97,6 +101,7 @@ test.describe('managing a space as its owner', () => {
     await seed(page, db)
     await page.goto('/')
     await page.getByRole('button', { name: 'עוד' }).click()
+    await page.getByRole('button', { name: 'המרחב והחברים' }).click()
     await expect(page.locator('.member-list li')).toHaveCount(2)
 
     await page.getByRole('button', { name: 'הסרת דנה כהן מהמרחב' }).click()
@@ -113,9 +118,13 @@ test.describe('managing a space as its owner', () => {
     await seed(page, db)
     await page.goto('/')
     await page.getByRole('button', { name: 'עוד' }).click()
+    await page.getByRole('button', { name: 'המרחב והחברים' }).click()
     await expect(page.locator('.member-list li')).toHaveCount(2)
-
-    await expect(page.getByRole('button', { name: 'יצירת קוד חדש' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: /^הסרת .* מהמרחב$/ })).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'חזרה' }).click()
+    await page.getByRole('button', { name: 'הזמנת אנשים' }).click()
+    await expect(page.locator('.invite-code')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'יצירת קוד חדש' })).toHaveCount(0)
   })
 })
