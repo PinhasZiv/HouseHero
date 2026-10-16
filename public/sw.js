@@ -194,19 +194,48 @@ self.addEventListener('notificationclick', (event) => {
   // tasks to offer once it is actually open, not this service worker.
   const target = event.action === 'snooze' ? base + (base.includes('?') ? '&' : '?') + 'snooze=1' : base
 
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-      // Prefer an already-open copy: focusing it keeps the person's place, and
-      // navigating it applies the space/task from the notification.
-      for (const client of clients) {
-        if (new URL(client.url).pathname.startsWith(SCOPE_PATH)) {
-          return client.focus().then((focused) => {
-            if ('navigate' in focused) return focused.navigate(target).catch(() => focused)
-            return focused
-          })
-        }
-      }
-      return self.clients.openWindow(target)
-    }),
-  )
+  event.waitUntil(openApp(new URL(target, self.location.origin).href))
 })
+
+// How long a window gets to answer focus() before the tap opens a fresh one.
+const FOCUS_TIMEOUT_MS = 1500
+
+function isPhone() {
+  const data = self.navigator.userAgentData
+  if (data && typeof data.mobile === 'boolean') return data.mobile
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(self.navigator.userAgent || '')
+}
+
+/**
+ * Brings the app up at `url` after a notification tap.
+ *
+ * Chrome grants the tap a single "window interaction", and focus() and
+ * openWindow() each spend it - so whichever is called first is the only one
+ * that can bring a window up. On a phone, focus() on an app sitting in the
+ * background (or frozen there by Android) can fail or never answer, leaving
+ * the tap with no result at all. openWindow() is how the phone launches the
+ * installed app at a URL, running or not, so that is the one used there.
+ * focus() is kept for an app already on screen, and for desktops, where it
+ * brings the existing window forward instead of opening another.
+ */
+async function openApp(url) {
+  const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+  const app = windows.find((client) => new URL(client.url).pathname.startsWith(SCOPE_PATH))
+  if (!app || (isPhone() && app.visibilityState !== 'visible')) return self.clients.openWindow(url)
+
+  const focused = await Promise.race([
+    app.focus().catch(() => null),
+    new Promise((resolve) => setTimeout(() => resolve(null), FOCUS_TIMEOUT_MS)),
+  ])
+  // Chrome has spent the tap by now, but other browsers may still allow this.
+  if (!focused) return self.clients.openWindow(url).catch(() => null)
+
+  try {
+    return await focused.navigate(url)
+  } catch {
+    // navigate() only works on a page this worker controls - one opened
+    // before the worker took over is asked to go there itself (see main.tsx).
+    focused.postMessage({ type: 'open-url', url })
+    return focused
+  }
+}
