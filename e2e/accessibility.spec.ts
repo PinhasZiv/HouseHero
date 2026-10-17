@@ -132,6 +132,15 @@ for (const scheme of ['light', 'dark'] as const) {
       })
     }
 
+    test('the weekly report passes WCAG 2.2 AA and has thumb-sized controls', async ({ page }) => {
+      await open(page, '/?tab=stats')
+      await page.getByRole('button', { name: /הדוח השבועי/ }).click()
+      await expect(page.getByRole('heading', { level: 1, name: 'הדוח השבועי' })).toBeVisible()
+      await page.waitForTimeout(300)
+      expect(await axeViolations(page)).toEqual([])
+      expect(await smallTargets(page)).toEqual([])
+    })
+
     test('the task details sheet passes WCAG 2.2 AA', async ({ page }) => {
       await open(page, '/')
       await page.locator('.task-card .task-main').first().click()

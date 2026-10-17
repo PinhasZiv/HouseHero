@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { describeWeeklyDays, formatDateTime, formatSnoozeUntil, personLabel, toDatetimeLocalValue, weekdayShort } from './format'
+import { describeWeeklyDays, formatDateTime, formatSnoozeUntil, personLabel, toDatetimeLocalValue, weekdayShort, formatWeekRange } from './format'
 
 describe('toDatetimeLocalValue', () => {
   it('zero-pads every field to the shape a datetime-local input expects', () => {
@@ -109,5 +109,13 @@ describe('describeWeeklyDays', () => {
   it('lists the chosen days in week order regardless of input order', () => {
     expect(describeWeeklyDays([3, 1], 'en')).toBe('Monday, Wednesday')
     expect(describeWeeklyDays([5, 0], 'he')).toBe('ראשון, שישי')
+  })
+})
+
+describe('formatWeekRange', () => {
+  it('names the month once inside a month, and both across a month boundary', () => {
+    expect(formatWeekRange('2026-10-11', '2026-10-17', 'he')).toBe('\u200F11\u200E–\u200E17 באוקטובר')
+    expect(formatWeekRange('2026-10-11', '2026-10-17', 'en')).toBe('11–17 October')
+    expect(formatWeekRange('2026-09-27', '2026-10-03', 'he')).toBe('27 בספט׳ – 3 באוק׳')
   })
 })

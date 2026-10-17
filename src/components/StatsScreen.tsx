@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as api from '../lib/api'
 import { addDays, daysBetween } from '../lib/taskDue'
-import { cyclesWord, describeInterval, formatDateTime, weekdayName } from '../lib/format'
+import { cyclesWord, describeInterval, formatDateTime, formatWeekRange, weekdayName } from '../lib/format'
 import {
   planIntervalChange,
   suggestInterval,
@@ -12,7 +12,9 @@ import {
 } from '../lib/cadence'
 import type { Task } from '../lib/types'
 import { useI18n } from '../lib/i18n'
-import { useDialog } from '../lib/useDialog'
+import { useBackClose, useDialog } from '../lib/useDialog'
+import { readParam, stripParam } from '../lib/urlParams'
+import { latestWeekEnd } from '../lib/weeklyReport'
 import type { Language } from '../lib/i18n/types'
 import {
   busiestWeekday,
@@ -30,6 +32,7 @@ import { useApp } from '../state/AppState'
 import { useToast } from './Toast'
 import { ChartIcon, StarIcon } from './Icons'
 import type { StatsCompletion } from '../lib/api'
+import { lastReportableWeek, WeeklyReport } from './WeeklyReport'
 
 /** How many of a task's completion timestamps to list before just counting
  *  the rest - a task done daily for a year is 300+ rows, not a list anyone
@@ -163,6 +166,17 @@ export function StatsScreen() {
   // 6-week trend, "when was this person last active") regardless of this -
   // see filterByRange().
   const [range, setRange] = useState<StatsRange>('all')
+  // The weekly report, over this screen: the Saturday-evening notification
+  // opens straight onto it (?week=<that Saturday>), and a row below opens it
+  // on the latest week. Back returns to the stats.
+  const [reportWeek, setReportWeek] = useState<string | null>(() => {
+    const requested = readParam('week')
+    if (!requested || !/^\d{4}-\d{2}-\d{2}$/.test(requested)) return null
+    const latest = lastReportableWeek(today)
+    return requested > latest ? latest : latestWeekEnd(requested)
+  })
+  useEffect(() => stripParam('week'), [])
+  useBackClose(() => setReportWeek(null), reportWeek !== null)
 
   useEffect(() => {
     if (!currentSpace) return
@@ -350,6 +364,18 @@ export function StatsScreen() {
     return onTimeRate(rangedCompletions.filter((row) => row.user_id === selected.userId))
   }, [rangedCompletions, selected])
 
+  if (reportWeek) {
+    return (
+      <WeeklyReport
+        weekEnd={reportWeek}
+        completions={completions}
+        skips={skips}
+        onWeekChange={setReportWeek}
+        onClose={() => setReportWeek(null)}
+      />
+    )
+  }
+
   function personName(userId: string): string {
     if (userId === session?.user.id) return t.space.you
     const person = people.get(userId)
@@ -363,6 +389,15 @@ export function StatsScreen() {
       <header className="screen-header">
         <h1>{t.stats.title}</h1>
       </header>
+
+      <ul className="menu-list report-entry">
+        <li>
+          <button type="button" className="menu-row" onClick={() => setReportWeek(latestWeekEnd(today))}>
+            <span className="menu-row-title">{t.report.open}</span>
+            <span className="menu-row-detail">{formatWeekRange(addDays(latestWeekEnd(today), -6), latestWeekEnd(today), language)}</span>
+          </button>
+        </li>
+      </ul>
 
       <div className="segmented" role="tablist" aria-label={t.stats.rangeAria}>
         <button

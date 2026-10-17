@@ -24,6 +24,15 @@ import {
   weekStart,
   type SummaryCompletion,
 } from '../_shared/weeklySummary.ts'
+import {
+  HISTORY_LIMIT,
+  buildWeeklyReport,
+  reportSince,
+  type ReportCompletion,
+  type ReportSkip,
+  type ReportTask,
+  type WeeklyReport,
+} from '../_shared/weeklyReport.ts'
 import { sendPush, type PushTarget } from '../_shared/webpush.ts'
 
 interface Profile {
@@ -482,21 +491,91 @@ Deno.serve(async (request) => {
   }
 
   if (summaryFor.length) {
-    const from = summaryFor.map(({ localDate }) => weekStart(localDate)).sort()[0]
-    const completions = await admin
-      .from('task_completions')
-      .select('space_id, user_id, points_awarded, completed_on, completion_group')
-      .gte('completed_on', from)
-    if (completions.error) {
-      console.error('loading the weekly summary failed', completions.error)
+    // The same rows the app's report screen reads, space by space - every
+    // task (done ones too) and the newest page of completions and skips - so
+    // the figures in the notification are the ones it opens on.
+    const summarySpaces = [...new Set(summaryFor.flatMap(({ spaceIds }) => spaceIds))]
+    const [allTasks, ...histories] = await Promise.all([
+      admin
+        .from('tasks')
+        .select(
+          'id, space_id, title, task_type, recurrence_mode, interval_days, weekly_days, ' +
+            'end_condition, end_after_count, end_date, occurrences_completed, due_date, ' +
+            'last_completed_date, last_skipped_date, is_done, assigned_to, ' +
+            'starts_at, expires_at, cancelled_at, expired_at, created_at',
+        )
+        .in('space_id', summarySpaces),
+      ...summarySpaces.flatMap((spaceId) => [
+        admin
+          .from('task_completions')
+          .select('task_id, user_id, points_awarded, completed_on, completion_group, prev_due_date')
+          .eq('space_id', spaceId)
+          .order('completed_on', { ascending: false })
+          .limit(HISTORY_LIMIT),
+        admin
+          .from('task_skips')
+          .select('task_id, skipped_on, prev_due_date')
+          .eq('space_id', spaceId)
+          .order('skipped_on', { ascending: false })
+          .limit(HISTORY_LIMIT),
+      ]),
+    ])
+    const loadFailed = [allTasks, ...histories].find((result) => result.error)
+    if (loadFailed?.error) {
+      console.error('loading the weekly summary failed', loadFailed.error)
     } else {
-      const rows = (completions.data ?? []) as SummaryCompletion[]
+      type SummaryTask = ReportTask & { space_id: string; assigned_to: string | null; created_at: string }
+      const tasksBySpace = new Map<string, SummaryTask[]>()
+      for (const task of (allTasks.data ?? []) as unknown as SummaryTask[]) {
+        tasksBySpace.set(task.space_id, [...(tasksBySpace.get(task.space_id) ?? []), task])
+      }
+      const historyBySpace = new Map(
+        summarySpaces.map((spaceId, i) => [
+          spaceId,
+          {
+            completions: (histories[i * 2].data ?? []) as unknown as ReportCompletion[],
+            skips: (histories[i * 2 + 1].data ?? []) as unknown as ReportSkip[],
+          },
+        ]),
+      )
+      const rows: SummaryCompletion[] = [...historyBySpace].flatMap(([spaceId, { completions }]) =>
+        completions.map((row) => ({ ...row, space_id: spaceId })),
+      )
+      // One household's week reads the same for everyone on the same clock.
+      const reports = new Map<string, WeeklyReport | null>()
+      const reportFor = (spaceId: string, localDate: string, timezone: string): WeeklyReport | null => {
+        const key = `${spaceId}|${localDate}|${timezone}`
+        if (!reports.has(key)) {
+          const spaceTasks = tasksBySpace.get(spaceId) ?? []
+          const { completions, skips } = historyBySpace.get(spaceId) ?? { completions: [], skips: [] }
+          const firstTask = spaceTasks.map((task) => todayIn(timezone, new Date(task.created_at))).sort()[0]
+          reports.set(
+            key,
+            firstTask
+              ? buildWeeklyReport({
+                  tasks: spaceTasks,
+                  completions,
+                  skips,
+                  redemptions: [],
+                  weekEnd: localDate,
+                  today: localDate,
+                  since: reportSince(firstTask, completions, skips),
+                  timezone,
+                  isPaused: (task) => isTaskPaused(pauses, task),
+                })
+              : null,
+          )
+        }
+        return reports.get(key) ?? null
+      }
+
       for (const { userId, profile, localDate, spaceIds } of summaryFor) {
         const language: Language = isLanguage(profile.language) ? profile.language : 'he'
         const { title, body } = composeWeeklySummary(
           spaceIds.map((spaceId) => {
             const week = summarizeSpaceWeek(rows, spaceId, userId, localDate)
             const top = week.topUserId ? profilesById.get(week.topUserId) : undefined
+            const household = reportFor(spaceId, localDate, profile.timezone)
             return {
               spaceName: spaceIds.length > 1 ? (spaceNames.get(spaceId) ?? '?') : undefined,
               total: week.total,
@@ -504,6 +583,10 @@ Deno.serve(async (request) => {
               myPoints: week.myPoints,
               topName: week.topUserId ? (top?.display_name ?? null) : null,
               topIsYou: week.topUserId === userId,
+              onTime: household?.figures.onTime ?? null,
+              daysClosed: household?.daysClosed,
+              daysCounted: household?.daysCounted,
+              streak: household?.streak,
             }
           }),
           language,
@@ -531,6 +614,7 @@ Deno.serve(async (request) => {
             tag: `househero-weekly-${localDate}`,
             spaceId: spaceIds[0],
             tab: 'stats',
+            week: localDate,
           },
           config.vapid,
         )

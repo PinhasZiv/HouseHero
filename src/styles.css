@@ -293,6 +293,88 @@ button { font: inherit; cursor: pointer; }
 }
 .screen-header-secondary { margin-top: 8px; }
 
+/* The weekly report: a row on the Stats screen opens it, over the stats. */
+.report-entry { margin-bottom: 18px; }
+.report-week-nav { display: flex; align-items: center; gap: 4px; width: 100%; }
+.report-week-nav .screen-subtitle { flex: 1; text-align: center; }
+.report-running { color: var(--accent-strong); font-weight: 600; }
+.report-week-arrow {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.3rem;
+  line-height: 1;
+}
+.report-week-arrow:disabled { opacity: 0.35; }
+/* Earlier is behind, later ahead - in reading order (the browser mirrors
+   these in Hebrew by itself). */
+.report-week-prev::before { content: '‹'; }
+.report-week-next::before { content: '›'; }
+
+.report-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.report-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.report-kpi-value { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; direction: ltr; text-align: start; unicode-bidi: plaintext; }
+.report-kpi-label { color: var(--text-muted); font-size: 0.86rem; }
+.report-delta { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+.report-delta-up { color: #2e7d4f; }
+.report-delta-down { color: var(--late); }
+@media (prefers-color-scheme: dark) { .report-delta-up { color: #8fd19c; } }
+.report-quiet { margin-bottom: 12px; }
+
+.report-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.report-day { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.report-day-count { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); min-height: 1.2em; font-variant-numeric: tabular-nums; }
+.report-day-track { display: flex; align-items: flex-end; justify-content: center; width: 100%; height: 72px; }
+.report-day-bar { width: 70%; max-width: 22px; min-height: 3px; background: var(--accent); border-radius: 4px 4px 0 0; }
+.report-day-future .report-day-bar, .report-day-none .report-day-bar { background: var(--border); }
+.report-day-mark {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 800;
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+.report-day-closed .report-day-mark { background: #e3f2e5; color: #2e6b3a; }
+.report-day-broken .report-day-mark { background: var(--late-soft); color: var(--late); }
+.report-day-open .report-day-mark { background: var(--due-soft); color: var(--due); }
+@media (prefers-color-scheme: dark) {
+  .report-day-closed .report-day-mark { background: #15301b; color: #8fd19c; }
+}
+.report-day-label { font-size: 0.75rem; color: var(--text-muted); }
+
+.report-people { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.report-person { display: flex; flex-direction: column; gap: 4px; }
+.report-person-head { display: flex; align-items: center; gap: 8px; }
+.report-person-name { font-weight: 650; unicode-bidi: plaintext; }
+.report-person-self .report-person-name { color: var(--accent-strong); }
+.report-person-points { margin-inline-start: auto; color: var(--gold); font-weight: 700; font-variant-numeric: tabular-nums; }
+.report-meter { height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.report-meter-fill { height: 100%; background: var(--accent); border-radius: 999px; }
+
+.report-list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.report-list li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.report-list li:last-child { border-bottom: 0; }
+.report-list li > span:last-child { white-space: nowrap; }
+.report-list-late { color: var(--late); }
+.report-streak { font-size: 1.2rem; font-weight: 700; }
+
 /* More: a short list of rows, each opening its own screen. */
 .menu-group-title {
   font-size: 0.82rem;
@@ -334,14 +416,15 @@ button { font: inherit; cursor: pointer; }
   white-space: nowrap;
   unicode-bidi: plaintext;
 }
-/* A chevron pointing the way the row leads - onward in reading order. */
+/* A chevron pointing the way the row leads - onward in reading order. The
+   browser mirrors ‹ and › inside right-to-left text by itself, so the
+   left-to-right character is the right one in both languages. */
 .menu-row::after {
   content: '›';
   color: var(--text-muted);
   font-size: 1.3rem;
   line-height: 1;
 }
-[dir='rtl'] .menu-row::after { content: '‹'; }
 
 .subpage-header { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .back-button {
@@ -356,9 +439,9 @@ button { font: inherit; cursor: pointer; }
   color: var(--accent-strong);
   font-weight: 600;
 }
-/* Back points the other way from onward. */
+/* Back points the other way from onward (mirrored in Hebrew by the browser,
+   as above). */
 .back-button::before { content: '‹'; font-size: 1.3rem; line-height: 1; }
-[dir='rtl'] .back-button::before { content: '›'; }
 /* A sub-screen that is a single card: the screen's own title already names
    it, so the card's heading would only repeat it. */
 .subpage-single > .card > h3:first-child { display: none; }
