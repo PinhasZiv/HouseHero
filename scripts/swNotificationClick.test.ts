@@ -156,3 +156,36 @@ describe('tapping a notification', () => {
     expect(log.opened).toEqual([`${TARGET}&snooze=1`])
   })
 })
+
+describe('a weekly summary push', () => {
+  it('points the notification at the report for the week it sums up', async () => {
+    const handlers: Record<string, (event: unknown) => void> = {}
+    const shown: { title: string; options: { data: { url: string } } }[] = []
+    const self = {
+      registration: {
+        scope: APP,
+        showNotification: async (title: string, options: { data: { url: string } }) => {
+          shown.push({ title, options })
+        },
+      },
+      location: new URL(`${APP}sw.js`),
+      navigator: { userAgent: PHONE },
+      addEventListener: (type: string, handler: (event: unknown) => void) => {
+        handlers[type] = handler
+      },
+      skipWaiting() {},
+      clients: { matchAll: async () => [], openWindow: async () => null },
+    }
+    runInNewContext(source, { self, caches: {}, fetch: async () => ({}), URL, URLSearchParams, Response, console, setTimeout, clearTimeout, Promise })
+
+    let pending: Promise<unknown> = Promise.resolve()
+    handlers.push({
+      data: { json: () => ({ title: 'הסיכום השבועי', body: '…', spaceId: 's1', tab: 'stats', week: '2026-10-17' }) },
+      waitUntil: (promise: Promise<unknown>) => {
+        pending = promise
+      },
+    })
+    await pending
+    expect(shown[0].options.data.url).toBe('/HouseHero/?space=s1&tab=stats&week=2026-10-17')
+  })
+})

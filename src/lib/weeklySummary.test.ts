@@ -77,6 +77,21 @@ describe('composeWeeklySummary', () => {
     expect(body).toBe("הבית: בוצעו השבוע 3 משימות, 3 מהן על ידך (+15 נק'). המקום הראשון השבוע שלך!\nהצימר: שבוע שקט - לא בוצעו משימות.")
   })
 
+  it('adds how the household kept up - on time, closed days, the streak - when the report has them', () => {
+    const { body } = composeWeeklySummary(
+      [{ total: 12, mine: 5, myPoints: 40, topName: 'דנה', topIsYou: false, onTime: 86, daysClosed: 6, daysCounted: 7, streak: 12 }],
+      'he',
+    )
+    expect(body).toBe("בוצעו השבוע 12 משימות, 5 מהן על ידך (+40 נק'). 86% בזמן · 6/7 ימים נסגרו · רצף של 12 ימים. בראש הטבלה: דנה.")
+
+    // A streak of one day is not worth a mention, and nothing to time leaves the share out.
+    const { body: en } = composeWeeklySummary(
+      [{ total: 2, mine: 2, myPoints: 10, topName: 'Me', topIsYou: true, onTime: null, daysClosed: 1, daysCounted: 2, streak: 1 }],
+      'en',
+    )
+    expect(en).toBe('2 tasks done, 2 by you (+10 pts). 1/2 days closed. You led the week!')
+  })
+
   it('has an English version', () => {
     const { title, body } = composeWeeklySummary(
       [{ total: 1, mine: 0, myPoints: 0, topName: 'Dana', topIsYou: false }],

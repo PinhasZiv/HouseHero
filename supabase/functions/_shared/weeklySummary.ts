@@ -91,11 +91,29 @@ export interface SummaryLine {
   /** null in a quiet week. */
   topName: string | null
   topIsYou: boolean
+  /** From the weekly report (weeklyReport.ts), so the push and the screen it
+   *  opens agree: done on time or early, out of everything that fell due. */
+  onTime?: number | null
+  daysClosed?: number
+  daysCounted?: number
+  streak?: number
 }
 
 function tasksWord(count: number, language: Language): string {
   if (language === 'en') return count === 1 ? '1 task' : `${count} tasks`
   return count === 1 ? 'משימה אחת' : `${count} משימות`
+}
+
+/** "86% on time · 6/7 days closed · 12-day streak" - whatever there is. */
+function shape(entry: SummaryLine, language: Language): string {
+  const parts: string[] = []
+  const en = language === 'en'
+  if (entry.onTime !== undefined && entry.onTime !== null) parts.push(en ? `${entry.onTime}% on time` : `${entry.onTime}% בזמן`)
+  if (entry.daysCounted) {
+    parts.push(en ? `${entry.daysClosed}/${entry.daysCounted} days closed` : `${entry.daysClosed}/${entry.daysCounted} ימים נסגרו`)
+  }
+  if (entry.streak !== undefined && entry.streak >= 2) parts.push(en ? `${entry.streak}-day streak` : `רצף של ${entry.streak} ימים`)
+  return parts.length ? ` ${parts.join(' · ')}.` : ''
 }
 
 function line(entry: SummaryLine, language: Language): string {
@@ -104,13 +122,13 @@ function line(entry: SummaryLine, language: Language): string {
     if (entry.total === 0) return `${prefix}A quiet week - nothing was done.`
     const mine = entry.mine > 0 ? `, ${entry.mine} by you (+${entry.myPoints} pts)` : ''
     const top = entry.topIsYou ? ' You led the week!' : entry.topName ? ` Top of the week: ${entry.topName}.` : ''
-    return `${prefix}${tasksWord(entry.total, 'en')} done${mine}.${top}`
+    return `${prefix}${tasksWord(entry.total, 'en')} done${mine}.${shape(entry, 'en')}${top}`
   }
   if (entry.total === 0) return `${prefix}שבוע שקט - לא בוצעו משימות.`
   const mine = entry.mine > 0 ? `, ${entry.mine === 1 ? 'אחת' : entry.mine} מהן על ידך (+${entry.myPoints} נק')` : ''
   const top = entry.topIsYou ? ' המקום הראשון השבוע שלך!' : entry.topName ? ` בראש הטבלה: ${entry.topName}.` : ''
   const done = entry.total === 1 ? 'בוצעה השבוע משימה אחת' : `בוצעו השבוע ${entry.total} משימות`
-  return `${prefix}${done}${mine}.${top}`
+  return `${prefix}${done}${mine}.${shape(entry, 'he')}${top}`
 }
 
 export function composeWeeklySummary(entries: SummaryLine[], language: Language): { title: string; body: string } {

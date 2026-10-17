@@ -132,6 +132,8 @@ function notificationUrl(payload) {
   if (payload.spaceId) params.set('space', payload.spaceId)
   if (payload.taskId) params.set('task', payload.taskId)
   if (payload.tab) params.set('tab', payload.tab)
+  // The weekly summary opens the report on the week it describes.
+  if (payload.week) params.set('week', payload.week)
   const query = params.toString()
   return query ? `${SCOPE_PATH}?${query}` : SCOPE_PATH
 }
