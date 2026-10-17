@@ -144,4 +144,71 @@ describe('buildWeeklyReport', () => {
     expect(report.days.map((day) => day.status)).toEqual(['none', 'none', 'closed', 'closed', 'closed', 'future', 'future'])
     expect(report.daysCounted).toBe(3)
   })
+
+  it('looks at next week: what falls due each day if everything is done on its day, and whose it is', () => {
+    const tasks = [
+      task('dish', 'כלים'),
+      task('vac', 'שואב', { interval_days: 7, due_date: '2026-10-20', assigned_to: DANA }),
+      task('drops', 'טיפות', { end_condition: 'on_date', end_date: '2026-10-21' }),
+      task('done', 'חד פעמית', { task_type: 'one_time', recurrence_mode: null, interval_days: null, is_done: true, due_date: '2026-10-19' }),
+    ]
+    const report = buildWeeklyReport({ ...base, tasks, completions: dailyDishes(11, 17), skips: [] })
+    expect(report.outlook?.from).toBe('2026-10-18')
+    expect(report.outlook?.upcoming).toBe(true)
+    // Dishes every day, drops until the 21st, the vacuum on Tuesday.
+    expect(report.outlook?.days.map((day) => day.count)).toEqual([2, 2, 3, 2, 1, 1, 1])
+    expect(report.outlook?.items.filter((item) => item.assignedTo === DANA)).toEqual([
+      { taskId: 'vac', title: 'שואב', date: '2026-10-20', assignedTo: DANA },
+    ])
+  })
+
+  it('mid-week, the outlook is the rest of the week: days gone by have no count, and a late task counts today', () => {
+    const tasks = [task('oven', 'תנור', { interval_days: 3, due_date: '2026-10-12', last_completed_date: '2026-10-09' })]
+    const report = buildWeeklyReport({ ...base, weekEnd: '2026-10-10', today: '2026-10-14', tasks, completions: [], skips: [] })
+    expect(report.outlook?.upcoming).toBe(false)
+    expect(report.outlook?.days.map((day) => day.count)).toEqual([null, null, null, 1, 0, 0, 1])
+  })
+
+  it('an earlier week has no outlook and no suggestions - both are about now', () => {
+    const report = buildWeeklyReport({ ...base, weekEnd: '2026-10-03', tasks: [task('dish', 'כלים')], completions: dailyDishes(1, 17), skips: [] })
+    expect(report.outlook).toBeNull()
+    expect(report.suggestions).toEqual([])
+  })
+
+  it('offers the interval change the Stats screen would, strongest first', () => {
+    // The fridge, weekly, skipped five weeks running.
+    const fridgeSkips = [12, 19, 26, 33, 40].map((back) => {
+      const on = addDaysTo(TODAY, -back)
+      return { task_id: 'fridge', skipped_on: on, prev_due_date: on }
+    })
+    const tasks = [task('dish', 'כלים'), task('fridge', 'מקרר', { interval_days: 7, due_date: '2026-10-19', last_completed_date: null })]
+    const report = buildWeeklyReport({ ...base, tasks, completions: dailyDishes(11, 17), skips: fridgeSkips })
+    expect(report.suggestions.map((s) => [s.taskId, s.direction, s.suggested])).toEqual([['fridge', 'longer', 11]])
+  })
+
+  it('a vacation of the whole house takes its days out of the count; one person\'s is only noted', () => {
+    const report = buildWeeklyReport({
+      ...base,
+      tasks: [task('dish', 'כלים')],
+      completions: dailyDishes(11, 17).filter((row) => row.completed_on !== '2026-10-13' && row.completed_on !== '2026-10-14'),
+      skips: [],
+      pauses: [
+        { user_id: null, started_on: '2026-10-13', ended_on: '2026-10-15' },
+        { user_id: DANA, started_on: '2026-10-16', ended_on: null },
+        { user_id: ME, started_on: '2026-09-01', ended_on: '2026-09-05' },
+      ],
+    })
+    expect(report.days.map((day) => day.status)).toEqual(['closed', 'closed', 'away', 'away', 'closed', 'closed', 'closed'])
+    expect(report.daysCounted).toBe(5)
+    expect(report.daysClosed).toBe(5)
+    expect(report.away).toEqual([
+      { userId: null, from: '2026-10-13', to: '2026-10-14' },
+      { userId: DANA, from: '2026-10-16', to: '2026-10-17' },
+    ])
+  })
 })
+
+function addDaysTo(day: string, n: number): string {
+  const [y, m, d] = day.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10)
+}

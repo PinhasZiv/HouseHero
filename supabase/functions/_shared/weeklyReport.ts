@@ -1,12 +1,22 @@
 // The weekly report: one household's week, Sunday through Saturday, from the
 // rows already stored - completions and skips (each with the due date it
-// settled), the tasks themselves, and reward redemptions.
+// settled), the tasks themselves, reward redemptions and vacations - plus a
+// look at the week after it, projected from where each task stands now.
 //
 // Shared by the app's report screen and the Saturday-evening push, so the
 // figures in the notification are the ones the screen opens on.
 
-import { addDays, classify, todayIn, type DueTask } from './taskDue.ts'
-import { completionTiming, onTimeShare, summarizeCadence, type CadenceCounts, type CadenceTask } from './cadence.ts'
+import { addDays, classify, planCompletion, todayIn, type DueTask } from './taskDue.ts'
+import {
+  SUGGESTION_WINDOW_DAYS,
+  completionTiming,
+  onTimeShare,
+  suggestInterval,
+  summarizeCadence,
+  type CadenceCounts,
+  type CadenceSuggestion,
+  type CadenceTask,
+} from './cadence.ts'
 import { brokenDays, houseStreak, type HandledRow } from './streak.ts'
 import { weekStart } from './weeklySummary.ts'
 
@@ -33,6 +43,14 @@ export interface ReportRedemption {
   requested_by: string
   status: 'pending' | 'approved' | 'rejected' | 'cancelled'
   decided_at: string | null
+}
+
+/** A vacation in this space: one person's (user_id), or everyone's (null).
+ *  The day it ended on is a day back at home. */
+export interface ReportPause {
+  user_id: string | null
+  started_on: string
+  ended_on: string | null
 }
 
 /** The Saturday that closes the most recent week to have reached its
@@ -71,9 +89,10 @@ function maxDay(a: string, b: string): string {
  * How a day of the week went: every task that fell due was taken care of
  * that day ('closed'), something was left for later ('broken'), it is today
  * and something is still waiting ('open'), it has not come yet ('future'),
- * or the household did not exist yet ('none').
+ * the household did not exist yet ('none'), or everyone was on vacation
+ * ('away'). Only the first three count towards the week's closed days.
  */
-export type DayStatus = 'closed' | 'broken' | 'open' | 'future' | 'none'
+export type DayStatus = 'closed' | 'broken' | 'open' | 'future' | 'none' | 'away'
 
 export interface ReportDay {
   date: string
@@ -101,6 +120,17 @@ export interface WeekFigures {
   onTime: number | null
 }
 
+/** The week after the report's, as it stands: what falls due on each day if
+ *  everything is done on its day. Days already gone by have no count. */
+export interface Outlook {
+  from: string
+  to: string
+  /** Not started yet - "next week" rather than "the rest of this week". */
+  upcoming: boolean
+  days: { date: string; count: number | null }[]
+  items: { taskId: string; title: string; date: string; assignedTo: string | null }[]
+}
+
 export interface WeeklyReport {
   weekStart: string
   weekEnd: string
@@ -122,6 +152,14 @@ export interface WeeklyReport {
   brokeOn: string | null
   redeemed: { title: string; cost: number; by: string }[]
   pending: { title: string; cost: number; by: string }[]
+  /** Vacations during the week, cut to it - the whole space's (userId null)
+   *  marks its days 'away'. */
+  away: { userId: string | null; from: string; to: string }[]
+  /** Only while the week after this one is not over yet. */
+  outlook: Outlook | null
+  /** Interval changes worth offering, strongest first - as on the Stats
+   *  screen, over the last sixty days, so only for a recent week. */
+  suggestions: CadenceSuggestion[]
 }
 
 function dedupe<T extends { completion_group: string | null }>(rows: T[]): T[] {
@@ -155,6 +193,38 @@ function figures<T extends ReportTask>(
   }
 }
 
+/**
+ * Every occurrence from `from` to `to`, walking each task forward as if it
+ * were done on its due day - something already late counts as done today.
+ * Days before today are left out: what happened on them is history.
+ */
+function projectOccurrences<T extends ReportTask>(
+  tasks: T[],
+  from: string,
+  to: string,
+  today: string,
+  isPaused: (task: T) => boolean,
+): Outlook['items'] {
+  const start = from > today ? from : today
+  const items: Outlook['items'] = []
+  for (const task of tasks) {
+    if (task.is_done || task.task_type === 'time_limited' || isPaused(task)) continue
+    let occurrences = task.occurrences_completed
+    let due: string | null = task.due_date < today ? today : task.due_date
+    while (due !== null && due <= to) {
+      if (due >= start) items.push({ taskId: task.id, title: task.title, date: due, assignedTo: task.assigned_to ?? null })
+      const next = planCompletion({ ...task, occurrences_completed: occurrences }, due)
+      occurrences = next.occurrencesCompleted
+      due = next.nextDueDate !== null && next.nextDueDate > due ? next.nextDueDate : null
+    }
+  }
+  return items.sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title))
+}
+
+function suggestionStrength(suggestion: CadenceSuggestion): number {
+  return Math.abs(suggestion.suggested - suggestion.current) / suggestion.current
+}
+
 export function buildWeeklyReport<T extends ReportTask>(input: {
   tasks: T[]
   completions: ReportCompletion[]
@@ -166,6 +236,7 @@ export function buildWeeklyReport<T extends ReportTask>(input: {
   since: string
   timezone: string
   isPaused?: (task: T) => boolean
+  pauses?: ReportPause[]
 }): WeeklyReport {
   const { tasks, completions, skips, redemptions, weekEnd, today, since, timezone } = input
   const isPaused = input.isPaused ?? (() => false)
@@ -189,6 +260,18 @@ export function buildWeeklyReport<T extends ReportTask>(input: {
       task.last_skipped_date !== today,
   )
 
+  // Vacations, cut to the part of the week that has happened.
+  const lastDay = weekEnd < today ? weekEnd : today
+  const away: WeeklyReport['away'] = []
+  for (const pause of input.pauses ?? []) {
+    const end = pause.ended_on ? addDays(pause.ended_on, -1) : today
+    const clipFrom = pause.started_on > from ? pause.started_on : from
+    const clipTo = end < lastDay ? end : lastDay
+    if (clipFrom <= clipTo) away.push({ userId: pause.user_id, from: clipFrom, to: clipTo })
+  }
+  away.sort((a, b) => a.from.localeCompare(b.from))
+  const everyoneAway = (date: string) => away.some((entry) => entry.userId === null && entry.from <= date && date <= entry.to)
+
   const weekRows = completions.filter((row) => row.completed_on >= from && row.completed_on <= weekEnd)
   const deduped = dedupe(weekRows)
   const days: ReportDay[] = []
@@ -200,7 +283,9 @@ export function buildWeeklyReport<T extends ReportTask>(input: {
         ? 'future'
         : date < since
           ? 'none'
-          : date === today
+          : everyoneAway(date)
+            ? 'away'
+            : date === today
             ? waitingToday
               ? 'open'
               : 'closed'
@@ -265,6 +350,29 @@ export function buildWeeklyReport<T extends ReportTask>(input: {
       : houseStreak({ tasks, handled, today, since, todayClosed: !waitingToday, isPaused })
   const brokeOn = [...days].reverse().find((day) => day.status === 'broken')?.date ?? null
 
+  const nextFrom = addDays(weekEnd, 1)
+  const nextTo = addDays(weekEnd, 7)
+  let outlook: Outlook | null = null
+  if (nextTo >= today) {
+    const items = projectOccurrences(tasks, nextFrom, nextTo, today, isPaused)
+    const days: Outlook['days'] = []
+    for (let i = 0; i < 7; i++) {
+      const date = addDays(nextFrom, i)
+      days.push({ date, count: date < today ? null : items.filter((item) => item.date === date).length })
+    }
+    outlook = { from: nextFrom, to: nextTo, upcoming: nextFrom > today, days, items }
+  }
+
+  const suggestions: CadenceSuggestion[] = []
+  if (recent) {
+    const { byTask } = summarizeCadence(tasks, completions, skips, today, addDays(today, -SUGGESTION_WINDOW_DAYS), isPaused)
+    for (const task of tasks) {
+      const suggestion = suggestInterval(task, byTask.get(task.id))
+      if (suggestion) suggestions.push(suggestion)
+    }
+    suggestions.sort((a, b) => suggestionStrength(b) - suggestionStrength(a))
+  }
+
   const decidedInWeek = (row: ReportRedemption) => {
     if (!row.decided_at) return false
     const day = todayIn(timezone, new Date(row.decided_at))
@@ -292,5 +400,8 @@ export function buildWeeklyReport<T extends ReportTask>(input: {
     pending: redemptions
       .filter((row) => row.status === 'pending')
       .map((row) => ({ title: row.reward_title, cost: row.cost, by: row.requested_by })),
+    away,
+    outlook,
+    suggestions,
   }
 }

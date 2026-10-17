@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as api from '../lib/api'
 import { addDays, daysBetween } from '../lib/taskDue'
-import { cyclesWord, describeInterval, formatDateTime, formatWeekRange, weekdayName } from '../lib/format'
+import { cyclesWord, formatDateTime, formatWeekRange, weekdayName } from '../lib/format'
 import {
-  planIntervalChange,
   suggestInterval,
   onTimeShare,
   summarizeCadence,
@@ -33,6 +32,7 @@ import { useToast } from './Toast'
 import { ChartIcon, StarIcon } from './Icons'
 import type { StatsCompletion } from '../lib/api'
 import { lastReportableWeek, WeeklyReport } from './WeeklyReport'
+import { CadenceSuggestionItem, DISMISS_DAYS, readDismissed, writeDismissed } from './CadenceSuggestionItem'
 
 /** How many of a task's completion timestamps to list before just counting
  *  the rest - a task done daily for a year is 300+ rows, not a list anyone
@@ -140,21 +140,9 @@ function PersonStatsSheet({
   )
 }
 
-const DISMISSED_KEY = 'househero.cadence.dismissed'
-/** How long "not now" keeps a suggestion away. */
-const DISMISS_DAYS = 30
-
-function readDismissed(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem(DISMISSED_KEY) ?? '{}') as Record<string, string>
-  } catch {
-    return {}
-  }
-}
-
 /** Points, completion counts, and "who did what" for the current space. */
 export function StatsScreen() {
-  const { currentSpace, today, people, session, tasks, pauses, isPaused, patchTask } = useApp()
+  const { currentSpace, today, people, session, tasks, pauses, isPaused } = useApp()
   const { t, language } = useI18n()
   const toast = useToast()
   const [completions, setCompletions] = useState<StatsCompletion[] | null>(null)
@@ -312,24 +300,10 @@ export function StatsScreen() {
       .filter(({ task }) => !dismissed[task.id] || daysBetween(dismissed[task.id], today) >= DISMISS_DAYS)
   }, [spaceTasks, completions, skips, today, isPaused, dismissed])
 
-  async function applySuggestion(task: Task, suggestion: CadenceSuggestion) {
-    const plan = planIntervalChange(task, suggestion.suggested, suggestion.current, today)
-    try {
-      patchTask(await api.updateTaskInterval(task.id, plan.interval_days, plan.due_date))
-      toast.show(t.stats.intervalChanged(task.title, describeInterval(plan.interval_days, language)))
-    } catch (cause) {
-      toast.showError(cause)
-    }
-  }
-
   function dismissSuggestion(taskId: string) {
     const next = { ...dismissed, [taskId]: today }
     setDismissed(next)
-    try {
-      localStorage.setItem(DISMISSED_KEY, JSON.stringify(next))
-    } catch {
-      // Storage blocked; it just comes back next time.
-    }
+    writeDismissed(next)
   }
 
   const missedCycles = useMemo(
@@ -516,25 +490,7 @@ export function StatsScreen() {
               <h3>{t.stats.suggestionsTitle}</h3>
               <ul className="suggestion-list">
                 {suggestions.map(({ task, suggestion }) => (
-                  <li key={task.id} className="suggestion">
-                    <strong>{task.title}</strong>
-                    <p className="muted small">
-                      {suggestion.direction === 'shorter'
-                        ? t.stats.suggestShorter(
-                            describeInterval(Math.max(1, Math.round(suggestion.actualGap ?? suggestion.suggested)), language),
-                            describeInterval(suggestion.current, language),
-                          )
-                        : t.stats.suggestLonger(suggestion.dropped, suggestion.cycles, describeInterval(suggestion.current, language))}
-                    </p>
-                    <div className="suggestion-actions">
-                      <button type="button" className="btn btn-primary btn-small" onClick={() => void applySuggestion(task, suggestion)}>
-                        {t.stats.applySuggestion(describeInterval(suggestion.suggested, language))}
-                      </button>
-                      <button type="button" className="btn btn-ghost btn-small" onClick={() => dismissSuggestion(task.id)}>
-                        {t.stats.notNow}
-                      </button>
-                    </div>
-                  </li>
+                  <CadenceSuggestionItem key={task.id} task={task} suggestion={suggestion} onDismiss={() => dismissSuggestion(task.id)} />
                 ))}
               </ul>
             </section>

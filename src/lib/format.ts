@@ -170,6 +170,7 @@ export function formatWeekRange(start: string, end: string, language: Language):
   const from = toDate(start)
   const to = toDate(end)
   const locale = LOCALES[language]
+  if (start === end) return to.toLocaleDateString(locale, { day: 'numeric', month: 'long', timeZone: 'UTC' })
   if (from.getUTCMonth() === to.getUTCMonth()) {
     const month = to.toLocaleDateString(locale, { day: 'numeric', month: 'long', timeZone: 'UTC' })
     // Left-to-right marks around the dash keep "11–17" in that order inside

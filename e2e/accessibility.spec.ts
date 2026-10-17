@@ -66,10 +66,10 @@ function household(): FakeDb {
   })
 }
 
-async function open(page: Page, path: string) {
+async function open(page: Page, path: string, db: FakeDb = household()) {
   await seedSession(page)
   await page.addInitScript(() => window.localStorage.setItem('househero.language', 'he'))
-  await installSupabaseMock(page, household())
+  await installSupabaseMock(page, db)
   await page.goto(path)
   await expect(page.locator('.screen-header').first()).toBeVisible()
   // Let the cards' entrance animation finish: axe measures contrast on what
@@ -133,9 +133,21 @@ for (const scheme of ['light', 'dark'] as const) {
     }
 
     test('the weekly report passes WCAG 2.2 AA and has thumb-sized controls', async ({ page }) => {
-      await open(page, '/?tab=stats')
+      // With every part showing: a suggestion (the fridge, skipped five
+      // weeks running) and a vacation note, on top of the usual household.
+      const db = household()
+      db.tasks.push(task('t-fridge', 'לנקות את המקרר', { interval_days: 7, due_date: shift(3), last_completed_date: null }))
+      db.taskSkips = [4, 11, 18, 25, 32].map((back, i) => ({
+        id: `s${i}`, task_id: 't-fridge', space_id: FAKE_SPACE_ID, user_id: FAKE_USER_ID, skipped_on: shift(-back), created_at: `${shift(-back)}T10:00:00Z`,
+        prev_due_date: shift(-back), prev_last_skipped_date: null, prev_last_skipped_by: null, prev_is_done: false,
+      }))
+      db.pauses = [{ id: 'p1', space_id: FAKE_SPACE_ID, user_id: DANA.id, started_on: shift(-2), ended_on: shift(-1) }]
+      await open(page, '/?tab=stats', db)
       await page.getByRole('button', { name: /הדוח השבועי/ }).click()
       await expect(page.getByRole('heading', { level: 1, name: 'הדוח השבועי' })).toBeVisible()
+      await expect(page.locator('.card', { hasText: 'הצעה לשיפור' })).toBeVisible()
+      await expect(page.locator('.report-away')).toBeVisible()
+      await expect(page.locator('.report-outlook')).toBeVisible()
       await page.waitForTimeout(300)
       expect(await axeViolations(page)).toEqual([])
       expect(await smallTargets(page)).toEqual([])

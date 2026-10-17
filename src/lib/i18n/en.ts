@@ -414,6 +414,7 @@ export const en: Strings = {
       open: 'still open',
       future: 'still to come',
       none: 'before you started',
+      away: 'everyone away',
     },
     dayAria: (weekday: string, done: number, status: string) => `${weekday}: ${done === 1 ? '1 task' : `${done} tasks`}, ${status}`,
     people: 'Who did what',
@@ -440,6 +441,18 @@ export const en: Strings = {
     noRewards: 'No rewards were redeemed this week.',
     pointsCost: (n: number) => `${n} pts`,
     quiet: 'A quiet week: nothing was done.',
+    awayEveryone: (range: string) => `The whole house was away, ${range}. Those days are not counted.`,
+    awayPerson: (name: string, range: string) => `${name} was away, ${range}. Tasks assigned to ${name} are not counted on those days.`,
+    awaySelf: (range: string) => `You were away, ${range}. Tasks assigned to you are not counted on those days.`,
+    suggestionTitle: 'One thing to improve',
+    outlookNext: 'Next week',
+    outlookRest: 'The rest of this week',
+    outlookTotal: (n: number) => (n === 0 ? 'Nothing due.' : n === 1 ? '1 task due.' : `${n} tasks due.`),
+    busiest: (day: string, n: number) => `Busiest: ${day}, ${n === 1 ? '1 task' : `${n} tasks`}.`,
+    outlookAria: (weekday: string, n: number | null) =>
+      n === null ? `${weekday}: already past` : `${weekday}: ${n === 0 ? 'nothing' : n === 1 ? '1 task' : `${n} tasks`}`,
+    yours: 'Assigned to you',
+    noneYours: 'Nothing assigned to you alone.',
   },
 
   more: {

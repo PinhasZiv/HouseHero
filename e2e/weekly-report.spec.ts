@@ -75,7 +75,7 @@ test('the notification opens the report on its own week', async ({ page }) => {
   await expect(people.first()).toContainText("40 נק'")
   await expect(people.nth(1)).toContainText('דנה')
 
-  await expect(page.locator('.report-day')).toHaveCount(7)
+  await expect(page.locator('.report-days:not(.report-days-outlook) .report-day')).toHaveCount(7)
   await expect(page.locator('.card', { hasText: 'בולטות השבוע' })).toContainText('לפרוק את המדיח')
   // The one-shot parameter is gone - a reload lands on the plain Stats screen.
   expect(new URL(page.url()).searchParams.get('week')).toBeNull()
@@ -114,4 +114,71 @@ test('a task left for later shows on the day it broke, in the highlights and in 
   await expect(page.locator('.report-kpi', { hasText: 'ימים נסגרו במלואם' })).toContainText('6/7')
   await expect(page.locator('.report-list-late')).toContainText('לפרוק את המדיח')
   await expect(page.locator('.card', { hasText: 'רצף הבית' })).toContainText('נשבר ביום רביעי')
+})
+
+test('looks ahead to the week after: each day, and what is assigned to me', async ({ page }) => {
+  const db = makeFakeDb({
+    tasks: [
+      task('dish', 'לפרוק את המדיח'),
+      task('trash', 'להוציא את הזבל', { interval_days: 7, due_date: shift(appToday(), 1), assigned_to: FAKE_USER_ID }),
+    ],
+    taskCompletions: weekOfDishes(),
+  })
+  await seed(page, db)
+  await page.goto(`/?tab=stats&week=${SAT}`)
+
+  const outlook = page.locator('.report-outlook')
+  // "Next week" on the Saturday it is sent, "the rest of this week" after.
+  await expect(outlook.getByRole('heading', { level: 3 })).toHaveText(/מבט לשבוע הבא|מה נשאר השבוע/)
+  await expect(outlook.locator('.report-day')).toHaveCount(7)
+  await expect(outlook.locator('.report-list')).toContainText('להוציא את הזבל')
+  await expect(outlook.locator('.report-list')).toContainText('פעם אחת')
+})
+
+test('offers one interval change, which applies from the report, or waits when put off', async ({ page }) => {
+  // The fridge, weekly, skipped five weeks running.
+  const skips = [4, 11, 18, 25, 32].map((back, i) => {
+    const on = shift(appToday(), -back)
+    return {
+      id: `s${i}`, task_id: 'fridge', space_id: FAKE_SPACE_ID, user_id: FAKE_USER_ID, skipped_on: on, created_at: `${on}T10:00:00Z`,
+      prev_due_date: on, prev_last_skipped_date: null, prev_last_skipped_by: null, prev_is_done: false,
+    }
+  })
+  const db = makeFakeDb({
+    tasks: [
+      task('dish', 'לפרוק את המדיח'),
+      task('fridge', 'לנקות את המקרר', { interval_days: 7, due_date: shift(appToday(), 3), last_completed_date: null, last_completed_at: null, last_completed_by: null, last_completed_actor: null }),
+    ],
+    taskCompletions: weekOfDishes(),
+    taskSkips: skips,
+  })
+  await seed(page, db)
+  await page.goto(`/?tab=stats&week=${SAT}`)
+
+  const card = page.locator('.card', { hasText: 'הצעה לשיפור' })
+  await expect(card).toContainText('לנקות את המקרר')
+  await card.getByRole('button', { name: /^לשנות ל/ }).click()
+  await expect.poll(() => db.tasks.find((row) => row.id === 'fridge')?.interval_days).toBe(11)
+
+  await card.getByRole('button', { name: 'לא עכשיו' }).click()
+  await expect(card).toBeHidden()
+})
+
+test('a vacation leaves its days out, and says whose it was', async ({ page }) => {
+  const db = makeFakeDb({
+    otherPeople: [DANA],
+    tasks: [task('dish', 'לפרוק את המדיח')],
+    taskCompletions: weekOfDishes().filter((row) => row.completed_on !== shift(SUN, 2) && row.completed_on !== shift(SUN, 3)),
+    pauses: [
+      { id: 'p1', space_id: FAKE_SPACE_ID, user_id: null, started_on: shift(SUN, 2), ended_on: shift(SUN, 4) },
+      { id: 'p2', space_id: FAKE_SPACE_ID, user_id: DANA.id, started_on: shift(SUN, 5), ended_on: shift(SUN, 6) },
+    ],
+  })
+  await seed(page, db)
+  await page.goto(`/?tab=stats&week=${SAT}`)
+
+  await expect(page.locator('.report-day-away')).toHaveCount(2)
+  await expect(page.locator('.report-kpi', { hasText: 'ימים נסגרו במלואם' })).toContainText('5/5')
+  await expect(page.locator('.report-away').first()).toContainText('חופשה של כל הבית')
+  await expect(page.locator('.report-away').nth(1)).toContainText('חופשה של דנה')
 })

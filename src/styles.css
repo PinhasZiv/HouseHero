@@ -374,6 +374,14 @@ button { font: inherit; cursor: pointer; }
 .report-list li > span:last-child { white-space: nowrap; }
 .report-list-late { color: var(--late); }
 .report-streak { font-size: 1.2rem; font-weight: 700; }
+.report-day-away .report-day-bar { background: var(--border); }
+.report-day-away .report-day-mark { background: var(--surface-2); color: var(--text-muted); }
+.report-away { margin: 10px 0 0; }
+/* Next week's bars are a forecast, so a lighter shade of the accent. */
+.report-days-outlook { margin-top: 10px; }
+.report-days-outlook .report-day-bar { background: var(--accent); opacity: 0.45; }
+.report-day-past .report-day-label { opacity: 0.5; }
+.report-subtitle { margin: 14px 0 4px; font-size: 0.95rem; }
 
 /* More: a short list of rows, each opening its own screen. */
 .menu-group-title {
