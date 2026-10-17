@@ -85,6 +85,11 @@ test('moves between weeks, and back returns to the stats', async ({ page }) => {
   await seed(page, makeFakeDb({ tasks: [task('dish', 'לפרוק את המדיח')], taskCompletions: weekOfDishes() }))
   await page.goto('/?tab=stats')
 
+  // The report's row stands apart from the range toggle below it.
+  const row = await page.locator('.report-entry').boundingBox()
+  const toggle = await page.locator('.segmented').boundingBox()
+  expect(toggle!.y - (row!.y + row!.height)).toBeGreaterThanOrEqual(12)
+
   await page.getByRole('button', { name: /הדוח השבועי/ }).click()
   const kpiDone = page.locator('.report-kpi', { hasText: 'משימות בוצעו' })
   await expect(kpiDone).toContainText('7')

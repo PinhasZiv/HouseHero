@@ -294,7 +294,8 @@ button { font: inherit; cursor: pointer; }
 .screen-header-secondary { margin-top: 8px; }
 
 /* The weekly report: a row on the Stats screen opens it, over the stats. */
-.report-entry { margin-bottom: 18px; }
+/* Two classes, so .menu-list's own margin: 0 further down cannot cancel it. */
+.menu-list.report-entry { margin-bottom: 18px; }
 .report-week-nav { display: flex; align-items: center; gap: 4px; width: 100%; }
 .report-week-nav .screen-subtitle { flex: 1; text-align: center; }
 .report-running { color: var(--accent-strong); font-weight: 600; }
