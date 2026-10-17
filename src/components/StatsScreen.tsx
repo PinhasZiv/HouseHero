@@ -5,6 +5,7 @@ import { cyclesWord, describeInterval, formatDateTime, weekdayName } from '../li
 import {
   planIntervalChange,
   suggestInterval,
+  onTimeShare,
   summarizeCadence,
   SUGGESTION_WINDOW_DAYS,
   type CadenceSuggestion,
@@ -84,7 +85,7 @@ function PersonStatsSheet({
 
         {onTime?.percent != null && (
           <p className="muted small">
-            {onTime.percent}% {t.stats.onTimeLabel}
+            {onTime.percent}% {t.stats.onTimeOfDoneLabel}
           </p>
         )}
 
@@ -249,7 +250,6 @@ export function StatsScreen() {
   // At least 1, so an all-zero trend still renders flat bars instead of
   // dividing by zero.
   const weekChartMax = useMemo(() => Math.max(1, ...trend.map((week) => week.count)), [trend])
-  const onTime = useMemo(() => onTimeRate(rangedCompletions), [rangedCompletions])
   const neglected = useMemo(() => mostNeglectedTask(rangedCompletions), [rangedCompletions])
   const busiestDay = useMemo(() => busiestWeekday(rangedCompletions), [rangedCompletions])
   const inactive = useMemo(
@@ -277,6 +277,9 @@ export function StatsScreen() {
     [spaceTasks, completions, skips, today, range, isPaused],
   )
   const timingTotal = timing.early + timing.onTime + timing.late + timing.skipped + timing.missed
+  // Out of everything that fell due - a missed cycle counts against it, so
+  // it can no longer read 100% beside a list of missed cycles.
+  const onTimePercent = onTimeShare(timing)
 
   // Interval changes worth offering - always over the last 60 days, whatever
   // the range toggle says, so one quiet month cannot hide or invent a trend.
@@ -448,9 +451,9 @@ export function StatsScreen() {
               <span className="points-value">{stats.last7Days}</span>
               <span className="points-label">{t.stats.last7Days}</span>
             </div>
-            {onTime.percent != null && (
+            {onTimePercent != null && (
               <div className="stat-tile">
-                <span className="points-value">{onTime.percent}%</span>
+                <span className="points-value">{onTimePercent}%</span>
                 <span className="points-label">{t.stats.onTimeLabel}</span>
               </div>
             )}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   completionTiming,
   median,
+  onTimeShare,
   planIntervalChange,
   suggestInterval,
   summarizeCadence,
@@ -135,5 +136,21 @@ describe('planIntervalChange', () => {
 
   it('keeps the due date of a task never done', () => {
     expect(planIntervalChange(task({ last_completed_date: null }), 3, 7, TODAY).due_date).toBe('2026-10-17')
+  })
+})
+
+describe('onTimeShare', () => {
+  it('counts a missed cycle against it, and leaves skips out', () => {
+    // 1 early + 1 on time, out of those plus 1 late and 2 missed; the skip
+    // is not a lapse.
+    expect(onTimeShare({ early: 1, onTime: 1, late: 1, skipped: 4, missed: 2 })).toBe(40)
+  })
+
+  it('cannot read 100% while cycles were missed', () => {
+    expect(onTimeShare({ early: 0, onTime: 25, late: 0, skipped: 0, missed: 11 })).toBe(69)
+  })
+
+  it('is null with nothing to count', () => {
+    expect(onTimeShare({ early: 0, onTime: 0, late: 0, skipped: 3, missed: 0 })).toBeNull()
   })
 })

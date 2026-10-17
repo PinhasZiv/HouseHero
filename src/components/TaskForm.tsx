@@ -87,6 +87,9 @@ export function TaskForm({
   const [intervalDays, setIntervalDays] = useState(source?.interval_days ?? 7)
   const [weeklyDays, setWeeklyDays] = useState<number[]>(source?.weekly_days ?? [])
   const [endCondition, setEndCondition] = useState<EndCondition>(source?.end_condition ?? 'never')
+  const [moreOpen, setMoreOpen] = useState(
+    Boolean(source?.description) || (source?.end_condition ?? 'never') !== 'never',
+  )
   const [endAfterCount, setEndAfterCount] = useState(source?.end_after_count ?? 10)
   const [endDate, setEndDate] = useState(source?.end_date ?? addDays(today, 30))
   const [points, setPoints] = useState(source?.points ?? 10)
@@ -243,17 +246,6 @@ export function TaskForm({
               placeholder={t.taskForm.namePlaceholder}
               maxLength={80}
               autoComplete="off"
-            />
-          </label>
-
-          <label className="field">
-            <span>{t.taskForm.description}</span>
-            <textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder={t.taskForm.descriptionPlaceholder}
-              maxLength={2000}
-              rows={4}
             />
           </label>
 
@@ -530,56 +522,6 @@ export function TaskForm({
                   </div>
                 </fieldset>
               )}
-
-              <fieldset className="field">
-                <legend>{t.taskForm.endCondition}</legend>
-                <div className="segmented segmented-wrap end-condition">
-                  <button
-                    type="button"
-                    className={endCondition === 'never' ? 'segment segment-active' : 'segment'}
-                    onClick={() => setEndCondition('never')}
-                  >
-                    {t.taskForm.endNever}
-                  </button>
-                  <button
-                    type="button"
-                    className={endCondition === 'after_count' ? 'segment segment-active' : 'segment'}
-                    onClick={() => setEndCondition('after_count')}
-                  >
-                    {t.taskForm.endAfterCount}
-                  </button>
-                  <button
-                    type="button"
-                    className={endCondition === 'on_date' ? 'segment segment-active' : 'segment'}
-                    onClick={() => setEndCondition('on_date')}
-                  >
-                    {t.taskForm.endOnDate}
-                  </button>
-                </div>
-                {endCondition === 'after_count' && (
-                  <label className="inline-field">
-                    <span>{t.taskForm.endAfterCountLabel}</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={1000}
-                      value={endAfterCount}
-                      onChange={(event) => setEndAfterCount(Number(event.target.value))}
-                    />
-                  </label>
-                )}
-                {endCondition === 'on_date' && (
-                  <label className="field">
-                    <span>{t.taskForm.endDateLabel}</span>
-                    <input
-                      type="date"
-                      value={endDate}
-                      min={addDays(dueDate, 1)}
-                      onChange={(event) => setEndDate(event.target.value)}
-                    />
-                  </label>
-                )}
-              </fieldset>
             </>
           )}
 
@@ -643,6 +585,73 @@ export function TaskForm({
               </select>
             </label>
           )}
+
+          {/* What most tasks never need, out of the way until it is wanted - or
+              already open when editing a task that uses it. */}
+          <details className="more-options" open={moreOpen} onToggle={(event) => setMoreOpen(event.currentTarget.open)}>
+            <summary>{t.taskForm.moreOptions}</summary>
+            <label className="field">
+              <span>{t.taskForm.description}</span>
+              <textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder={t.taskForm.descriptionPlaceholder}
+                maxLength={2000}
+                rows={4}
+              />
+            </label>
+            {taskType === 'recurring' && (
+              <fieldset className="field">
+                <legend>{t.taskForm.endCondition}</legend>
+                <div className="segmented segmented-wrap end-condition">
+                  <button
+                    type="button"
+                    className={endCondition === 'never' ? 'segment segment-active' : 'segment'}
+                    onClick={() => setEndCondition('never')}
+                  >
+                    {t.taskForm.endNever}
+                  </button>
+                  <button
+                    type="button"
+                    className={endCondition === 'after_count' ? 'segment segment-active' : 'segment'}
+                    onClick={() => setEndCondition('after_count')}
+                  >
+                    {t.taskForm.endAfterCount}
+                  </button>
+                  <button
+                    type="button"
+                    className={endCondition === 'on_date' ? 'segment segment-active' : 'segment'}
+                    onClick={() => setEndCondition('on_date')}
+                  >
+                    {t.taskForm.endOnDate}
+                  </button>
+                </div>
+                {endCondition === 'after_count' && (
+                  <label className="inline-field">
+                    <span>{t.taskForm.endAfterCountLabel}</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={1000}
+                      value={endAfterCount}
+                      onChange={(event) => setEndAfterCount(Number(event.target.value))}
+                    />
+                  </label>
+                )}
+                {endCondition === 'on_date' && (
+                  <label className="field">
+                    <span>{t.taskForm.endDateLabel}</span>
+                    <input
+                      type="date"
+                      value={endDate}
+                      min={addDays(dueDate, 1)}
+                      onChange={(event) => setEndDate(event.target.value)}
+                    />
+                  </label>
+                )}
+              </fieldset>
+            )}
+          </details>
 
           {error && <p className="error-text">{error}</p>}
 

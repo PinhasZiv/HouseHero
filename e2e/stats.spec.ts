@@ -482,10 +482,13 @@ test.describe('stats screen', () => {
     await expect(page.locator('.stat-tile', { hasText: 'בזמן' }).locator('.points-value')).toHaveText('50%')
   })
 
-  test('the on-time tile wraps a recurring task\'s lateness to its own cycle', async ({ page }) => {
+  test('the on-time tile wraps a recurring task\'s lateness to its own cycle, and counts the cycles missed', async ({ page }) => {
     // A dishwasher every 2 days: one completion exactly one full cycle late
-    // (nothing was actually neglected) and one half a cycle into the next -
-    // that reads as 50% on time, not 0%.
+    // (on time for the occurrence it landed on, with the one before it
+    // missed) and one half a cycle into a later cycle (late, with two
+    // missed before it). 1 on time out of 1 + 1 late + 3 missed: 20% - not
+    // 0%, since the wrap still applies, and not 50%, since missed cycles
+    // count.
     const db = makeFakeDb({
       tasks: [statsTask({ id: 'task-a', title: 'להכניס מדיח', interval_days: 2 })],
       taskCompletions: [
@@ -505,7 +508,7 @@ test.describe('stats screen', () => {
     await page.goto('/')
     await page.getByRole('button', { name: 'סטטיסטיקות' }).click()
 
-    await expect(page.locator('.stat-tile', { hasText: 'בזמן' }).locator('.points-value')).toHaveText('50%')
+    await expect(page.locator('.stat-tile', { hasText: 'בזמן' }).locator('.points-value')).toHaveText('20%')
   })
 
   test('flags the most neglected task - repeatedly late, not a single unlucky day', async ({ page }) => {

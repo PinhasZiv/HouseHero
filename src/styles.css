@@ -77,7 +77,10 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans Hebrew',
+  /* Rubik ships with the app (only the Hebrew and Latin files a screen
+     actually uses get downloaded, about 50KB, and then cached for offline);
+     the system faces are the fallback while it loads. */
+  font-family: 'Rubik Variable', system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans Hebrew',
     'Arial Hebrew', Arial, sans-serif;
   font-size: 16px;
   line-height: 1.45;
@@ -289,6 +292,76 @@ button { font: inherit; cursor: pointer; }
   cursor: pointer;
 }
 .screen-header-secondary { margin-top: 8px; }
+
+/* More: a short list of rows, each opening its own screen. */
+.menu-group-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin: 18px 0 8px;
+}
+.menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.menu-list li + li { border-top: 1px solid var(--border); }
+.menu-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 16px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: start;
+}
+.menu-row:active { background: var(--surface-2); }
+.menu-row-title { flex: 1; font-weight: 600; }
+.menu-row-detail {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  unicode-bidi: plaintext;
+}
+/* A chevron pointing the way the row leads - onward in reading order. */
+.menu-row::after {
+  content: '›';
+  color: var(--text-muted);
+  font-size: 1.3rem;
+  line-height: 1;
+}
+[dir='rtl'] .menu-row::after { content: '‹'; }
+
+.subpage-header { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 4px;
+  margin-inline-start: -4px;
+  border: 0;
+  background: none;
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+/* Back points the other way from onward. */
+.back-button::before { content: '‹'; font-size: 1.3rem; line-height: 1; }
+[dir='rtl'] .back-button::before { content: '›'; }
+/* A sub-screen that is a single card: the screen's own title already names
+   it, so the card's heading would only repeat it. */
+.subpage-single > .card > h3:first-child { display: none; }
 
 /* Today's progress and the household's streak, above the lists. */
 .today-progress {
@@ -1067,6 +1140,28 @@ button { font: inherit; cursor: pointer; }
 /* A form inside a sheet adds no box of its own: the sheet lays out its
    fields, and the sheet - not the form - is the dialog. */
 .sheet-form { display: contents; }
+
+/* The task form's rarely needed fields, folded away under one row. */
+.more-options > summary {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  color: var(--accent-strong);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.more-options > summary::-webkit-details-marker { display: none; }
+.more-options > summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-inline-end: 8px;
+  transition: transform 0.15s ease;
+}
+[dir='rtl'] .more-options > summary::before { content: '◂'; }
+.more-options[open] > summary::before { transform: rotate(90deg); }
+[dir='rtl'] .more-options[open] > summary::before { transform: rotate(-90deg); }
+.more-options > * + * { margin-top: 16px; }
 
 .sheet-actions { display: flex; gap: 10px; }
 .sheet-actions .btn { flex: 1; }

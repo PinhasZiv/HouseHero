@@ -204,6 +204,7 @@ export const en: Strings = {
   },
 
   taskForm: {
+    moreOptions: 'More options',
     titleNew: 'New task',
     titleEdit: 'Edit task',
     name: 'Name',
@@ -377,6 +378,7 @@ export const en: Strings = {
     total: 'Total',
 
     onTimeLabel: 'On time or early',
+    onTimeOfDoneLabel: 'on time or early, of what they did',
     weeklyTrendTitle: 'Weekly trend',
     weeksAgoLabel: (n: number) => (n === 0 ? 'This week' : n === 1 ? 'Last week' : `${n} weeks ago`),
     neglectedTaskTitle: 'Most neglected task',
@@ -389,6 +391,14 @@ export const en: Strings = {
     inactiveDays: (n: number) => `${days(n, 'en')} with nothing done`,
 
     missedCyclesTitle: 'Missed cycles',
+  },
+
+  more: {
+    title: 'More',
+    spaceRow: 'Space and members',
+    vacationOn: 'On',
+    vacationOff: 'Off',
+    back: 'Back',
   },
 
   space: {

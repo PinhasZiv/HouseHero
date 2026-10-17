@@ -42,6 +42,7 @@ test('going on vacation freezes my own tasks, and coming back restarts them toda
   await expect(page.locator('.task-late', { hasText: 'להשקות עציצים' })).toBeVisible()
 
   await page.getByRole('button', { name: 'עוד' }).click()
+  await page.getByRole('button', { name: 'חופשה' }).click()
   await page.getByRole('button', { name: 'יציאה לחופשה' }).click()
   await expect(page.getByText('מצב חופשה הופעל. נסיעה טובה!')).toBeVisible()
   expect(db.pauses).toHaveLength(1)
@@ -80,6 +81,7 @@ test('a whole-space vacation freezes everything, shared tasks included', async (
 
   // The owner ends it for everyone, from the Space screen too.
   await page.getByRole('button', { name: 'עוד' }).click()
+  await page.getByRole('button', { name: 'חופשה' }).click()
   await expect(page.locator('.vacation-card')).toContainText('כל המרחב בחופשה')
   await page.locator('.vacation-card').getByRole('button', { name: 'חזרנו' }).click()
   await expect(page.getByText('ברוכים השבים! המשימות מתחילות מחדש מהיום.')).toBeVisible()
@@ -92,6 +94,7 @@ test('the owner confirms before sending the whole space on vacation', async ({ p
   await seed(page, db)
   await page.goto('/')
   await page.getByRole('button', { name: 'עוד' }).click()
+  await page.getByRole('button', { name: 'חופשה' }).click()
 
   await page.locator('.vacation-card').getByRole('button', { name: 'חופשה לכל המרחב' }).click()
   const sheet = page.locator('.sheet', { hasText: 'חופשה לכל המרחב' })
@@ -113,6 +116,7 @@ test('only the owner can end a whole-space vacation', async ({ page }) => {
   await expect(page.locator('.vacation-banner')).toBeVisible()
   await expect(page.locator('.vacation-banner').getByRole('button')).toHaveCount(0)
   await page.getByRole('button', { name: 'עוד' }).click()
+  await page.getByRole('button', { name: 'חופשה' }).click()
   await expect(page.locator('.vacation-card').getByRole('button', { name: 'חזרנו' })).toHaveCount(0)
   await expect(page.locator('.vacation-card')).toContainText('רק מנהל המרחב')
 })

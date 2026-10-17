@@ -11,7 +11,10 @@ import { ConfirmSheet } from './ConfirmSheet'
 import { VacationCard } from './VacationCard'
 
 /** Who is in the space, how to invite someone else, and how to leave it. */
-export function SpaceScreen() {
+/** Which part of the space's settings a sub-screen of More shows. */
+export type SpacePart = 'space' | 'vacation' | 'invite'
+
+export function SpaceScreen({ part }: { part: SpacePart }) {
   const { currentSpace, spaces, session, reload, setCurrentSpaceId } = useApp()
   const { t } = useI18n()
   const toast = useToast()
@@ -110,121 +113,133 @@ export function SpaceScreen() {
 
   return (
     <>
-      <section className="card">
-        {renaming ? (
-          <div className="inline-form">
-            <input
-              value={draftName}
-              onChange={(event) => setDraftName(event.target.value)}
-              maxLength={60}
-              aria-label={t.space.nameAria}
-            />
-            <button type="button" className="btn btn-primary btn-small" onClick={rename}>
-              {t.common.save}
-            </button>
-            <button type="button" className="btn btn-ghost btn-small" onClick={() => setRenaming(false)}>
-              {t.common.cancel}
-            </button>
-          </div>
-        ) : (
-          <div className="row-between">
-            <h3>{currentSpace.name}</h3>
-            {isOwner && (
-              <button
-                type="button"
-                className="btn btn-ghost btn-small"
-                onClick={() => {
-                  setDraftName(currentSpace.name)
-                  setRenaming(true)
-                }}
-              >
-                {t.space.rename}
+      {part === 'space' && (
+        <section className="card">
+          {renaming ? (
+            <div className="inline-form">
+              <input
+                value={draftName}
+                onChange={(event) => setDraftName(event.target.value)}
+                maxLength={60}
+                aria-label={t.space.nameAria}
+              />
+              <button type="button" className="btn btn-primary btn-small" onClick={rename}>
+                {t.common.save}
               </button>
-            )}
-          </div>
-        )}
-      </section>
-
-      <VacationCard spaceId={currentSpace.id} isOwner={isOwner} members={members} />
-
-      <section className="card">
-        <h3>{t.space.inviteTitle}</h3>
-        <p className="muted">{t.space.inviteBody}</p>
-        <div className="invite-code" aria-label={t.space.inviteCodeAria}>
-          {currentSpace.invite_code}
-        </div>
-        <button type="button" className="btn btn-primary" onClick={share}>
-          {t.space.share}
-        </button>
-        {isOwner && (
-          <button type="button" className="btn btn-ghost btn-small" onClick={() => setConfirming('newCode')}>
-            {t.space.newCode}
-          </button>
-        )}
-      </section>
-
-      <section className="card">
-        <h3>{t.space.members(members.length)}</h3>
-        <ul className="member-list">
-          {members.map((member) => (
-            <li key={member.user_id}>
-              {member.profile?.avatar_url ? (
-                <img src={member.profile.avatar_url} alt="" className="avatar" referrerPolicy="no-referrer" />
-              ) : (
-                <span className="avatar avatar-initials">
-                  {initials(member.profile?.display_name ?? null, member.profile?.email ?? null)}
-                </span>
-              )}
-              <span className="member-name">
-                {memberName(member)}
-                {member.user_id === session?.user.id && <span className="chip">{t.space.you}</span>}
-              </span>
-              {member.role === 'owner' && <span className="chip">{t.space.owner}</span>}
-              {isOwner && member.user_id !== session?.user.id && member.role !== 'owner' && (
+              <button type="button" className="btn btn-ghost btn-small" onClick={() => setRenaming(false)}>
+                {t.common.cancel}
+              </button>
+            </div>
+          ) : (
+            <div className="row-between">
+              <h3>{currentSpace.name}</h3>
+              {isOwner && (
                 <button
                   type="button"
-                  className="btn btn-danger-text btn-small"
-                  onClick={() => setRemovingMember(member)}
-                  aria-label={t.space.removeMemberAria(memberName(member))}
+                  className="btn btn-ghost btn-small"
+                  onClick={() => {
+                    setDraftName(currentSpace.name)
+                    setRenaming(true)
+                  }}
                 >
-                  {t.space.removeMember}
+                  {t.space.rename}
                 </button>
               )}
-            </li>
-          ))}
-        </ul>
-      </section>
+            </div>
+          )}
+        </section>
+      )}
 
-      <section className="card">
-        <h3>{t.space.yourSpaces}</h3>
-        <ul className="space-list">
-          {spaces.map((space) => (
-            <li key={space.id}>
-              <button
-                type="button"
-                className={`space-row ${space.id === currentSpace.id ? 'space-row-active' : ''}`}
-                onClick={() => setCurrentSpaceId(space.id)}
-              >
-                {space.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-        <button type="button" className="btn btn-ghost" onClick={() => setShowJoin(true)}>
-          {t.space.createOrJoin}
-        </button>
-      </section>
+      {part === 'vacation' && (
+        <VacationCard spaceId={currentSpace.id} isOwner={isOwner} members={members} />
+      )}
 
-      <section className="card card-quiet">
-        <button type="button" className="btn btn-danger-text" onClick={() => setConfirming('leave')}>
-          {t.space.leave}
-        </button>
-        {isOwner && (
-          <button type="button" className="btn btn-danger" onClick={() => setConfirming('remove')}>
-            {t.space.remove}
+      {part === 'invite' && (
+        <section className="card">
+          <h3>{t.space.inviteTitle}</h3>
+          <p className="muted">{t.space.inviteBody}</p>
+          <div className="invite-code" aria-label={t.space.inviteCodeAria}>
+            {currentSpace.invite_code}
+          </div>
+          <button type="button" className="btn btn-primary" onClick={share}>
+            {t.space.share}
           </button>
-        )}
-      </section>
+          {isOwner && (
+            <button type="button" className="btn btn-ghost btn-small" onClick={() => setConfirming('newCode')}>
+              {t.space.newCode}
+            </button>
+          )}
+        </section>
+      )}
+
+      {part === 'space' && (
+        <section className="card">
+          <h3>{t.space.members(members.length)}</h3>
+          <ul className="member-list">
+            {members.map((member) => (
+              <li key={member.user_id}>
+                {member.profile?.avatar_url ? (
+                  <img src={member.profile.avatar_url} alt="" className="avatar" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className="avatar avatar-initials">
+                    {initials(member.profile?.display_name ?? null, member.profile?.email ?? null)}
+                  </span>
+                )}
+                <span className="member-name">
+                  {memberName(member)}
+                  {member.user_id === session?.user.id && <span className="chip">{t.space.you}</span>}
+                </span>
+                {member.role === 'owner' && <span className="chip">{t.space.owner}</span>}
+                {isOwner && member.user_id !== session?.user.id && member.role !== 'owner' && (
+                  <button
+                    type="button"
+                    className="btn btn-danger-text btn-small"
+                    onClick={() => setRemovingMember(member)}
+                    aria-label={t.space.removeMemberAria(memberName(member))}
+                  >
+                    {t.space.removeMember}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {part === 'space' && (
+        <section className="card">
+          <h3>{t.space.yourSpaces}</h3>
+          <ul className="space-list">
+            {spaces.map((space) => (
+              <li key={space.id}>
+                <button
+                  type="button"
+                  className={`space-row ${space.id === currentSpace.id ? 'space-row-active' : ''}`}
+                  onClick={() => setCurrentSpaceId(space.id)}
+                >
+                  {space.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button type="button" className="btn btn-ghost" onClick={() => setShowJoin(true)}>
+            {t.space.createOrJoin}
+          </button>
+        </section>
+      )}
+
+      {part === 'space' && (
+        <section className="card card-quiet">
+          <button type="button" className="btn btn-danger-text" onClick={() => setConfirming('leave')}>
+            {t.space.leave}
+          </button>
+          {isOwner && (
+            <button type="button" className="btn btn-danger" onClick={() => setConfirming('remove')}>
+              {t.space.remove}
+            </button>
+          )}
+        </section>
+      )}
 
       {showJoin && <SpaceSetup onDone={() => setShowJoin(false)} allowCancel />}
 

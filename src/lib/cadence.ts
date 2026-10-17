@@ -137,6 +137,17 @@ export function summarizeCadence<T extends CadenceTask>(
   return { total, byTask }
 }
 
+/**
+ * The share of the household's occurrences taken care of on time or early,
+ * as a whole percent - out of everything that fell due, including the ones
+ * that went by entirely. A skip is neither: "not needed this time" is not a
+ * lapse, so it sits outside the count. Null when there is nothing to count.
+ */
+export function onTimeShare(counts: CadenceCounts): number | null {
+  const counted = counts.early + counts.onTime + counts.late + counts.missed
+  return counted > 0 ? Math.round(((counts.early + counts.onTime) / counted) * 100) : null
+}
+
 export function median(values: number[]): number | null {
   if (!values.length) return null
   const sorted = [...values].sort((a, b) => a - b)
