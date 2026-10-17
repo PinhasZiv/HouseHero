@@ -421,6 +421,7 @@ export const he = {
       open: 'עוד פתוח',
       future: 'עוד לא הגיע',
       none: 'לפני שהתחלתם',
+      away: 'כל הבית בחופשה',
     },
     dayAria: (weekday: string, done: number, status: string) => `${weekday}: ${done === 1 ? 'משימה אחת' : `${done} משימות`}, ${status}`,
     people: 'מי עשה מה',
@@ -447,6 +448,18 @@ export const he = {
     noRewards: 'לא מומשו תגמולים השבוע.',
     pointsCost: (n: number) => `${n} נק'`,
     quiet: 'שבוע שקט: לא בוצעו משימות.',
+    awayEveryone: (range: string) => `חופשה של כל הבית, ${range}. הימים האלה לא נספרו.`,
+    awayPerson: (name: string, range: string) => `חופשה של ${name}, ${range}. משימות שמשויכות ל${name} לא נספרו בימים האלה.`,
+    awaySelf: (range: string) => `החופשה שלך, ${range}. משימות שמשויכות אליך לא נספרו בימים האלה.`,
+    suggestionTitle: 'הצעה לשיפור',
+    outlookNext: 'מבט לשבוע הבא',
+    outlookRest: 'מה נשאר השבוע',
+    outlookTotal: (n: number) => (n === 0 ? 'לא צפויות משימות.' : n === 1 ? 'משימה אחת צפויה.' : `${n} משימות צפויות.`),
+    busiest: (day: string, n: number) => `העמוס ביותר: ${day}, ${n === 1 ? 'משימה אחת' : `${n} משימות`}.`,
+    outlookAria: (weekday: string, n: number | null) =>
+      n === null ? `${weekday}: כבר עבר` : `${weekday}: ${n === 0 ? 'אין משימות' : n === 1 ? 'משימה אחת' : `${n} משימות`}`,
+    yours: 'משויך אליך',
+    noneYours: 'אין משימות שמשויכות רק אליך.',
   },
 
   more: {

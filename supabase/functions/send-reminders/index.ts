@@ -29,6 +29,7 @@ import {
   buildWeeklyReport,
   reportSince,
   type ReportCompletion,
+  type ReportPause,
   type ReportSkip,
   type ReportTask,
   type WeeklyReport,
@@ -495,7 +496,7 @@ Deno.serve(async (request) => {
     // task (done ones too) and the newest page of completions and skips - so
     // the figures in the notification are the ones it opens on.
     const summarySpaces = [...new Set(summaryFor.flatMap(({ spaceIds }) => spaceIds))]
-    const [allTasks, ...histories] = await Promise.all([
+    const [allTasks, allPauses, ...histories] = await Promise.all([
       admin
         .from('tasks')
         .select(
@@ -505,6 +506,8 @@ Deno.serve(async (request) => {
             'starts_at, expires_at, cancelled_at, expired_at, created_at',
         )
         .in('space_id', summarySpaces),
+      // Ended vacations too: a week's days the whole house was away are not counted.
+      admin.from('pauses').select('space_id, user_id, started_on, ended_on').in('space_id', summarySpaces),
       ...summarySpaces.flatMap((spaceId) => [
         admin
           .from('task_completions')
@@ -520,7 +523,7 @@ Deno.serve(async (request) => {
           .limit(HISTORY_LIMIT),
       ]),
     ])
-    const loadFailed = [allTasks, ...histories].find((result) => result.error)
+    const loadFailed = [allTasks, ...(pausesMissing ? [] : [allPauses]), ...histories].find((result) => result.error)
     if (loadFailed?.error) {
       console.error('loading the weekly summary failed', loadFailed.error)
     } else {
@@ -529,6 +532,7 @@ Deno.serve(async (request) => {
       for (const task of (allTasks.data ?? []) as unknown as SummaryTask[]) {
         tasksBySpace.set(task.space_id, [...(tasksBySpace.get(task.space_id) ?? []), task])
       }
+      const summaryPauses = (pausesMissing ? [] : (allPauses.data ?? [])) as (ReportPause & { space_id: string })[]
       const historyBySpace = new Map(
         summarySpaces.map((spaceId, i) => [
           spaceId,
@@ -562,6 +566,7 @@ Deno.serve(async (request) => {
                   since: reportSince(firstTask, completions, skips),
                   timezone,
                   isPaused: (task) => isTaskPaused(pauses, task),
+                  pauses: summaryPauses.filter((pause) => pause.space_id === spaceId),
                 })
               : null,
           )
