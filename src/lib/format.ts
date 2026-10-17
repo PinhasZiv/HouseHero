@@ -173,8 +173,10 @@ export function formatWeekRange(start: string, end: string, language: Language):
   if (from.getUTCMonth() === to.getUTCMonth()) {
     const month = to.toLocaleDateString(locale, { day: 'numeric', month: 'long', timeZone: 'UTC' })
     // Left-to-right marks around the dash keep "11–17" in that order inside
-    // Hebrew text, where a bare dash between numbers flips them to "17–11".
-    return language === 'he' ? `${from.getUTCDate()}\u200E–\u200E${month}` : `${from.getUTCDate()}–${month}`
+    // Hebrew text, where a bare dash between numbers flips them to "17–11";
+    // the right-to-left mark in front keeps a line that takes its direction
+    // from its first letter (unicode-bidi: plaintext) right to left.
+    return language === 'he' ? `\u200F${from.getUTCDate()}\u200E–\u200E${month}` : `${from.getUTCDate()}–${month}`
   }
   const short = (date: Date) => date.toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' })
   return `${short(from)} – ${short(to)}`
